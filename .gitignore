@@ -1,0 +1,57 @@
+# .NET build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.cache
+*.userprefs
+
+# Rider / Resharper
+.idea/
+_ReSharper.*/
+*.DotSettings.user
+
+# Test results
+TestResults/
+[Cc]overage*/
+*.coverage
+*.coveragexml
+
+# Build artifacts
+*.tlog
+*.lastbuildstate
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# Tooling caches
+.vsidx
+.cr/
+artifacts/
+
+# Local secrets / overrides
+appsettings.local.json
+appsettings.Development.json
+*.local.config
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Editor swap / backup
+*~
+*.swp
+*.bak
