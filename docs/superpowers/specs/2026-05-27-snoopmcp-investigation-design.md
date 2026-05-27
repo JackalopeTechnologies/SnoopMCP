@@ -125,10 +125,19 @@ Drive Visual Studio externally; consume its Live Visual Tree.
 
 ## 6. v1 scope
 
+### Navigation is the hard part
+
+WPF tree navigation is the place v1 is most likely to fail in practice. Visual and logical trees diverge; real windows have thousands of nodes most of which have no name; popups and adorners live in separate visual trees from the controls that opened them; `ItemsControl`s virtualize; and template children sit visually inside but not logically under their host. Brute-force tree walking blows the LLM's context window before reaching anything useful. v1 therefore invests deliberately in navigation primitives — rich predicates, hit-testing, parent traversal, path strings, virtualization-aware enumeration, popup back-references — so the LLM can locate elements by *shape* and *content*, not by walking. Search-first, walk-second.
+
 ### In
 
-- Enumerate visual roots (all active `PresentationSource`s — windows, popups, tooltip layers, adorner layers)
-- Walk visual and logical trees from any root, with identity (type, x:Name, AutomationId) at each node
+- Enumerate visual roots (all active `PresentationSource`s — windows, popups, tooltip layers, adorner layers), each annotated with the element that opened it where applicable
+- Walk visual and logical trees from any root; navigate upward via visual / logical parent and out of templates via `TemplatedParent`
+- Locate elements via rich predicates: type, x:Name, AutomationId, visible-text-contains, property-value-equals, has-ancestor, has-descendant, in-template-of
+- Hit-test a root-relative point on a visual root and return the deepest element there
+- Emit canonical path strings on every element description; resolve a path string back to an element under a given root
+- Per-node identity returns type, x:Name, AutomationId, visible bounds (root-relative), short visible-text snippet, `IsInTemplate` flag, and `HasBindingErrors` flag
+- Virtualization-aware `getChildren` — realized children plus realized/virtualized counts; never silently hides items
 - Describe DataContext shape at any node (type, base types, interfaces, declared CLR properties — names and types only)
 - DP introspection: list DPs on an element, read effective DP value with **full precedence trace** (which source won, what the losers were, in order)
 - CLR property reads on the DataContext via dotted paths (`SelectedCustomer.Address.Street`)
@@ -149,25 +158,61 @@ Drive Visual Studio externally; consume its Live Visual Tree.
 
 ## 7. Proposed MCP tool surface
 
-Twelve tools, grouped into four buckets. Every tool is read-only.
+Seventeen tools, grouped into four buckets. Every tool is read-only. The navigation bucket is the largest because LLM-shaped exploration is search-first, not walk-first (see §6).
 
 ### Attach / discovery
 
 ```text
-attach(pid: int) -> { sessionId, processName, runtimeVersion, frameworkVersion }
+attach(pid: int) -> { sessionId, processName, runtimeVersion,
+                      frameworkVersion, bitness }
 detach() -> { ok: bool }
-listVisualRoots() -> [ { rootId, kind: "Window"|"Popup"|"Tooltip"|"Adorner"|"Other",
-                         hwnd, title, rootElementId } ]
+listVisualRoots() -> [ { rootId,
+                         kind: "Window"|"Popup"|"Tooltip"|"Adorner"|"Other",
+                         hwnd, title, rootElementId,
+                         openedBy: elementId | null } ]
 ```
 
-### Tree navigation (cheap, listing-shaped)
+`openedBy` carries the element id that owns / opened the secondary root (the ComboBox for its dropdown, the host for a Tooltip, etc.). Null for top-level windows.
+
+### Tree navigation
 
 ```text
-describeElement(id) -> { type, name, automationId, childCount,
-                         dataContextType, hashCode, isAlive }
-getChildren(id, tree: "visual"|"logical") -> [ describeElement ]
-findElements(rootId, predicate: { type?, name?, automationId?, pathLike? })
-                                 -> [ describeElement ]
+describeElement(id) ->
+    { type, name, automationId,
+      bounds: { x, y, width, height },          // root-relative
+      visibleText,                              // capped at ~200 chars
+      isInTemplate, hasBindingErrors,
+      path,                                     // canonical path string
+      childCount, dataContextType, hashCode, isAlive }
+
+getChildren(id, tree: "visual"|"logical") ->
+    { children: [ describeElement ],
+      virtualization: { isVirtualizing: bool,
+                        realizedItems: int,
+                        totalItems: int | null } | null }
+
+getParent(id, tree: "visual"|"logical") -> describeElement | null
+
+getTemplatedParent(id) -> describeElement | null
+
+findElements(rootId, predicate) -> [ describeElement ]
+   predicate fields (all optional, AND-combined):
+     type             string                substring match on full type name
+     name             string                exact x:Name match
+     automationId     string                exact AutomationProperties.AutomationId
+     textContains     string                case-insensitive in visibleText
+     propertyEquals   { property, value }   DP current value equals
+     hasAncestor      predicate             recursive
+     hasDescendant    predicate             recursive
+     inTemplateOf     predicate             TemplatedParent matches
+
+hitTest(rootId, x: double, y: double) -> describeElement | null
+   coordinates are root-relative
+
+resolvePath(rootId, pathString) -> describeElement | error
+   path grammar:
+     /TypeName[Name='X', AutomationId='Y', Text='Z'][n]/...
+   each step matches by type + optional attribute predicates + optional index
 ```
 
 ### WPF-aware introspection (targeted)
@@ -209,7 +254,7 @@ readDataContextPath(id, path) ->
     { value, valueType, pathReachable, failureAt? }
 ```
 
-**Total: 13 tools.** Compact enough to fit in the LLM's working set; targeted enough that each call returns useful, bounded JSON.
+**Total: 17 tools.** Navigation grew from 3 → 7 in response to the challenges in §6. Other buckets unchanged. Compact enough to fit in the LLM's working set; each call returns useful, bounded JSON.
 
 ---
 
