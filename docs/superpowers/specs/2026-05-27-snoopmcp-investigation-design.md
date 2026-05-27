@@ -313,6 +313,7 @@ Payload emits structured log lines to the host over a side channel on the same p
 5. **Persistent reattach.** Survive target restarts in a watched mode.
 6. **Snapshots and diffs.** Capture full tree state to disk; diff two snapshots. Useful for "what changed between window-shown and the moment the bug appears."
 7. **Binding trace recording.** Subscribe to `PresentationTraceSources.DataBindingSource` and surface binding errors as MCP notifications in real time.
+8. **Web inspector UI.** Host-side ASP.NET Core endpoint serving a browser-based tree explorer that reuses the existing 17 MCP tools internally. Three useful tiers: (A) tool-explorer page that proxies any tool and renders the JSON response; (B) full tree + properties browser with `findElements`-backed search; (C) live inspector with WebSocket updates, hover-to-highlight (requires payload adorner support), and per-element screenshot capture (requires payload `RenderTargetBitmap` support). Tier A is small (~2 tasks); Tier C requires payload changes that ride with the existing Phase 2 mutation work. Localhost only.
 
 **Open questions:**
 
