@@ -7,6 +7,11 @@
         <OutputType>Library</OutputType>
         <PlatformTarget>x64</PlatformTarget>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <!-- The payload is injected into a foreign process and must carry its NuGet dependency
+             closure (e.g. Microsoft.Extensions.Logging.Abstractions) into its own output so the
+             AssemblyResolve bootstrap can load them from the staged payload/ folder. A plain
+             library build would leave package DLLs out of bin. -->
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
 
     <ItemGroup>

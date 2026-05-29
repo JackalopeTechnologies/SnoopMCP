@@ -10,7 +10,7 @@ using SnoopMCP.Protocol.Errors;
 public sealed class InjectorService : IInjectorService
 {
     private const string LauncherRelativePath = @"injector\Snoop.InjectorLauncher.x64.exe";
-    private const string PayloadFileName = "SnoopMCP.Payload.dll";
+    private const string PayloadRelativePath = @"payload\SnoopMCP.Payload.dll";
     private const string PayloadClassName = "SnoopMCP.Payload.PayloadEntryPoint";
     private const string PayloadMethodName = "Inject";
     private const int AccessDeniedExitCode = 5;
@@ -114,13 +114,13 @@ public sealed class InjectorService : IInjectorService
 
     private static string LocatePayload()
     {
-        string candidate = Path.Combine(AppContext.BaseDirectory, PayloadFileName);
+        string candidate = Path.Combine(AppContext.BaseDirectory, PayloadRelativePath);
         bool exists = File.Exists(candidate);
         if (!exists)
         {
             throw new SnoopMcpException(
                 ErrorCode.PayloadLoadFailed,
-                $"{PayloadFileName} not found at {candidate}. Verify the payload ProjectReference in the host csproj.");
+                $"Payload not found at {candidate}. Verify CopyPayloadBinaries staged the payload closure.");
         }
         return candidate;
     }

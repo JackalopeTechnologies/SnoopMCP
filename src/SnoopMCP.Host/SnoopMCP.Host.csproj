@@ -7,6 +7,7 @@
         <PlatformTarget>x64</PlatformTarget>
         <InvariantGlobalization>true</InvariantGlobalization>
         <InjectorStageDir>$(MSBuildThisFileDirectory)..\SnoopMCP.Injection\bin\$(Configuration)\net10.0-windows\injector\</InjectorStageDir>
+        <PayloadOutputDir>$(MSBuildThisFileDirectory)..\SnoopMCP.Payload\bin\$(Configuration)\net10.0-windows\</PayloadOutputDir>
     </PropertyGroup>
 
     <ItemGroup>
@@ -15,12 +16,11 @@
         <ProjectReference Include="..\SnoopMCP.Injection\SnoopMCP.Injection.csproj">
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
-        <!-- Build SnoopMCP.Payload.dll beside the host (the assembly the launcher injects);
-             the host never loads it, so no CLR reference. -->
+        <!-- Build ordering only: the host never loads the payload (no CLR reference). The payload's
+             full dependency closure is staged into payload/ by CopyPayloadBinaries below so the
+             payload's AssemblyResolve bootstrap can find its deps inside the target process. -->
         <ProjectReference Include="..\SnoopMCP.Payload\SnoopMCP.Payload.csproj">
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-            <OutputItemType>Content</OutputItemType>
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </ProjectReference>
     </ItemGroup>
 
@@ -41,6 +41,23 @@
                Text="No injector binaries found at $(InjectorStageDir). Build SnoopMCP.Injection first (it stages Snoop's launcher + native DLL)." />
         <Copy SourceFiles="@(InjectorBinary)"
               DestinationFiles="@(InjectorBinary->'$(OutDir)injector\%(RecursiveDir)%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true" />
+    </Target>
+
+    <!--
+        Stage the payload's full dependency closure under payload/ next to the host.
+        The payload is injected into a foreign process whose base directory does NOT
+        contain the payload's deps (SnoopMCP.Protocol, Microsoft.Extensions.Logging.
+        Abstractions); the payload's AssemblyResolve bootstrap probes this folder.
+    -->
+    <Target Name="CopyPayloadBinaries" AfterTargets="Build">
+        <ItemGroup>
+            <PayloadBinary Include="$(PayloadOutputDir)*.dll;$(PayloadOutputDir)*.json" />
+        </ItemGroup>
+        <Error Condition="'@(PayloadBinary)' == ''"
+               Text="No payload binaries found at $(PayloadOutputDir). Build SnoopMCP.Payload first." />
+        <Copy SourceFiles="@(PayloadBinary)"
+              DestinationFiles="@(PayloadBinary->'$(OutDir)payload\%(Filename)%(Extension)')"
               SkipUnchangedFiles="true" />
     </Target>
 </Project>
