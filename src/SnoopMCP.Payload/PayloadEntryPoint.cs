@@ -68,6 +68,7 @@ public static class PayloadEntryPoint
             toolRegistry.Register(new DescribeDataContextToolHandler(registry, dataContextInspector, marshal));
             toolRegistry.Register(new ReadDataContextPathToolHandler(registry, dataContextInspector, marshal));
             toolRegistry.Register(new ListDependencyPropertiesToolHandler(registry, dpInspector, marshal));
+            toolRegistry.Register(new GetDependencyPropertyToolHandler(registry, dpInspector, marshal));
 
             ILogger<PipeServer> logger = NullLogger<PipeServer>.Instance;
             psServer = new PipeServer(pipeName, toolRegistry, logger);
