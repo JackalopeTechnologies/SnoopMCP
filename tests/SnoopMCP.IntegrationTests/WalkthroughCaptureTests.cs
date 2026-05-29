@@ -73,6 +73,20 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
         return matches[0].GetProperty("id").GetInt32();
     }
 
+    private static JsonElement FirstRootOfKind(JsonElement listVisualRootsResponse, string kind)
+    {
+        JsonElement result = default;
+        foreach (JsonElement root in listVisualRootsResponse.GetProperty("roots").EnumerateArray())
+        {
+            bool isKind = string.Equals(root.GetProperty("kind").GetString(), kind, StringComparison.Ordinal);
+            if (isKind && result.ValueKind != JsonValueKind.Object)
+            {
+                result = root.Clone();
+            }
+        }
+        return result;
+    }
+
     [Fact(Skip = "Manual capture; run by hand to refresh walkthrough.md. See class XML doc for the command.")]
     public async Task CaptureWalkthroughTranscript()
     {
@@ -156,6 +170,47 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
         mTranscript.Add(
             "DependencyProperties", "getDependencyProperty",
             new { id = deleteButtonId, propertyName = "Background" }, bg);
+
+        // --- Styles & templates ---
+        JsonElement style = await mTools.ResolveStyle(deleteButtonId, ct);
+        mTranscript.Add("StylesTemplates", "resolveStyle", new { id = deleteButtonId }, style);
+
+        JsonElement template = await mTools.ResolveTemplate(saveButtonId, ct);
+        mTranscript.Add("StylesTemplates", "resolveTemplate", new { id = saveButtonId }, template);
+
+        // --- Bindings ---
+        JsonElement inspect = await mTools.InspectBinding(brokenBindingId, "Text", ct);
+        mTranscript.Add("Bindings", "inspectBinding", new { id = brokenBindingId, propertyName = "Text" }, inspect);
+
+        JsonElement listed = await mTools.ListBindings(detailPaneId, true, ct);
+        mTranscript.Add("Bindings", "listBindings", new { id = detailPaneId, includeDescendants = true }, listed);
+
+        // --- Snapshot ---
+        JsonElement xaml = await mTools.ExportXaml(detailPaneId, ct);
+        mTranscript.Add("Snapshot", "exportXaml", new { id = detailPaneId }, xaml);
+
+        // --- Popup (UIA opens the dropdown; the only non-MCP step) ---
+        bool opened = ComboBoxAutomation.TrySetDropDownOpen(ThemeComboAutomationId, open: true);
+        if (opened)
+        {
+            await Task.Delay(500);
+            JsonElement rootsWithPopup = await mTools.ListVisualRoots(ct);
+            mTranscript.Add("Popup", "listVisualRoots", new { note = "ThemeCombo dropdown open" }, rootsWithPopup);
+
+            JsonElement popupRoot = FirstRootOfKind(rootsWithPopup, "Popup");
+            if (popupRoot.ValueKind == JsonValueKind.Object)
+            {
+                int popupRootId = popupRoot.GetProperty("rootElementId").GetInt32();
+                JsonElement popupKids = await mTools.GetChildren(popupRootId, "visual", ct);
+                mTranscript.Add("Popup", "getChildren", new { id = popupRootId, tree = "visual" }, popupKids);
+            }
+
+            ComboBoxAutomation.TrySetDropDownOpen(ThemeComboAutomationId, open: false);
+        }
+
+        // --- Wrap-up ---
+        JsonElement detach = await mTools.Detach(ct);
+        mTranscript.Add("Wrapup", "detach", new { }, detach);
 
         await mTranscript.WriteAsync();
     }
