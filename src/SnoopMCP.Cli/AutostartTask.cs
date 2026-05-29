@@ -93,6 +93,10 @@ public static class AutostartTask
             }
             else
             {
+                // Drain the redirected streams before waiting so a verbose schtasks error cannot
+                // fill the pipe buffer and deadlock; the text itself is intentionally discarded.
+                process.StandardOutput.ReadToEnd();
+                process.StandardError.ReadToEnd();
                 process.WaitForExit();
                 exit = process.ExitCode;
             }
