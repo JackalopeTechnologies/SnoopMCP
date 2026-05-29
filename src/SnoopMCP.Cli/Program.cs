@@ -8,7 +8,7 @@ using SnoopMCP.ClientIntegration;
 /// <summary>
 /// Management CLI for SnoopMCP: registers the MCP server in LLM clients, manages the per-user logon
 /// autostart task, and supervises the host process. Verbs are dispatched from <see cref="Main"/>;
-/// each returns a process exit code (0 = success, 2 = partial failure, 64 = usage error).
+/// each returns a process exit code (0 = success, 2 = failure, 64 = usage error).
 /// </summary>
 public static class Program
 {
