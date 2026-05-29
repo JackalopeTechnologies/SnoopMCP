@@ -1,0 +1,69 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 120
+
+[*.{cs,vb}]
+# Allman braces
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_within_query_expression_clauses = true
+
+# var policy: when apparent
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+# Modern patterns
+csharp_style_expression_bodied_methods = false:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+csharp_prefer_switch_expression = true:warning
+
+# Field naming (m, ps, sm, pm prefixes per CLAUDE.md)
+dotnet_naming_rule.private_instance_fields.severity = warning
+dotnet_naming_rule.private_instance_fields.symbols = private_instance_field
+dotnet_naming_rule.private_instance_fields.style = m_prefix_camel_case
+
+dotnet_naming_symbols.private_instance_field.applicable_kinds = field
+dotnet_naming_symbols.private_instance_field.applicable_accessibilities = private
+dotnet_naming_symbols.private_instance_field.required_modifiers =
+
+dotnet_naming_style.m_prefix_camel_case.required_prefix = m
+dotnet_naming_style.m_prefix_camel_case.capitalization = camel_case
+
+dotnet_naming_rule.private_static_readonly_fields.severity = warning
+dotnet_naming_rule.private_static_readonly_fields.symbols = private_static_readonly_field
+dotnet_naming_rule.private_static_readonly_fields.style = sm_prefix_camel_case
+
+dotnet_naming_symbols.private_static_readonly_field.applicable_kinds = field
+dotnet_naming_symbols.private_static_readonly_field.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_readonly_field.required_modifiers = static,readonly
+
+dotnet_naming_style.sm_prefix_camel_case.required_prefix = sm
+dotnet_naming_style.sm_prefix_camel_case.capitalization = camel_case
+
+dotnet_naming_rule.private_static_fields.severity = warning
+dotnet_naming_rule.private_static_fields.symbols = private_static_field
+dotnet_naming_rule.private_static_fields.style = ps_prefix_camel_case
+
+dotnet_naming_symbols.private_static_field.applicable_kinds = field
+dotnet_naming_symbols.private_static_field.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_field.required_modifiers = static
+
+dotnet_naming_style.ps_prefix_camel_case.required_prefix = ps
+dotnet_naming_style.ps_prefix_camel_case.capitalization = camel_case
+
+[*.xaml]
+indent_size = 4
+
+[*.{xml,csproj,props,targets,json,yml,yaml}]
+indent_size = 2
