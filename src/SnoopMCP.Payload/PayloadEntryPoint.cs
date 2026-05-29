@@ -65,6 +65,7 @@ public static class PayloadEntryPoint
             toolRegistry.Register(new HitTestToolHandler(registry, hitTester, marshal));
             toolRegistry.Register(new ResolvePathToolHandler(registry, pathResolver, marshal));
             toolRegistry.Register(new DescribeDataContextToolHandler(registry, dataContextInspector, marshal));
+            toolRegistry.Register(new ReadDataContextPathToolHandler(registry, dataContextInspector, marshal));
 
             ILogger<PipeServer> logger = NullLogger<PipeServer>.Instance;
             psServer = new PipeServer(pipeName, toolRegistry, logger);
