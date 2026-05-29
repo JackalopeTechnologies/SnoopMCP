@@ -139,4 +139,33 @@ public sealed class EndToEndTests : IAsyncLifetime
         Assert.True(xaml.TryGetProperty("xaml", out _));
         Assert.True(xaml.GetProperty("byteCount").GetInt32() > 0);
     }
+
+    [Fact]
+    public async Task ListWpfProcesses_ReturnsSampleWpfApp_AsAttachable()
+    {
+        Assert.NotNull(mTools);
+        Assert.NotNull(mSampleProcess);
+        CancellationToken ct = TestContext.Current.CancellationToken;
+
+        JsonElement result = await mTools!.ListWpfProcesses(ct);
+
+        JsonElement processes = result.GetProperty("processes");
+        Assert.Equal(JsonValueKind.Array, processes.ValueKind);
+
+        bool found = false;
+        bool attachable = false;
+        foreach (JsonElement proc in processes.EnumerateArray())
+        {
+            string name = proc.GetProperty("processName").GetString() ?? string.Empty;
+            bool isSample = string.Equals(name, "SampleWpfApp", StringComparison.Ordinal);
+            if (isSample)
+            {
+                found = true;
+                attachable = proc.GetProperty("attachable").GetBoolean();
+            }
+        }
+
+        Assert.True(found, "SampleWpfApp not found in listWpfProcesses output.");
+        Assert.True(attachable, "SampleWpfApp was discovered but reported as non-attachable.");
+    }
 }

@@ -112,10 +112,11 @@ The LLM will call:
 
 ## Tool surface
 
-Nineteen read-only tools, plus `attach`/`detach`:
+Twenty read-only tools, plus `attach`/`detach`:
 
 | Tool | Use it for |
 |---|---|
+| `listWpfProcesses()` | Discover WPF processes the host can attach to (pid, name, window title, bitness). Host-side, pre-attach — no session required |
 | `attach(pid)` | Open a session by process id |
 | `detach()` | Close the current session |
 | `listVisualRoots()` | Find windows, popups, tooltip layers |
@@ -154,7 +155,6 @@ Nineteen read-only tools, plus `attach`/`detach`:
 - **Read-only.** No property writes, no method invocation, no scripting.
 - **One target at a time.** Phase 2 may add multi-target.
 - **x64 only.** x86/ARM64 targets are rejected at probe time.
-- **No cross-process discovery.** Use `Get-Process` to find PIDs.
 - **No persistent reattach.** Sessions die with the target process.
 - **`textContains` searches capped visible text** (~200 chars per element).
 - **`propertyEquals` does not support attached properties.**
