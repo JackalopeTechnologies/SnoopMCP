@@ -3,8 +3,11 @@
 
 namespace SnoopMCP.Payload;
 
+using System.Windows;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using SnoopMCP.Payload.Inspection;
+using SnoopMCP.Payload.PathStrings;
 using SnoopMCP.Payload.Tools;
 
 /// <summary>
@@ -29,11 +32,24 @@ public static class PayloadEntryPoint
         try
         {
             string pipeName = args.Trim();
-            var registry = new ToolRegistry();
-            registry.Register(new EchoToolHandler());
+
+            if (Application.Current is null)
+            {
+                throw new InvalidOperationException(
+                    "Application.Current is null; payload must inject into a running WPF app.");
+            }
+
+            var registry = new ElementRegistry();
+            var emitter = new PathStringEmitter();
+            var describer = new ElementDescriber(registry, emitter);
+            var marshal = new DispatcherMarshal(Application.Current.Dispatcher);
+
+            var toolRegistry = new ToolRegistry();
+            toolRegistry.Register(new EchoToolHandler());
+            toolRegistry.Register(new DescribeElementToolHandler(registry, describer, marshal));
 
             ILogger<PipeServer> logger = NullLogger<PipeServer>.Instance;
-            psServer = new PipeServer(pipeName, registry, logger);
+            psServer = new PipeServer(pipeName, toolRegistry, logger);
             psServer.Start();
         }
         catch (Exception)
