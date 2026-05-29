@@ -55,3 +55,8 @@ desktop.ini
 *~
 *.swp
 *.bak
+
+# SnoopMCP installer build artifacts
+SnoopMCP.Installer/stage/
+SnoopMCP.Installer/*.msi
+SnoopMCP.Installer/*.wixpdb
