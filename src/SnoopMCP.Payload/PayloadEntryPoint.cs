@@ -48,6 +48,7 @@ public static class PayloadEntryPoint
             var rootEnumerator = new RootEnumerator(registry, ownerResolver);
             var childrenEnumerator = new ChildrenEnumerator(describer);
             var parentNavigator = new ParentNavigator(describer);
+            var elementFinder = new ElementFinder(describer);
 
             var toolRegistry = new ToolRegistry();
             toolRegistry.Register(new EchoToolHandler());
@@ -56,6 +57,7 @@ public static class PayloadEntryPoint
             toolRegistry.Register(new GetChildrenToolHandler(registry, childrenEnumerator, marshal));
             toolRegistry.Register(new GetParentToolHandler(registry, parentNavigator, marshal));
             toolRegistry.Register(new GetTemplatedParentToolHandler(registry, parentNavigator, marshal));
+            toolRegistry.Register(new FindElementsToolHandler(registry, elementFinder, marshal));
 
             ILogger<PipeServer> logger = NullLogger<PipeServer>.Instance;
             psServer = new PipeServer(pipeName, toolRegistry, logger);
