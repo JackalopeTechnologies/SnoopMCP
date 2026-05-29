@@ -112,6 +112,10 @@ The LLM will call:
 
 ## Tool surface
 
+For a guided, end-to-end demonstration of every tool against the bundled sample
+app — real tool calls and captured responses diagnosing real bugs — see
+[`docs/walkthrough.md`](docs/walkthrough.md).
+
 Twenty read-only tools, plus `attach`/`detach`:
 
 | Tool | Use it for |
