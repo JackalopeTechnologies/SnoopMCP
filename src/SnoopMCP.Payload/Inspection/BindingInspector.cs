@@ -8,15 +8,17 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Data;
+using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using SnoopMCP.Payload;
 using SnoopMCP.Protocol.Errors;
 using SnoopMCP.Protocol.Tools;
 
 /// <summary>
 /// Inspects the state of WPF data bindings. <see cref="Inspect"/> (Task 23) is the deep dive on one
-/// binding — its <c>BindingExpression</c> state, source, path, mode, and current value. The element
-/// registry is held for <c>ListBindings</c> (Task 24), which stamps every binding summary with a
-/// stable element id the LLM can drill into.
+/// binding — its <c>BindingExpression</c> state, source, path, mode, and current value.
+/// <see cref="ListBindings"/> (Task 24) is the broad audit — every binding on an element, optionally
+/// across its visual subtree, each summary stamped with a stable element id the LLM can drill into.
 /// </summary>
 public sealed class BindingInspector
 {
@@ -92,6 +94,75 @@ public sealed class BindingInspector
         }
 
         return response;
+    }
+
+    /// <summary>
+    /// Audits every dependency property carrying a <c>BindingExpression</c> on
+    /// <paramref name="element"/>, and — when <paramref name="includeDescendants"/> is <c>true</c> —
+    /// across its visual subtree. Each row carries the owning element's stable id and type.
+    /// </summary>
+    /// <param name="element">The element at which the audit begins.</param>
+    /// <param name="includeDescendants">When <c>true</c>, recurses through the visual subtree.</param>
+    /// <returns>Every binding found, summarised.</returns>
+    public ListBindingsResponse ListBindings(DependencyObject element, bool includeDescendants)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        var sink = new List<BindingSummaryDto>();
+        Walk(element, includeDescendants, sink);
+        return new ListBindingsResponse(sink);
+    }
+
+    private void Walk(DependencyObject element, bool includeDescendants, List<BindingSummaryDto> sink)
+    {
+        CollectFrom(element, sink);
+        bool recurse = includeDescendants && element is Visual or Visual3D;
+        if (recurse)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(element);
+            for (int i = 0; i < count; i++)
+            {
+                Walk(VisualTreeHelper.GetChild(element, i), true, sink);
+            }
+        }
+    }
+
+    private void CollectFrom(DependencyObject element, List<BindingSummaryDto> sink)
+    {
+        int elementId = mRegistry.GetOrAssign(element);
+        string elementType = element.GetType().Name;
+        LocalValueEnumerator enumerator = element.GetLocalValueEnumerator();
+        while (enumerator.MoveNext())
+        {
+            DependencyProperty dp = enumerator.Current.Property;
+            BindingExpressionBase? expression = BindingOperations.GetBindingExpressionBase(element, dp);
+            if (expression is not null)
+            {
+                sink.Add(Summarize(element, dp, expression, elementId, elementType));
+            }
+        }
+    }
+
+    private static BindingSummaryDto Summarize(
+        DependencyObject element,
+        DependencyProperty dp,
+        BindingExpressionBase expression,
+        int elementId,
+        string elementType)
+    {
+        BindingExpression? typed = expression as BindingExpression;
+        Binding? binding = typed?.ParentBinding;
+        object? currentValue = element.GetValue(dp);
+
+        return new BindingSummaryDto(
+            ElementId: elementId,
+            ElementType: elementType,
+            Property: dp.Name,
+            BindingPath: binding?.Path?.Path,
+            Mode: binding?.Mode.ToString(),
+            State: MapState(expression),
+            HasError: expression.HasError,
+            ResolvedSourceType: typed?.ResolvedSource?.GetType().FullName,
+            CurrentValue: Convert.ToString(currentValue, CultureInfo.InvariantCulture));
     }
 
     private static InspectBindingResponse BuildResponse(

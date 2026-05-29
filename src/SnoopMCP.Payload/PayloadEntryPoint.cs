@@ -75,6 +75,7 @@ public static class PayloadEntryPoint
             toolRegistry.Register(new ResolveStyleToolHandler(registry, styleResolver, marshal));
             toolRegistry.Register(new ResolveTemplateToolHandler(registry, templateResolver, marshal));
             toolRegistry.Register(new InspectBindingToolHandler(registry, bindingInspector, marshal));
+            toolRegistry.Register(new ListBindingsToolHandler(registry, bindingInspector, marshal));
 
             ILogger<PipeServer> logger = NullLogger<PipeServer>.Instance;
             psServer = new PipeServer(pipeName, toolRegistry, logger);
