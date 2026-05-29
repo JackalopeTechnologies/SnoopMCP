@@ -46,11 +46,13 @@ public static class PayloadEntryPoint
 
             var ownerResolver = new PopupOwnerResolver();
             var rootEnumerator = new RootEnumerator(registry, ownerResolver);
+            var childrenEnumerator = new ChildrenEnumerator(describer);
 
             var toolRegistry = new ToolRegistry();
             toolRegistry.Register(new EchoToolHandler());
             toolRegistry.Register(new DescribeElementToolHandler(registry, describer, marshal));
             toolRegistry.Register(new ListVisualRootsToolHandler(rootEnumerator, marshal));
+            toolRegistry.Register(new GetChildrenToolHandler(registry, childrenEnumerator, marshal));
 
             ILogger<PipeServer> logger = NullLogger<PipeServer>.Instance;
             psServer = new PipeServer(pipeName, toolRegistry, logger);
