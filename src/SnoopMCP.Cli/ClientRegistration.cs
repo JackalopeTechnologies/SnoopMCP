@@ -28,7 +28,7 @@ public static class ClientRegistration
         foreach (IClientWriter writer in writers)
         {
             RegisterResult result = writer.Register(endpoint);
-            log.WriteLine($"{writer.ClientName}: {result.Message}");
+            log.WriteLine(result.Message);
             failures += result.Success ? 0 : 1;
         }
         return failures == 0 ? ExitOk : ExitPartialFailure;
@@ -45,7 +45,7 @@ public static class ClientRegistration
         foreach (IClientWriter writer in writers)
         {
             UnregisterResult result = writer.Unregister();
-            log.WriteLine($"{writer.ClientName}: {result.Message}");
+            log.WriteLine(result.Message);
             failures += result.Success ? 0 : 1;
         }
         return failures == 0 ? ExitOk : ExitPartialFailure;
@@ -61,7 +61,7 @@ public static class ClientRegistration
         foreach (IClientWriter writer in writers)
         {
             StatusResult result = writer.GetStatus();
-            log.WriteLine($"{writer.ClientName}: {result.Message}");
+            log.WriteLine(result.Message);
         }
         return ExitOk;
     }
