@@ -54,6 +54,7 @@ public static class PayloadEntryPoint
             var pathResolver = new PathResolver(describer, pathParser);
             var dataContextInspector = new DataContextInspector();
             var dpInspector = new DependencyPropertyInspector();
+            var styleResolver = new StyleResolver();
 
             var toolRegistry = new ToolRegistry();
             toolRegistry.Register(new EchoToolHandler());
@@ -69,6 +70,7 @@ public static class PayloadEntryPoint
             toolRegistry.Register(new ReadDataContextPathToolHandler(registry, dataContextInspector, marshal));
             toolRegistry.Register(new ListDependencyPropertiesToolHandler(registry, dpInspector, marshal));
             toolRegistry.Register(new GetDependencyPropertyToolHandler(registry, dpInspector, marshal));
+            toolRegistry.Register(new ResolveStyleToolHandler(registry, styleResolver, marshal));
 
             ILogger<PipeServer> logger = NullLogger<PipeServer>.Instance;
             psServer = new PipeServer(pipeName, toolRegistry, logger);
