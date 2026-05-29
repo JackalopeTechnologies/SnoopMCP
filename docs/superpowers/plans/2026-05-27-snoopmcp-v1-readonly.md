@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a read-only MCP server (`SnoopMCP.Host.exe`) that injects a payload DLL (`SnoopMCP.Payload.dll`) into any running .NET 10+ WPF process and exposes 19 inspection tools over stdio so an LLM client can diagnose styling, binding, and resolution problems live.
+**Goal:** Build a read-only MCP server (`SnoopMCP.Host.exe`) that injects a payload DLL (`SnoopMCP.Payload.dll`) into any running .NET 10+ WPF process and exposes 19 inspection tools over an HTTP MCP endpoint so an LLM client can diagnose styling, binding, and resolution problems live.
 
-**Architecture:** Host process speaks MCP/JSON-RPC over stdio to its client (external transport) and length-prefixed JSON over a named pipe to its payload (internal transport). Payload runs inside the target, marshals every WPF call onto the Dispatcher, and owns an element-identity registry mapping stable integer ids to `WeakReference<DependencyObject>`. Cross-process injection uses Snoop's `ManagedInjector`, pinned as a **git submodule** under `external/snoopwpf/` and referenced via a thin `SnoopMCP.Injection` wrapper csproj.
+**Architecture:** Host process speaks MCP over **Streamable HTTP** to its client (external transport, Kestrel on `http://127.0.0.1:6300`, endpoint `/mcp`) and length-prefixed JSON over a named pipe to its payload (internal transport). Payload runs inside the target, marshals every WPF call onto the Dispatcher, and owns an element-identity registry mapping stable integer ids to `WeakReference<DependencyObject>`. Cross-process injection uses Snoop's `ManagedInjector`, pinned as a **git submodule** under `external/snoopwpf/` and referenced via a thin `SnoopMCP.Injection` wrapper csproj.
 
 **Tech Stack:**
-- .NET 10 (target framework `net10.0` for cross-cutting libs; `net10.0-windows` with `<UseWPF>true</UseWPF>` for payload and sample app)
-- `ModelContextProtocol.AspNetCore` 1.2.0 (MCP C# SDK — provides `StdioServerTransport`, `[McpServerTool]`/`[McpServerToolType]`)
-- `Microsoft.Extensions.Hosting` 10.0.0 for the host's lifecycle
-- `Microsoft.Extensions.Logging` 10.0.0 for logging (no `IPenskeLogger` — see Coding Standards Note)
+- .NET 10 (target framework `net10.0` for cross-cutting libs; `net10.0-windows` with `<UseWPF>true</UseWPF>` for payload and sample app; `Microsoft.NET.Sdk.Web` for the host)
+- `ModelContextProtocol.AspNetCore` 1.3.0 (MCP C# SDK — provides `AddMcpServer`, `WithHttpTransport`, `MapMcp`, `[McpServerTool]`/`[McpServerToolType]`); version mirrors `JackalopeTechnologies/SaddleRAG`'s `SaddleRAG.Mcp`
+- ASP.NET Core / Kestrel (via `Microsoft.NET.Sdk.Web`) for the host's lifecycle + HTTP transport
+- `Microsoft.Extensions.Logging` console for logging (no `IPenskeLogger` — see Coding Standards Note); stdout is free since the protocol runs over HTTP
 - `System.IO.Pipes.NamedPipeServerStream` / `NamedPipeClientStream` for host↔payload (internal transport — not exposed to the LLM)
 - `System.Text.Json` for all JSON serialization
 - xUnit v3 + `Xunit.StaFact` for unit tests requiring an STA thread
@@ -19,7 +19,7 @@
 
 **Transport summary (called out so it stays straight):**
 
-- **MCP / stdio** is the *external* transport — between the LLM client and `SnoopMCP.Host.exe`.
+- **MCP / Streamable HTTP** is the *external* transport — between the LLM client and `SnoopMCP.Host.exe`, over Kestrel at `http://127.0.0.1:6300/mcp` (localhost-only). This matches the house pattern: every other Jackalope MCP server (SaddleRAG etc.) is HTTP, not stdio.
 - **Named pipe / length-prefixed JSON** is the *internal* transport — between `SnoopMCP.Host.exe` and the `SnoopMCP.Payload.dll` we injected into the target. Snoop itself does not run; only its `ManagedInjector` source is used, and only to load our payload.
 
 **Repository:** `https://github.com/JackalopeTechnologies/SnoopMCP` (org `JackalopeTechnologies`, owner `wyodoug`). Identity is wired via `~/.gitconfig` `includeIf` for `E:/GitHub/` → `douglas@jackalopetechnologies.com`; do not change it.
@@ -8920,11 +8920,13 @@ git -C E:/GitHub/SnoopMCP commit -m "Task 25: exportXaml tool — XamlWriter sna
 
 ---
 
-## Task 26: Host project scaffold + MCP stdio server
+## Task 26: Host project scaffold + MCP HTTP server
 
-**Goal:** Stand up `SnoopMCP.Host.exe` — an `Microsoft.Extensions.Hosting`-based app that hosts the MCP server over stdio. No tools yet; that's Task 29. This task just gets the process bootable and the MCP transport wired so subsequent tasks plug into a working host.
+**Goal:** Stand up `SnoopMCP.Host.exe` — an ASP.NET Core (Kestrel) app that hosts the MCP server over **Streamable HTTP**, bound to **`http://127.0.0.1:6300`**, MCP endpoint at **`/mcp`**. No tools yet; that's Task 29. This task gets the process bootable and the HTTP MCP transport wired so subsequent tasks plug into a working host.
 
-`ModelContextProtocol.AspNetCore` 1.2.0 supplies `WithStdioServerTransport()`. Logging goes to stderr (stdout is reserved for the MCP transport).
+**Transport decision (locked):** HTTP, not stdio. The MCP transport is host↔LLM-client only and is fully independent of the host↔payload named pipe. We mirror the house pattern proven in `JackalopeTechnologies/SaddleRAG`'s `SaddleRAG.Mcp`: `AddMcpServer(...).WithHttpTransport(t => t.Stateless = true).WithToolsFromAssembly()` then `app.MapMcp("/mcp")`. Package is `ModelContextProtocol.AspNetCore` **1.3.0** (the version SaddleRAG ships; supersedes the 1.2.0 the spec drafted against). Because the protocol no longer owns stdout, logging is plain console — no stderr redirection needed.
+
+**Binding:** localhost-only on port **6300**. Configured explicitly via Kestrel `ListenLocalhost(6300)` so the host is self-contained (no dependence on `launchSettings.json` or `appsettings.json` for the port).
 
 **Files:**
 - Create: `src\SnoopMCP.Host\SnoopMCP.Host.csproj`
@@ -8932,8 +8934,10 @@ git -C E:/GitHub/SnoopMCP commit -m "Task 25: exportXaml tool — XamlWriter sna
 
 - [ ] **Step 1: Host project** — `src\SnoopMCP.Host\SnoopMCP.Host.csproj`
 
+Uses the `Microsoft.NET.Sdk.Web` SDK (ASP.NET Core / Kestrel). `net10.0-windows` because later tasks (the injector wiring in Task 31) interact with Windows-only process APIs and the host launches into WPF targets.
+
 ```xml
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Web">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>net10.0-windows</TargetFramework>
@@ -8948,12 +8952,12 @@ git -C E:/GitHub/SnoopMCP commit -m "Task 25: exportXaml tool — XamlWriter sna
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
-        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.2.0" />
+        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.3.0" />
     </ItemGroup>
 </Project>
 ```
+
+> The `Microsoft.NET.Sdk.Web` SDK brings the ASP.NET Core framework reference (Kestrel, `WebApplication`, routing) implicitly — no separate `Microsoft.AspNetCore.*` package refs needed. `ModelContextProtocol.AspNetCore` brings `AddMcpServer`, `WithHttpTransport`, `MapMcp`, and the `[McpServerTool]`/`[McpServerToolType]` attributes.
 
 - [ ] **Step 2: Add the project to the solution**
 
@@ -8963,38 +8967,64 @@ dotnet sln SnoopMCP.sln add src/SnoopMCP.Host/SnoopMCP.Host.csproj
 
 - [ ] **Step 3: Program entry** — `src\SnoopMCP.Host\Program.cs`
 
-The MCP stdio transport requires that nothing else write to stdout. We route all logging to stderr via `LogToStandardErrorThreshold = LogLevel.Trace`. Tool registrations come in Task 29 via `WithToolsFromAssembly()`.
+Mirrors SaddleRAG.Mcp's Streamable-HTTP setup, trimmed to v1 essentials. The MCP endpoint constant and the bind address are named constants (no magic strings/numbers per the analyzer). Tool registrations are discovered by `WithToolsFromAssembly()` in Task 29.
 
 ```csharp
 namespace SnoopMCP.Host;
 
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Protocol;
 
 public static class Program
 {
-    public static async Task<int> Main(string[] args)
-    {
-        HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
+    private const string McpEndpointPattern = "/mcp";
+    private const int ListenPort = 6300;
 
-        builder.Logging.ClearProviders();
-        builder.Logging.AddConsole(options =>
-        {
-            options.LogToStandardErrorThreshold = LogLevel.Trace;
-        });
-        builder.Logging.SetMinimumLevel(LogLevel.Information);
+    public static async Task Main(string[] args)
+    {
+        WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+        builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenLocalhost(ListenPort));
 
         builder.Services
-            .AddMcpServer()
-            .WithStdioServerTransport()
+            .AddMcpServer(options => options.ServerInfo = new Implementation
+            {
+                Name = "SnoopMCP — WPF live-inspection MCP server",
+                Version = ThisAssembly.InformationalVersion
+            })
+            .WithHttpTransport(transport => transport.Stateless = true)
             .WithToolsFromAssembly();
 
-        using IHost host = builder.Build();
-        await host.RunAsync();
-        return 0;
+        WebApplication app = builder.Build();
+        app.MapMcp(McpEndpointPattern);
+
+        await app.RunAsync().ConfigureAwait(false);
     }
 }
 ```
+
+> **`ThisAssembly.InformationalVersion`** is a small helper to avoid a magic version string. Create `src\SnoopMCP.Host\ThisAssembly.cs`:
+>
+> ```csharp
+> namespace SnoopMCP.Host;
+>
+> using System.Reflection;
+>
+> internal static class ThisAssembly
+> {
+>     private const string DefaultDevVersion = "0.0.0-dev";
+>
+>     public static string InformationalVersion { get; } =
+>         Assembly.GetExecutingAssembly()
+>             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+>             ?.InformationalVersion
+>         ?? DefaultDevVersion;
+> }
+> ```
+
+> **If the MCP SDK API differs at execution time** (1.3.0 may have moved names): the authoritative, compiling reference is `E:/GitHub/SaddleRAG/SaddleRAG.Mcp/Program.cs` (lines ~388–404 for `AddMcpServer/WithHttpTransport/WithToolsFromAssembly`, line ~567 for `MapMcp`). Mirror whatever it does. `Implementation` lives in `ModelContextProtocol.Protocol`. Keep the SHAPE: Kestrel localhost:6300 → AddMcpServer(ServerInfo) → WithHttpTransport(stateless) → WithToolsFromAssembly → MapMcp("/mcp").
 
 - [ ] **Step 4: Build**
 
@@ -9002,13 +9032,24 @@ public static class Program
 dotnet build src/SnoopMCP.Host/SnoopMCP.Host.csproj -c Debug
 ```
 
-Expected: build succeeds. If `AddMcpServer` is unresolved, query saddlerag for the current `ModelContextProtocol.AspNetCore` API surface and adjust the using directives; the package consolidates its public extensions under `ModelContextProtocol.Server` and `Microsoft.Extensions.DependencyInjection`.
+Expected: build succeeds with zero warnings.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Smoke-check the HTTP endpoint is reachable (best-effort, no human)**
+
+Start the host in the background, give Kestrel a moment, then probe `/mcp`. An MCP Streamable-HTTP endpoint answers a bare `GET` with `405 Method Not Allowed` or `406 Not Acceptable` (it wants POST / specific Accept headers) — any HTTP status proves Kestrel is listening on 6300. Connection-refused means it isn't.
 
 ```text
-git -C E:/GitHub/SnoopMCP add .
-git -C E:/GitHub/SnoopMCP commit -m "Task 26: Host project scaffold with MCP stdio server transport"
+powershell -NoProfile -Command "$p = Start-Process -FilePath 'dotnet' -ArgumentList 'run --project E:/GitHub/SnoopMCP/src/SnoopMCP.Host/SnoopMCP.Host.csproj -c Debug' -PassThru; Start-Sleep -Seconds 8; try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:6300/mcp' -Method GET -UseBasicParsing -TimeoutSec 5; Write-Host ('reachable-status-' + [int]$r.StatusCode) } catch { if ($_.Exception.Response) { Write-Host ('reachable-status-' + [int]$_.Exception.Response.StatusCode) } else { Write-Host ('unreachable-' + $_.Exception.Message) } } finally { Stop-Process -Id $p.Id -Force }"
+```
+
+Expected: output begins `reachable-status-` (any status code — 400/405/406 are all fine; they prove the listener is up). If it prints `unreachable-…`, Kestrel failed to bind — investigate before committing.
+
+- [ ] **Step 6: Commit**
+
+Commit message file `E:/tmp/msg-task-26.txt`:
+
+```text
+Task 26: Host project scaffold with MCP Streamable-HTTP server on localhost:6300
 ```
 
 ---
@@ -9494,21 +9535,22 @@ Expected: 4 tests pass.
 
 - [ ] **Step 4: Register `SessionManager` in `Program.cs`** — modify `src\SnoopMCP.Host\Program.cs`
 
-Add `using SnoopMCP.Host;` and the registration in `builder.Services`:
+Add the `SessionManager` singleton registration before the `AddMcpServer(...)` chain. The MCP setup from Task 26 is unchanged (HTTP transport). The `builder.Services` portion becomes:
 
 ```csharp
 builder.Services.AddSingleton<SessionManager>();
-```
 
-Final `Services` block becomes:
-
-```csharp
-builder.Services.AddSingleton<SessionManager>();
 builder.Services
-    .AddMcpServer()
-    .WithStdioServerTransport()
+    .AddMcpServer(options => options.ServerInfo = new Implementation
+    {
+        Name = "SnoopMCP — WPF live-inspection MCP server",
+        Version = ThisAssembly.InformationalVersion
+    })
+    .WithHttpTransport(transport => transport.Stateless = true)
     .WithToolsFromAssembly();
 ```
+
+(`SessionManager` lives in the `SnoopMCP.Host` namespace — same as `Program` — so no extra `using` is needed.)
 
 - [ ] **Step 5: Commit**
 
@@ -10462,15 +10504,26 @@ dotnet build SnoopMCP.sln -c Release
 
 The host is `src\SnoopMCP.Host\bin\Release\net10.0-windows\SnoopMCP.Host.exe`.
 
+### Run the host
+
+SnoopMCP is an HTTP MCP server (Streamable HTTP), not a stdio subprocess. Start it directly:
+
+```text
+src\SnoopMCP.Host\bin\Release\net10.0-windows\SnoopMCP.Host.exe
+```
+
+It binds Kestrel to `http://127.0.0.1:6300` (localhost only) and serves the MCP endpoint at `/mcp`.
+
 ### Attach via the MCP client
 
-Configure your MCP client with a `command` and `args` pointing at the host:
+Point your MCP client at the HTTP endpoint:
 
 ```json
 {
   "mcpServers": {
     "snoopmcp": {
-      "command": "C:\\path\\to\\SnoopMCP.Host.exe"
+      "type": "http",
+      "url": "http://127.0.0.1:6300/mcp"
     }
   }
 }
