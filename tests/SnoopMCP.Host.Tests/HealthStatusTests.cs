@@ -19,7 +19,7 @@ public sealed class HealthStatusTests
     }
 
     [Fact]
-    public void Create_NullVersion_Throws()
+    public void Create_NullOrEmptyVersion_Throws()
     {
         Assert.Throws<ArgumentException>(() => HealthStatus.Create(string.Empty, attached: false));
     }
