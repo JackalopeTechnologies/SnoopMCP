@@ -110,6 +110,39 @@ The LLM will call:
 3. `findElements(rootId, predicate: { type: "Button", name: "Save" })`
 4. `describeElement(matchedId)`
 
+## Install (MSI)
+
+A per-user MSI installs SnoopMCP without administrator rights to
+`%LocalAppData%\SnoopMCP`, registers the MCP server in Claude Code and VS Code,
+creates a logon autostart task, and starts the host.
+
+**Build the installer** (needs the .NET 10 SDK, the VS C++ x64 workload, and the
+[WiX 5 toolset](https://wixtoolset.org) — `dotnet tool install --global wix`):
+
+```text
+pwsh -File SnoopMCP.Installer/build-installer.ps1 -Version 1.1.0
+```
+
+This produces `SnoopMCP.Installer/SnoopMCP.msi`. Double-click it (or
+`msiexec /i SnoopMCP.msi`) to install. After install, both AI clients point at
+`http://127.0.0.1:6300/mcp` and a "SnoopMCP Sample App" Start-menu shortcut is
+available. Confirm with `SnoopMCP.Cli status`.
+
+**Limitations (v1.1):** non-elevated targets only (the host attaches to
+same-elevation WPF apps — see Known limitations); single user per machine (port
+6300 is not multiplexed); the host start at install time is best-effort (the
+logon task starts it on every sign-in regardless).
+
+### Verifying an install (manual)
+
+After running the MSI on a test machine:
+1. `%LocalAppData%\SnoopMCP\` contains `SnoopMCP.Host.exe`, `SnoopMCP.Cli.exe`, `injector\`, `payload\`, and `samples\SampleWpfApp.exe`.
+2. `schtasks /Query /TN "SnoopMCP Host"` shows the logon task.
+3. `~/.claude.json` and `%APPDATA%\Code\User\mcp.json` each carry a `snoopmcp` HTTP entry — and nothing else was disturbed.
+4. `http://127.0.0.1:6300/health` returns 200 (or run `SnoopMCP.Cli status`).
+5. The "SnoopMCP Sample App" Start-menu shortcut launches the sample.
+6. Uninstall (Apps & features, or `msiexec /x`) removes the task, the client entries, and the files — leaving other MCP servers intact.
+
 ## Tool surface
 
 For a guided, end-to-end demonstration of every tool against the bundled sample
