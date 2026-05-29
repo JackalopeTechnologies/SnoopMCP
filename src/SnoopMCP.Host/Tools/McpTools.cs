@@ -6,6 +6,7 @@ namespace SnoopMCP.Host.Tools;
 using System.ComponentModel;
 using System.Text.Json;
 using ModelContextProtocol.Server;
+using SnoopMCP.Host.Injection;
 using SnoopMCP.Protocol;
 using SnoopMCP.Protocol.Tools;
 using SnoopMCP.Protocol.Wire;
@@ -34,6 +35,23 @@ public sealed class McpTools
         ArgumentNullException.ThrowIfNull(injector);
         mSession = session;
         mInjector = injector;
+    }
+
+    /// <summary>
+    /// Enumerates running WPF processes the host can see as candidate attach targets. Host-side,
+    /// pre-attach discovery — no injection required — so an LLM client can pick a target by name or
+    /// window title instead of needing a PID supplied out-of-band.
+    /// </summary>
+    /// <param name="cancellationToken">A token to observe while enumerating.</param>
+    /// <returns>The set of candidate WPF processes with pid, name, window title, bitness, and attachability.</returns>
+    [McpServerTool, Description(
+        "List running WPF processes that can be attached to (pid, name, window title, bitness).")]
+    public Task<JsonElement> ListWpfProcesses(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var enumerator = new ProcessEnumerator();
+        var response = new ListWpfProcessesResponse(enumerator.ListWpfProcesses());
+        return Task.FromResult(SerializeResult(response));
     }
 
     /// <summary>Attaches to a running WPF process by PID, injecting the payload and opening the session.</summary>
