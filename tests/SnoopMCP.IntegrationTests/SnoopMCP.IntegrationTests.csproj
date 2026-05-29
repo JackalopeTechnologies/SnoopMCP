@@ -5,10 +5,16 @@
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
         <RootNamespace>SnoopMCP.IntegrationTests</RootNamespace>
+        <UseWPF>true</UseWPF>
         <InjectorStageDir>$(MSBuildThisFileDirectory)..\..\src\SnoopMCP.Injection\bin\$(Configuration)\net10.0-windows\injector\</InjectorStageDir>
         <PayloadOutputDir>$(MSBuildThisFileDirectory)..\..\src\SnoopMCP.Payload\bin\$(Configuration)\net10.0-windows\</PayloadOutputDir>
         <SampleOutputDir>$(MSBuildThisFileDirectory)..\..\samples\SampleWpfApp\bin\$(Configuration)\net10.0-windows\</SampleOutputDir>
     </PropertyGroup>
+
+    <!-- UseWPF removes System.IO from the SDK implicit-usings set; restore it explicitly. -->
+    <ItemGroup>
+        <Using Include="System.IO" />
+    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="xunit.v3" Version="3.2.2" />
