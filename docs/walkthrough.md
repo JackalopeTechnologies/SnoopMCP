@@ -497,7 +497,7 @@ Run against the Save button (`id: 4`). The full list is long (every DP on a
 { "tool": "listDependencyProperties", "arguments": { "id": 4 } }
 ```
 
-```json
+```jsonc
 {
   "properties": [
     { "name": "IsPressed",  "ownerType": "System.Windows.Controls.Primitives.ButtonBase", "valueType": "System.Boolean",                "isAttached": false },
@@ -555,7 +555,7 @@ carefully — it has a subtlety worth understanding.
 { "tool": "resolveStyle", "arguments": { "id": 160 } }
 ```
 
-```json
+```jsonc
 {
   "appliedStyleKey": "Button",
   "appliedStyleSource": "Explicit",
