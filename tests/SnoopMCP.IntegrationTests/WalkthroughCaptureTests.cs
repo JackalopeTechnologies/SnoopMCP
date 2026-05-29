@@ -69,7 +69,7 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
     {
         JsonElement found = await mTools!.FindElements(rootId, predicate, ct);
         JsonElement matches = found.GetProperty("matches");
-        Assert.True(matches.GetArrayLength() > 0, $"No element matched predicate.");
+        Assert.True(matches.GetArrayLength() > 0, "No element matched predicate.");
         return matches[0].GetProperty("id").GetInt32();
     }
 

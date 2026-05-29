@@ -16,6 +16,8 @@ public sealed class WalkthroughTranscript
 {
     private const string TranscriptFileName = "walkthrough-transcript.json";
 
+    private static readonly string smSourceDirectory = ResolveSourceDirectory();
+
     private readonly List<WalkthroughRecord> mRecords = new();
 
     public void Add(string scene, string tool, object request, JsonElement response)
@@ -26,12 +28,17 @@ public sealed class WalkthroughTranscript
         mRecords.Add(new WalkthroughRecord(scene, tool, request, response.Clone()));
     }
 
-    /// <summary>Writes the buffered records to the JSON file beside this source file.</summary>
-    public async Task WriteAsync([CallerFilePath] string callerPath = "")
+    /// <summary>Writes the buffered records to <c>walkthrough-transcript.json</c> beside this source file.</summary>
+    public async Task WriteAsync()
     {
-        string dir = Path.GetDirectoryName(callerPath) ?? AppContext.BaseDirectory;
-        string target = Path.Combine(dir, TranscriptFileName);
+        string target = Path.Combine(smSourceDirectory, TranscriptFileName);
         string json = JsonSerializer.Serialize(mRecords, WireSerializer.JsonOptions);
         await File.WriteAllTextAsync(target, json);
+    }
+
+    private static string ResolveSourceDirectory([CallerFilePath] string thisFilePath = "")
+    {
+        string dir = Path.GetDirectoryName(thisFilePath) ?? AppContext.BaseDirectory;
+        return dir;
     }
 }
