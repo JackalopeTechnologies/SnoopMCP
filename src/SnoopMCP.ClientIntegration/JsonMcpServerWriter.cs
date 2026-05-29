@@ -112,7 +112,7 @@ public abstract class JsonMcpServerWriter : IClientWriter
             }
             catch (JsonException)
             {
-                present = false;
+                // Malformed config is treated as "not registered".
             }
         }
         result = new StatusResult(present, present
