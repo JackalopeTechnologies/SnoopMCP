@@ -17,6 +17,7 @@ using ModelContextProtocol.Protocol;
 public static class Program
 {
     private const string McpEndpointPattern = "/mcp";
+    private const string HealthEndpointPattern = "/health";
     private const string ServerName = "SnoopMCP — WPF live-inspection MCP server";
     private const int ListenPort = 6300;
 
@@ -47,6 +48,8 @@ public static class Program
 
         WebApplication app = builder.Build();
         app.MapMcp(McpEndpointPattern);
+        app.MapGet(HealthEndpointPattern, (SessionManager session) =>
+            Results.Ok(HealthStatus.Create(ThisAssembly.InformationalVersion, session.IsAttached)));
 
         await app.RunAsync().ConfigureAwait(false);
     }
