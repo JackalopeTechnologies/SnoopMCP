@@ -57,6 +57,7 @@ public static class PayloadEntryPoint
             var styleResolver = new StyleResolver();
             var templateResolver = new TemplateResolver(registry, describer);
             var bindingInspector = new BindingInspector(registry);
+            var xamlExporter = new XamlExporter();
 
             var toolRegistry = new ToolRegistry();
             toolRegistry.Register(new EchoToolHandler());
@@ -76,6 +77,7 @@ public static class PayloadEntryPoint
             toolRegistry.Register(new ResolveTemplateToolHandler(registry, templateResolver, marshal));
             toolRegistry.Register(new InspectBindingToolHandler(registry, bindingInspector, marshal));
             toolRegistry.Register(new ListBindingsToolHandler(registry, bindingInspector, marshal));
+            toolRegistry.Register(new ExportXamlToolHandler(registry, xamlExporter, marshal));
 
             ILogger<PipeServer> logger = NullLogger<PipeServer>.Instance;
             psServer = new PipeServer(pipeName, toolRegistry, logger);
