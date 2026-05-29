@@ -38,13 +38,63 @@
                            Name="installed" Type="integer" Value="1" KeyPath="yes" />
         </Component>
 
+        <!-- Install: register clients, create the logon task, start the host (best-effort). -->
+        <SetProperty Id="RegisterClients" Before="RegisterClients" Sequence="execute"
+                     Value="&quot;[INSTALLFOLDER]SnoopMCP.Cli.exe&quot; register-clients" />
+        <CustomAction Id="RegisterClients" BinaryRef="Wix4UtilCA_X86" DllEntry="WixQuietExec"
+                      Execute="deferred" Return="ignore" Impersonate="yes" />
+
+        <SetProperty Id="InstallAutostart" Before="InstallAutostart" Sequence="execute"
+                     Value="&quot;[INSTALLFOLDER]SnoopMCP.Cli.exe&quot; install-autostart" />
+        <CustomAction Id="InstallAutostart" BinaryRef="Wix4UtilCA_X86" DllEntry="WixQuietExec"
+                      Execute="deferred" Return="ignore" Impersonate="yes" />
+
+        <SetProperty Id="StartHost" Before="StartHost" Sequence="execute"
+                     Value="&quot;[INSTALLFOLDER]SnoopMCP.Cli.exe&quot; start" />
+        <CustomAction Id="StartHost" BinaryRef="Wix4UtilCA_X86" DllEntry="WixQuietExec"
+                      Execute="deferred" Return="ignore" Impersonate="yes" />
+
+        <!-- Uninstall: stop the host, remove the logon task, unregister clients. -->
+        <SetProperty Id="StopHost" Before="StopHost" Sequence="execute"
+                     Value="&quot;[INSTALLFOLDER]SnoopMCP.Cli.exe&quot; stop" />
+        <CustomAction Id="StopHost" BinaryRef="Wix4UtilCA_X86" DllEntry="WixQuietExec"
+                      Execute="deferred" Return="ignore" Impersonate="yes" />
+
+        <SetProperty Id="UninstallAutostart" Before="UninstallAutostart" Sequence="execute"
+                     Value="&quot;[INSTALLFOLDER]SnoopMCP.Cli.exe&quot; uninstall-autostart" />
+        <CustomAction Id="UninstallAutostart" BinaryRef="Wix4UtilCA_X86" DllEntry="WixQuietExec"
+                      Execute="deferred" Return="ignore" Impersonate="yes" />
+
+        <SetProperty Id="UnregisterClients" Before="UnregisterClients" Sequence="execute"
+                     Value="&quot;[INSTALLFOLDER]SnoopMCP.Cli.exe&quot; unregister-clients" />
+        <CustomAction Id="UnregisterClients" BinaryRef="Wix4UtilCA_X86" DllEntry="WixQuietExec"
+                      Execute="deferred" Return="ignore" Impersonate="yes" />
+
         <Feature Id="Main" Title="SnoopMCP" Level="1">
             <ComponentGroupRef Id="PublishOutput" />
             <ComponentRef Id="SampleShortcut" />
         </Feature>
 
+        <InstallExecuteSequence>
+            <Custom Action="RegisterClients" After="InstallFiles" Condition="NOT Installed OR REINSTALL" />
+            <Custom Action="InstallAutostart" After="RegisterClients" Condition="NOT Installed OR REINSTALL" />
+            <Custom Action="StartHost" After="InstallAutostart" Condition="NOT Installed OR REINSTALL" />
+            <Custom Action="StopHost" Before="UninstallAutostart" Condition="REMOVE = &quot;ALL&quot;" />
+            <Custom Action="UninstallAutostart" Before="UnregisterClients" Condition="REMOVE = &quot;ALL&quot;" />
+            <Custom Action="UnregisterClients" Before="RemoveFiles" Condition="REMOVE = &quot;ALL&quot;" />
+        </InstallExecuteSequence>
+
         <ui:WixUI Id="WixUI_Minimal" />
         <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
+        <UI>
+            <ProgressText Action="RegisterClients" Message="Registering SnoopMCP with your AI tools..." />
+            <ProgressText Action="InstallAutostart" Message="Creating the logon autostart task..." />
+            <ProgressText Action="StartHost" Message="Starting the SnoopMCP host..." />
+            <ProgressText Action="StopHost" Message="Stopping the SnoopMCP host..." />
+            <ProgressText Action="UninstallAutostart" Message="Removing the logon autostart task..." />
+            <ProgressText Action="UnregisterClients" Message="Removing SnoopMCP from your AI tools..." />
+        </UI>
 
     </Package>
 
