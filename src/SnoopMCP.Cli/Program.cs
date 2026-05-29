@@ -29,8 +29,8 @@ public static class Program
         {
             VerbRegisterClients => Task.FromResult(ExitUsage),
             VerbUnregisterClients => Task.FromResult(ExitUsage),
-            VerbInstallAutostart => Task.FromResult(ExitUsage),
-            VerbUninstallAutostart => Task.FromResult(ExitUsage),
+            VerbInstallAutostart => Task.FromResult(InstallAutostart()),
+            VerbUninstallAutostart => Task.FromResult(UninstallAutostart()),
             VerbStatus => Task.FromResult(ExitUsage),
             VerbStart => Task.FromResult(ExitUsage),
             VerbStop => Task.FromResult(ExitUsage),
@@ -39,11 +39,32 @@ public static class Program
         return await dispatched.ConfigureAwait(false);
     }
 
+    private const int ExitOk = 0;
+    private const int ExitFailure = 2;
+    private const string MsgAutostartCreated = "Autostart task created.";
+    private const string MsgAutostartCreateFailed = "Failed to create autostart task.";
+    private const string MsgAutostartRemoved = "Autostart task removed.";
+    private const string MsgAutostartRemoveFailed = "Failed to remove autostart task.";
+
     private static int PrintUsage()
     {
         Console.Error.WriteLine(
             "Usage: SnoopMCP.Cli <register-clients|unregister-clients|install-autostart|"
             + "uninstall-autostart|status|start|stop> [--vscode] [--claude-code]");
         return ExitUsage;
+    }
+
+    private static int InstallAutostart()
+    {
+        bool ok = AutostartTask.Create(HostProcess.ExePath());
+        Console.WriteLine(ok ? MsgAutostartCreated : MsgAutostartCreateFailed);
+        return ok ? ExitOk : ExitFailure;
+    }
+
+    private static int UninstallAutostart()
+    {
+        bool ok = AutostartTask.Remove();
+        Console.WriteLine(ok ? MsgAutostartRemoved : MsgAutostartRemoveFailed);
+        return ok ? ExitOk : ExitFailure;
     }
 }
