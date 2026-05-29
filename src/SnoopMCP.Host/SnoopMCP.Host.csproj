@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <RootNamespace>SnoopMCP.Host</RootNamespace>
+        <AssemblyName>SnoopMCP.Host</AssemblyName>
+        <PlatformTarget>x64</PlatformTarget>
+        <InvariantGlobalization>true</InvariantGlobalization>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\SnoopMCP.Protocol\SnoopMCP.Protocol.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
+        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.2.0" />
+    </ItemGroup>
+</Project>
