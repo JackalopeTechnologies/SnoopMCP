@@ -124,7 +124,7 @@ pwsh -File SnoopMCP.Installer/build-installer.ps1 -Version 1.1.0
 ```
 
 This produces `SnoopMCP.Installer/SnoopMCP.msi`. Double-click it (or
-`msiexec /i SnoopMCP.msi`) to install. After install, both AI clients point at
+`msiexec /i SnoopMCP.Installer\SnoopMCP.msi`) to install. After install, both AI clients point at
 `http://127.0.0.1:6300/mcp` and a "SnoopMCP Sample App" Start-menu shortcut is
 available. Confirm with `SnoopMCP.Cli status`.
 
@@ -136,7 +136,7 @@ logon task starts it on every sign-in regardless).
 ### Verifying an install (manual)
 
 After running the MSI on a test machine:
-1. `%LocalAppData%\SnoopMCP\` contains `SnoopMCP.Host.exe`, `SnoopMCP.Cli.exe`, `injector\`, `payload\`, and `samples\SampleWpfApp.exe`.
+1. `%LocalAppData%\SnoopMCP\` contains (among other runtime DLLs) `SnoopMCP.Host.exe`, `SnoopMCP.Cli.exe`, `injector\`, `payload\`, and `samples\SampleWpfApp.exe`.
 2. `schtasks /Query /TN "SnoopMCP Host"` shows the logon task.
 3. `~/.claude.json` and `%APPDATA%\Code\User\mcp.json` each carry a `snoopmcp` HTTP entry — and nothing else was disturbed.
 4. `http://127.0.0.1:6300/health` returns 200 (or run `SnoopMCP.Cli status`).
