@@ -60,7 +60,7 @@ public sealed class VsCodeMcpWriterTests : IDisposable
 
         JsonObject root = ReadConfig();
         Assert.Equal("http://x", (string?)root["servers"]!["other"]!["url"]);
-        Assert.NotNull(root["inputs"]);
+        Assert.Empty(root["inputs"]!.AsArray());
         Assert.Equal("http://127.0.0.1:6300/mcp", (string?)root["servers"]!["snoopmcp"]!["url"]);
     }
 
@@ -77,6 +77,42 @@ public sealed class VsCodeMcpWriterTests : IDisposable
         JsonObject root = ReadConfig();
         Assert.False(root["servers"]!.AsObject().ContainsKey("snoopmcp"));
         Assert.True(root["servers"]!.AsObject().ContainsKey("other"));
+    }
+
+    [Fact]
+    public void Register_OnFileWithNoServersSection_AddsTheSection()
+    {
+        File.WriteAllText(mConfigPath, "{\"inputs\":[]}");
+        var writer = new VsCodeMcpWriter(mConfigPath);
+
+        RegisterResult result = writer.Register(McpEndpoint.Default);
+
+        Assert.True(result.Success, result.Message);
+        JsonObject root = ReadConfig();
+        Assert.Empty(root["inputs"]!.AsArray());
+        Assert.Equal("http://127.0.0.1:6300/mcp", (string?)root["servers"]!["snoopmcp"]!["url"]);
+    }
+
+    [Fact]
+    public void Register_OnMalformedJson_FailsWithoutThrowing()
+    {
+        File.WriteAllText(mConfigPath, "{ this is not json ");
+        var writer = new VsCodeMcpWriter(mConfigPath);
+
+        RegisterResult result = writer.Register(McpEndpoint.Default);
+
+        Assert.False(result.Success);
+    }
+
+    [Fact]
+    public void Unregister_OnMissingFile_IsSuccessfulNoOp()
+    {
+        var writer = new VsCodeMcpWriter(mConfigPath);
+
+        UnregisterResult result = writer.Unregister();
+
+        Assert.True(result.Success);
+        Assert.False(File.Exists(mConfigPath));
     }
 
     [Fact]
