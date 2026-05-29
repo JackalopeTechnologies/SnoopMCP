@@ -44,9 +44,13 @@ public static class PayloadEntryPoint
             var describer = new ElementDescriber(registry, emitter);
             var marshal = new DispatcherMarshal(Application.Current.Dispatcher);
 
+            var ownerResolver = new PopupOwnerResolver();
+            var rootEnumerator = new RootEnumerator(registry, ownerResolver);
+
             var toolRegistry = new ToolRegistry();
             toolRegistry.Register(new EchoToolHandler());
             toolRegistry.Register(new DescribeElementToolHandler(registry, describer, marshal));
+            toolRegistry.Register(new ListVisualRootsToolHandler(rootEnumerator, marshal));
 
             ILogger<PipeServer> logger = NullLogger<PipeServer>.Instance;
             psServer = new PipeServer(pipeName, toolRegistry, logger);
