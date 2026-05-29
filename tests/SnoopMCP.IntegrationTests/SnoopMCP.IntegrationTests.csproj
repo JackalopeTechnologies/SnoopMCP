@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <PlatformTarget>x64</PlatformTarget>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+        <RootNamespace>SnoopMCP.IntegrationTests</RootNamespace>
+        <InjectorStageDir>$(MSBuildThisFileDirectory)..\..\src\SnoopMCP.Injection\bin\$(Configuration)\net10.0-windows\injector\</InjectorStageDir>
+        <PayloadOutputDir>$(MSBuildThisFileDirectory)..\..\src\SnoopMCP.Payload\bin\$(Configuration)\net10.0-windows\</PayloadOutputDir>
+        <SampleOutputDir>$(MSBuildThisFileDirectory)..\..\samples\SampleWpfApp\bin\$(Configuration)\net10.0-windows\</SampleOutputDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="xunit.v3" Version="3.2.2" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Host assemblies flow in normally (host + protocol + MCP SDK). -->
+        <ProjectReference Include="..\..\src\SnoopMCP.Host\SnoopMCP.Host.csproj" />
+        <!-- Build ordering only; their outputs are staged by the copy targets below. -->
+        <ProjectReference Include="..\..\src\SnoopMCP.Injection\SnoopMCP.Injection.csproj">
+            <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+        </ProjectReference>
+        <ProjectReference Include="..\..\src\SnoopMCP.Payload\SnoopMCP.Payload.csproj">
+            <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+        </ProjectReference>
+        <ProjectReference Include="..\..\samples\SampleWpfApp\SampleWpfApp.csproj">
+            <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+        </ProjectReference>
+    </ItemGroup>
+
+    <!-- Stage the injector closure under injector/ next to the test output. -->
+    <Target Name="CopyInjectorBinaries" AfterTargets="Build">
+        <ItemGroup>
+            <InjectorBinary Include="$(InjectorStageDir)**\*.*" />
+        </ItemGroup>
+        <Error Condition="'@(InjectorBinary)' == ''"
+               Text="No injector binaries at $(InjectorStageDir). Build SnoopMCP.Injection first." />
+        <Copy SourceFiles="@(InjectorBinary)"
+              DestinationFiles="@(InjectorBinary->'$(OutDir)injector\%(RecursiveDir)%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true" />
+    </Target>
+
+    <!-- Stage the payload dependency closure under payload/ next to the test output. -->
+    <Target Name="CopyPayloadBinaries" AfterTargets="Build">
+        <ItemGroup>
+            <PayloadBinary Include="$(PayloadOutputDir)*.dll;$(PayloadOutputDir)*.json" />
+        </ItemGroup>
+        <Error Condition="'@(PayloadBinary)' == ''"
+               Text="No payload binaries at $(PayloadOutputDir). Build SnoopMCP.Payload first." />
+        <Copy SourceFiles="@(PayloadBinary)"
+              DestinationFiles="@(PayloadBinary->'$(OutDir)payload\%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true" />
+    </Target>
+
+    <!-- Stage SampleWpfApp's full output at the test root so the test can launch it. -->
+    <Target Name="CopySampleApp" AfterTargets="Build">
+        <ItemGroup>
+            <SampleBinary Include="$(SampleOutputDir)**\*.*" />
+        </ItemGroup>
+        <Error Condition="'@(SampleBinary)' == ''"
+               Text="No SampleWpfApp output at $(SampleOutputDir). Build SampleWpfApp first." />
+        <Copy SourceFiles="@(SampleBinary)"
+              DestinationFiles="@(SampleBinary->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true" />
+    </Target>
+</Project>
