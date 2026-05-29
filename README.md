@@ -114,7 +114,10 @@ The LLM will call:
 
 A per-user MSI installs SnoopMCP without administrator rights to
 `%LocalAppData%\SnoopMCP`, registers the MCP server in Claude Code and VS Code,
-creates a logon autostart task, and starts the host.
+and creates a logon autostart task. The finish page offers a **"Launch SnoopMCP
+now"** checkbox (checked by default) to start the host immediately; either way
+the logon task starts it on the next sign-in. An upgrade or uninstall first
+terminates the running host (so the locked exe doesn't block file replacement).
 
 **Build the installer** (needs the .NET 10 SDK, the VS C++ x64 workload, and the
 [WiX 5 toolset](https://wixtoolset.org) — `dotnet tool install --global wix`):
@@ -130,8 +133,7 @@ available. Confirm with `SnoopMCP.Cli status`.
 
 **Limitations (v1.1):** non-elevated targets only (the host attaches to
 same-elevation WPF apps — see Known limitations); single user per machine (port
-6300 is not multiplexed); the host start at install time is best-effort (the
-logon task starts it on every sign-in regardless).
+6300 is not multiplexed).
 
 ### Verifying an install (manual)
 
@@ -139,9 +141,10 @@ After running the MSI on a test machine:
 1. `%LocalAppData%\SnoopMCP\` contains (among other runtime DLLs) `SnoopMCP.Host.exe`, `SnoopMCP.Cli.exe`, `injector\`, `payload\`, and `samples\SampleWpfApp.exe`.
 2. `schtasks /Query /TN "SnoopMCP Host"` shows the logon task.
 3. `~/.claude.json` and `%APPDATA%\Code\User\mcp.json` each carry a `snoopmcp` HTTP entry — and nothing else was disturbed.
-4. `http://127.0.0.1:6300/health` returns 200 (or run `SnoopMCP.Cli status`).
+4. With **"Launch SnoopMCP now"** ticked on the finish page, `http://127.0.0.1:6300/health` returns 200 (otherwise the host starts at next sign-in via the logon task). Either way, `SnoopMCP.Cli status` reports the state.
 5. The "SnoopMCP Sample App" Start-menu shortcut launches the sample.
-6. Uninstall (Apps & features, or `msiexec /x`) removes the task, the client entries, and the files — leaving other MCP servers intact.
+6. An **upgrade** (install a higher `-Version` over the running install) succeeds without a locked-file error — the running host is terminated first.
+7. Uninstall (Apps & features, or `msiexec /x`) removes the task, the client entries, and the files — leaving other MCP servers intact.
 
 ## Tool surface
 
