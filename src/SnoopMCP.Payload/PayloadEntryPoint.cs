@@ -3,6 +3,8 @@
 
 namespace SnoopMCP.Payload;
 
+using System.IO;
+using System.Reflection;
 using System.Windows;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,22 +19,64 @@ using SnoopMCP.Payload.Tools;
 /// </summary>
 public static class PayloadEntryPoint
 {
+    private const string ManagedAssemblyExtension = ".dll";
+    private const string ResourcesAssemblySuffix = ".resources";
+
     private static PipeServer? psServer;
 
     /// <summary>
-    /// Called by <c>ManagedInjector</c> from within the target process.
-    /// Starts the pipe server on a background task and returns immediately.
+    /// Called by <c>ManagedInjector</c> from within the target process. This is a thin bootstrap:
+    /// it installs an <see cref="AppDomain.AssemblyResolve"/> handler that probes the payload's own
+    /// directory, THEN delegates to <see cref="Run"/>. The split matters — the payload's dependencies
+    /// (<c>SnoopMCP.Protocol</c>, <c>Microsoft.Extensions.Logging.Abstractions</c>) sit next to the
+    /// payload, not in the target app's base directory, so without this handler the CLR fails to
+    /// resolve them when JIT-compiling <see cref="Run"/>. The bootstrap itself references only shared
+    /// framework types, so it JITs cleanly before the handler is needed.
     /// </summary>
     /// <param name="args">The named-pipe instance to bind. Must not be empty.</param>
     /// <returns><c>0</c> on success; non-zero when payload initialisation fails.</returns>
     public static int Inject(string args)
     {
         ArgumentException.ThrowIfNullOrEmpty(args);
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromPayloadDirectory;
+        return Run(args.Trim());
+    }
+
+    /// <summary>
+    /// Resolves payload dependencies from the payload assembly's own directory. The target process
+    /// only probes its own base directory, so transitive payload dependencies must be loaded by hand.
+    /// </summary>
+    private static Assembly? ResolveFromPayloadDirectory(object? sender, ResolveEventArgs eventArgs)
+    {
+        Assembly? resolved = null;
+        var requested = new AssemblyName(eventArgs.Name);
+        string simpleName = requested.Name ?? string.Empty;
+        bool isResolvable = simpleName.Length > 0
+            && !simpleName.EndsWith(ResourcesAssemblySuffix, StringComparison.Ordinal);
+        if (isResolvable)
+        {
+            string payloadDirectory = Path.GetDirectoryName(typeof(PayloadEntryPoint).Assembly.Location)
+                ?? string.Empty;
+            string candidate = Path.Combine(payloadDirectory, simpleName + ManagedAssemblyExtension);
+            if (File.Exists(candidate))
+            {
+                resolved = Assembly.LoadFrom(candidate);
+            }
+        }
+        return resolved;
+    }
+
+    /// <summary>
+    /// Builds the tool registry and starts the pipe server on a background task, returning immediately.
+    /// Invoked only after <see cref="Inject"/> has installed the dependency resolver.
+    /// </summary>
+    /// <param name="pipeName">The named-pipe instance to bind.</param>
+    /// <returns><c>0</c> on success; non-zero when payload initialisation fails.</returns>
+    private static int Run(string pipeName)
+    {
         int exitCode = 0;
         try
         {
-            string pipeName = args.Trim();
-
             if (Application.Current is null)
             {
                 throw new InvalidOperationException(
