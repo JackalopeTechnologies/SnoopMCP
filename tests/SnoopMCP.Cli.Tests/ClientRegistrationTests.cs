@@ -65,7 +65,7 @@ public sealed class ClientRegistrationTests : IDisposable
 
         Assert.Equal(0, code);
         string output = log.ToString();
-        Assert.Contains("Claude Code", output);
-        Assert.Contains("VS Code", output);
+        Assert.Contains(mWriters[0].ClientName, output);
+        Assert.Contains(mWriters[1].ClientName, output);
     }
 }
