@@ -50,6 +50,8 @@ public static class PayloadEntryPoint
             var parentNavigator = new ParentNavigator(describer);
             var elementFinder = new ElementFinder(describer);
             var hitTester = new HitTester(describer);
+            var pathParser = new PathStringParser();
+            var pathResolver = new PathResolver(describer, pathParser);
 
             var toolRegistry = new ToolRegistry();
             toolRegistry.Register(new EchoToolHandler());
@@ -60,6 +62,7 @@ public static class PayloadEntryPoint
             toolRegistry.Register(new GetTemplatedParentToolHandler(registry, parentNavigator, marshal));
             toolRegistry.Register(new FindElementsToolHandler(registry, elementFinder, marshal));
             toolRegistry.Register(new HitTestToolHandler(registry, hitTester, marshal));
+            toolRegistry.Register(new ResolvePathToolHandler(registry, pathResolver, marshal));
 
             ILogger<PipeServer> logger = NullLogger<PipeServer>.Instance;
             psServer = new PipeServer(pipeName, toolRegistry, logger);
