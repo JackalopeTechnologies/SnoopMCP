@@ -3,6 +3,7 @@
 
 namespace SnoopMCP.Payload.Inspection;
 
+using System.Globalization;
 using System.Reflection;
 using System.Windows;
 using SnoopMCP.Protocol.Tools;
@@ -34,6 +35,96 @@ public sealed class DataContextInspector
         object? dataContext = ResolveDataContext(element);
         DataContextInfo? info = dataContext is null ? null : BuildInfo(dataContext);
         return new DescribeDataContextResponse(info);
+    }
+
+    /// <summary>
+    /// Reads a dot-separated property path off an element's DataContext, e.g.
+    /// <c>SelectedCustomer.Address.Street</c>.
+    /// </summary>
+    /// <param name="element">The element whose DataContext roots the walk.</param>
+    /// <param name="path">The dot-separated property path. Must be non-empty.</param>
+    /// <returns>
+    /// The stringified leaf value and its runtime type when the path is reachable; otherwise a
+    /// response whose <see cref="ReadDataContextPathResponse.PathReachable"/> is <c>false</c> and
+    /// <see cref="ReadDataContextPathResponse.FailureAt"/> locates the offending segment.
+    /// </returns>
+    /// <remarks>
+    /// CA1822 disabled: scaffolded for DI in handler; will gain instance state in follow-up phases.
+    /// </remarks>
+#pragma warning disable CA1822
+    public ReadDataContextPathResponse ReadPath(DependencyObject element, string path)
+#pragma warning restore CA1822
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        ArgumentException.ThrowIfNullOrEmpty(path);
+
+        object? root = ResolveDataContext(element);
+        ReadDataContextPathResponse response = root is null
+            ? new ReadDataContextPathResponse(null, null, false, string.Empty)
+            : WalkPath(root, path);
+        return response;
+    }
+
+    private static ReadDataContextPathResponse WalkPath(object root, string path)
+    {
+        string[] segments = path.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        object? current = root;
+        string traversed = string.Empty;
+        bool failed = false;
+        string? failedAt = null;
+
+        for (int i = 0; i < segments.Length && !failed; i++)
+        {
+            string segment = segments[i];
+            string nextTraversed = traversed.Length == 0 ? segment : $"{traversed}.{segment}";
+            (object? value, string newTraversed, bool stepFailed, string? stepFailedAt) =
+                StepInto(current, segment, traversed, nextTraversed);
+            current = value;
+            traversed = newTraversed;
+            failed = stepFailed;
+            failedAt = stepFailedAt;
+        }
+
+        return BuildPathResult(current, failed, failedAt);
+    }
+
+    private static (object? Value, string Traversed, bool Failed, string? FailedAt) StepInto(
+        object? current,
+        string segment,
+        string traversed,
+        string nextTraversed)
+    {
+        (object? Value, string Traversed, bool Failed, string? FailedAt) result;
+        if (current is null)
+        {
+            result = (null, traversed, true, traversed);
+        }
+        else
+        {
+            PropertyInfo? prop = current.GetType().GetProperty(
+                segment,
+                BindingFlags.Public | BindingFlags.Instance);
+            result = prop is { CanRead: true } readable
+                ? (readable.GetValue(current), nextTraversed, false, null)
+                : (null, traversed, true, nextTraversed);
+        }
+        return result;
+    }
+
+    private static ReadDataContextPathResponse BuildPathResult(object? current, bool failed, string? failedAt)
+    {
+        ReadDataContextPathResponse result;
+        if (failed)
+        {
+            result = new ReadDataContextPathResponse(null, null, false, failedAt);
+        }
+        else
+        {
+            string? value = current is null ? null : Convert.ToString(current, CultureInfo.InvariantCulture);
+            string? valueType = current?.GetType().FullName;
+            result = new ReadDataContextPathResponse(value, valueType, true, null);
+        }
+        return result;
     }
 
     private static object? ResolveDataContext(DependencyObject element)
