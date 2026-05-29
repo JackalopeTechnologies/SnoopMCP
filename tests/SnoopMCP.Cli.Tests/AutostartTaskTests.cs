@@ -36,7 +36,7 @@ public sealed class AutostartTaskTests
     }
 
     [Fact]
-    public void BuildCreateArguments_NullHostPath_Throws()
+    public void BuildCreateArguments_NullOrEmptyHostPath_Throws()
     {
         Assert.Throws<ArgumentException>(() => AutostartTask.BuildCreateArguments(string.Empty));
     }
