@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SnoopMCP.Injection compiles no C# of ours. Its job: build Snoop's NATIVE
+    injector DLL (Snoop.GenericInjector.vcxproj) and managed launcher exe
+    (Snoop.InjectorLauncher.csproj) from the external/snoopwpf submodule for
+    x64 Release, then stage the resulting binary closure under this project's
+    output 'injector/' folder. The host (and integration tests) copy that
+    folder next to their own output so InjectorService can subprocess
+    Snoop.InjectorLauncher.x64.exe at runtime.
+
+    The native .vcxproj cannot be built by the .NET SDK's MSBuild ('dotnet
+    build'); we shell out to the full MSBuild.exe (located via vswhere). This
+    requires Visual Studio with the C++ (VC.Tools.x86.x64) workload.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>SnoopMCP.Injection</RootNamespace>
+    <AssemblyName>SnoopMCP.Injection</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RunAnalyzers>false</RunAnalyzers>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- This project carries no analyzer-relevant code; opt out of the package. -->
+    <IncludeCodeStructureAnalyzers>false</IncludeCodeStructureAnalyzers>
+    <SnoopRepoRoot>$(MSBuildThisFileDirectory)..\..\external\snoopwpf\</SnoopRepoRoot>
+    <SnoopBinDir>$(SnoopRepoRoot)bin\Release\</SnoopBinDir>
+    <InjectorStageDir>$(MSBuildThisFileDirectory)bin\$(Configuration)\$(TargetFramework)\injector\</InjectorStageDir>
+  </PropertyGroup>
+
+  <!--
+    Build Snoop's injector with the full MSBuild.exe, then stage the closure.
+    Runs after our (empty) Build so $(OutDir) exists.
+  -->
+  <Target Name="StageSnoopInjector" AfterTargets="Build">
+    <Exec Command="&quot;%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe&quot; -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe"
+          ConsoleToMsBuild="true"
+          StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="FullMSBuildPath" />
+    </Exec>
+
+    <Error Condition="'$(FullMSBuildPath)' == '' or !Exists('$(FullMSBuildPath)')"
+           Text="Could not locate the full MSBuild.exe via vswhere. SnoopMCP.Injection needs Visual Studio with the C++ (VC.Tools.x86.x64) workload to build Snoop's native injector." />
+
+    <Message Importance="high" Text="SnoopMCP.Injection: building Snoop native injector (x64) via $(FullMSBuildPath)" />
+
+    <Exec Command="&quot;$(FullMSBuildPath)&quot; &quot;$(SnoopRepoRoot)Snoop.GenericInjector\Snoop.GenericInjector.vcxproj&quot; -p:Configuration=Release -p:Platform=x64 -v:minimal -nologo" />
+
+    <Exec Command="&quot;$(FullMSBuildPath)&quot; &quot;$(SnoopRepoRoot)Snoop.InjectorLauncher\Snoop.InjectorLauncher.csproj&quot; -t:restore;build -p:Configuration=Release -p:Platform=x64 -v:minimal -nologo" />
+
+    <ItemGroup>
+      <SnoopInjectorArtifact Include="$(SnoopBinDir)**\*.*"
+                             Exclude="$(SnoopBinDir)**\*.pdb;$(SnoopBinDir)**\*.lib;$(SnoopBinDir)**\*.exp;$(SnoopBinDir)**\*.lastcodeanalysissucceeded" />
+    </ItemGroup>
+
+    <Error Condition="'@(SnoopInjectorArtifact)' == ''"
+           Text="Snoop injector build produced no artifacts in $(SnoopBinDir)." />
+
+    <Copy SourceFiles="@(SnoopInjectorArtifact)"
+          DestinationFiles="@(SnoopInjectorArtifact->'$(InjectorStageDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+
+    <Message Importance="high" Text="SnoopMCP.Injection: staged @(SnoopInjectorArtifact->Count()) injector files to $(InjectorStageDir)" />
+  </Target>
+
+</Project>

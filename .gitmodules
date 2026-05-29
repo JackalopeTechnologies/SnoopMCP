@@ -1,0 +1,5 @@
+[submodule "external/snoopwpf"]
+	path = external/snoopwpf
+	url = https://github.com/JackalopeTechnologies/snoopwpf.git
+	branch = snoopmcp
+	ignore = dirty
