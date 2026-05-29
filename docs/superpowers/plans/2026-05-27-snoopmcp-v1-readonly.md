@@ -9813,15 +9813,22 @@ git -C E:/GitHub/SnoopMCP commit -m "Task 29: Host MCP tool wrappers — attach/
 
 ## Task 30: Fork Snoop into JackalopeTechnologies and add as a git submodule
 
-**Goal:** Fork `snoopwpf/snoopwpf` to `JackalopeTechnologies/snoopwpf` (we own the pinned commit and can patch .NET 10 / Jackalope-specific issues without waiting on upstream), then pin **our fork** under `external/snoopwpf/` as a git submodule. Reference the upstream `Snoop.GenericInjector` project via `ProjectReference` from the fork.
+**Goal:** Pin our fork `JackalopeTechnologies/snoopwpf` (branch `snoopmcp`) under `external/snoopwpf/` as a git submodule, then build Snoop's injector **from that submodule source** and stage the resulting binaries next to `SnoopMCP.Host.exe`.
 
-The fork carries two branches:
-- **`main`** — tracks upstream `snoopwpf/snoopwpf:main` via the `upstream` remote. Periodic fetch + merge keeps us current.
-- **`snoopmcp`** — our active branch. SnoopMCP's submodule pins commits here. .NET 10 patches, Jackalope-specific tweaks, anything we're not ready to upstream lives on this branch.
+**Reconnaissance corrected the original design.** Recon of snoopwpf HEAD `81a5cd6` (Ms-PL ✓) found that Snoop's injector is NOT a managed library you `ProjectReference`. It is a two-component native+managed pipeline:
 
-Why fork (not pure-submodule of upstream): **.NET 10 compatibility risk.** Snoop upstream may not yet target `net10.0-windows`; the fork lets us land the compatibility bump without waiting for upstream review.
+- **`Snoop.GenericInjector`** — a **native C++ DLL** (`.vcxproj`, PlatformToolset v142+; needs MSVC + Windows SDK). Builds per-arch: `Snoop.GenericInjector.{x64|x86|arm64}.dll`. Uses `ICLRRuntimeHost::ExecuteInDefaultAppDomain` to call the managed payload entry inside the target.
+- **`Snoop.InjectorLauncher`** — a **managed launcher exe** (`Snoop.InjectorLauncher.{x64|x86|arm64}.exe`) that `CreateRemoteThread`+`LoadLibraryW`-loads the native DLL into the target. It **self-redirects across bitness** (launch x64 → it re-spawns x86 if the target is 32-bit).
 
-Pre-check: verify Snoop's license permits this. Acceptable: MS-PL, MIT, BSD-3-Clause, Apache 2.0. Snoop has historically been MS-PL; confirm at execution time.
+The host therefore **subprocesses the launcher exe** (Task 31) — it never references Snoop types. A ProjectReference can't do cross-bitness injection; that's the whole reason Snoop ships separate launcher exes. `SnoopMCP.Injection` is consequently a **build-and-stage** project, not a code wrapper: an MSBuild target builds the two submodule injector projects (x64) with the full `MSBuild.exe` and copies their output closure to `SnoopMCP.Injection`'s output, which flows to the host.
+
+**Validated at execution time (GO):** on this machine (VS Professional 2026 + VC++ x64) both `Snoop.GenericInjector.x64.dll` and `Snoop.InjectorLauncher.x64.exe` build cleanly, and `coreclr.dll`-based CLR hosting is version-agnostic for .NET 6+ — so **.NET 10 targets work unpatched**; no fork patches are needed for v1 (`snoopmcp` == upstream `develop` @ `81a5cd6`).
+
+The fork carries:
+- **`develop`** — tracks upstream `snoopwpf/snoopwpf:develop` (upstream's default). Periodic fetch + merge keeps us current.
+- **`snoopmcp`** — our pin branch (already created at `81a5cd6`). Future .NET-version patches / Jackalope tweaks land here.
+
+Pre-check (DONE): license is **Ms-PL** — permits fork + use with attribution.
 
 **Files:**
 - New GitHub repo: `JackalopeTechnologies/snoopwpf` (fork)
@@ -9852,10 +9859,10 @@ git -C E:/tmp/snoopwpf-fork remote add upstream https://github.com/snoopwpf/snoo
 git -C E:/tmp/snoopwpf-fork fetch upstream
 ```
 
-Create the working branch off the fork's `main` (which should mirror upstream `main` right after the fork):
+Create the working branch off the validated commit (`81a5cd6`, the tip of upstream/fork `develop`):
 
 ```text
-git -C E:/tmp/snoopwpf-fork checkout -b snoopmcp main
+git -C E:/tmp/snoopwpf-fork checkout -b snoopmcp 81a5cd67acb17978585e6f94de633cee81a5be19
 ```
 
 ```text
@@ -9874,13 +9881,13 @@ git -C E:/tmp/snoopwpf-fork rev-parse snoopmcp
 
 The temporary clone has served its purpose — the working tree we actually use comes from the submodule (Step 5). You can leave `E:/tmp/snoopwpf-fork` for now in case you need to make fork-side commits before the submodule add.
 
-- [ ] **Step 4: Identify the upstream injector project**
+- [ ] **Step 4: Confirm the injector project paths in the submodule**
 
-```text
-git -C E:/tmp/snoopwpf-fork grep -l "class Injector"
-```
+Two projects matter (verified at `81a5cd6`):
+- `external/snoopwpf/Snoop.GenericInjector/Snoop.GenericInjector.vcxproj` — native C++ DLL (multi-arch via `-p:Platform=x64`)
+- `external/snoopwpf/Snoop.InjectorLauncher/Snoop.InjectorLauncher.csproj` — managed launcher exe (multi-arch via `-p:Platform=x64`)
 
-Note the directory of the matching `.csproj`. The remaining steps assume the path is `Snoop.GenericInjector/Snoop.GenericInjector.csproj`. If grep returns a different path, substitute it.
+The launcher's CLI contract (from `Snoop.InjectorLauncher/InjectorLauncherCommandLineOptions.cs`): `--targetPID <int>` (required), `--targetHwnd <int>`, `--assembly <path-or-name>` (required), `--className <fqcn>` (required), `--methodName <name>` (required), `--settingsFile <string>`. The `--settingsFile` value is the single `string` argument delivered to the payload entry method — **SnoopMCP passes the pipe name here.**
 
 - [ ] **Step 5: Add the fork as a submodule pinned to `snoopmcp`**
 
@@ -9896,9 +9903,9 @@ Inside the submodule, also set the `upstream` remote so we can fetch and merge f
 git -C E:/GitHub/SnoopMCP/external/snoopwpf remote add upstream https://github.com/snoopwpf/snoopwpf.git
 ```
 
-- [ ] **Step 6: Project scaffolding** — `src\SnoopMCP.Injection\SnoopMCP.Injection.csproj`
+- [ ] **Step 6: Build-and-stage project** — `src\SnoopMCP.Injection\SnoopMCP.Injection.csproj`
 
-The project is a thin wrapper that re-exports the upstream injector type via `ProjectReference`. No source files of our own.
+`SnoopMCP.Injection` compiles no C# of ours. Its job: build the two submodule injector projects (x64 Release) with the **full MSBuild.exe** (the .NET SDK's `dotnet build` cannot build the native `.vcxproj`), then expose the resulting binaries as content that copies to the host output under an `injector/` subfolder. The host ProjectReferences this project content-only (Task 31, Step 1).
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -9906,16 +9913,44 @@ The project is a thin wrapper that re-exports the upstream injector type via `Pr
         <TargetFramework>net10.0-windows</TargetFramework>
         <RootNamespace>SnoopMCP.Injection</RootNamespace>
         <AssemblyName>SnoopMCP.Injection</AssemblyName>
-        <PlatformTarget>x64</PlatformTarget>
-        <!-- Upstream Snoop source predates our analyzer rules — suppress for the wrapper. -->
-        <NoWarn>$(NoWarn);CS1591</NoWarn>
-        <GenerateDocumentationFile>false</GenerateDocumentationFile>
-        <!-- Don't apply CodeStructure.Analyzers to upstream code; we don't own its style. -->
+        <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
         <RunAnalyzers>false</RunAnalyzers>
+        <GenerateDocumentationFile>false</GenerateDocumentationFile>
+        <!-- Where the submodule's Directory.build.props drops its build output. -->
+        <SnoopRepoRoot>$(MSBuildThisFileDirectory)..\..\external\snoopwpf\</SnoopRepoRoot>
+        <SnoopBinDir>$(SnoopRepoRoot)bin\Release\</SnoopBinDir>
     </PropertyGroup>
 
+    <!--
+        Locate the full MSBuild.exe (VS), then build the native injector DLL and the
+        managed launcher exe for x64 Release. Runs before our build so the staged
+        Content items below exist. Requires VS with the C++ x64 workload installed.
+    -->
+    <Target Name="BuildSnoopInjector" BeforeTargets="AssignTargetPaths;Build">
+        <Exec Command="&quot;$(MSBuildBinPath)\..\..\..\..\Installer\vswhere.exe&quot; -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe"
+              ConsoleToMsBuild="true"
+              StandardOutputImportance="low">
+            <Output TaskParameter="ConsoleOutput" PropertyName="FullMSBuildPath" />
+        </Exec>
+        <Error Condition="'$(FullMSBuildPath)' == '' or !Exists('$(FullMSBuildPath)')"
+               Text="Could not locate the full MSBuild.exe via vswhere. SnoopMCP.Injection needs Visual Studio with the C++ (VC.Tools.x86.x64) workload to build Snoop's native injector." />
+        <Exec Command="&quot;$(FullMSBuildPath)&quot; &quot;$(SnoopRepoRoot)Snoop.GenericInjector\Snoop.GenericInjector.vcxproj&quot; -t:restore;build -p:Configuration=Release -p:Platform=x64 -v:minimal -nologo" />
+        <Exec Command="&quot;$(FullMSBuildPath)&quot; &quot;$(SnoopRepoRoot)Snoop.InjectorLauncher\Snoop.InjectorLauncher.csproj&quot; -t:restore;build -p:Configuration=Release -p:Platform=x64 -v:minimal -nologo" />
+    </Target>
+
+    <!--
+        Stage the x64 launcher + native DLL + managed dependency closure into the
+        host output under injector/. Glob the whole Release bin so the launcher's
+        runtime closure (CommandLine.dll, *.config, *.runtimeconfig.json, etc.)
+        comes along; arch-suffixed binaries for x86/arm64 are inert extras.
+    -->
     <ItemGroup>
-        <ProjectReference Include="..\..\external\snoopwpf\Snoop.GenericInjector\Snoop.GenericInjector.csproj" />
+        <Content Include="$(SnoopBinDir)**\*.*"
+                 Exclude="$(SnoopBinDir)**\*.pdb;$(SnoopBinDir)**\*.lib;$(SnoopBinDir)**\*.exp">
+            <Link>injector\%(RecursiveDir)%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <Visible>false</Visible>
+        </Content>
     </ItemGroup>
 </Project>
 ```
@@ -9924,11 +9959,9 @@ The project is a thin wrapper that re-exports the upstream injector type via `Pr
 dotnet sln SnoopMCP.sln add src/SnoopMCP.Injection/SnoopMCP.Injection.csproj
 ```
 
-**Fallback if the upstream csproj doesn't multi-target with `net10.0-windows`:**
-
-1. Build the upstream project standalone — `dotnet build external/snoopwpf/Snoop.GenericInjector/Snoop.GenericInjector.csproj -c Release`
-2. In `SnoopMCP.Injection.csproj`, replace the `ProjectReference` with a `<Reference Include="..\..\external\snoopwpf\Snoop.GenericInjector\bin\Release\<tfm>\Snoop.GenericInjector.dll" />`
-3. Add an MSBuild `<Target Name="BuildUpstream" BeforeTargets="Build">` that invokes the upstream build so clean checkouts still work
+> **Build-command consequence:** because the native `.vcxproj` build runs via the full `MSBuild.exe` inside `BuildSnoopInjector`, the solution still builds with `dotnet build SnoopMCP.sln` (the Exec shells out to the real MSBuild for the native part). The machine must have VS + the C++ x64 workload — validated present (VS Professional 2026). On a machine without it, the `<Error>` fires with a clear message.
+>
+> **Glob-timing note:** the `Content` glob is evaluated at project-load, before `BuildSnoopInjector` runs on a clean tree. If a from-scratch build stages nothing, either (a) split into a separate `.targets` that re-globs after the build via a dynamic `<ItemGroup>` inside an `AfterTargets="BuildSnoopInjector"` target, or (b) accept that the first build populates `external/snoopwpf/bin/Release` and the copy happens on the same build via the dynamic-itemgroup approach. Implement the dynamic `<ItemGroup>`-inside-`<Target>` form if the static glob misses on a clean checkout.
 
 - [ ] **Step 7: Third-party notices** — `src\SnoopMCP.Injection\THIRD_PARTY_NOTICES.md`
 
@@ -9949,20 +9982,19 @@ build against.
 
 ## Maintenance: keeping the fork in sync with upstream
 
-The fork carries two branches:
+The fork carries:
 
-- `main` — tracks upstream `snoopwpf/snoopwpf:main`. Update with periodic merges.
-- `snoopmcp` — our active branch. SnoopMCP's submodule pins commits here.
+- `develop` — tracks upstream `snoopwpf/snoopwpf:develop` (upstream's default). Update with periodic merges.
+- `snoopmcp` — our pin branch. SnoopMCP's submodule pins commits here. (v1 pin == upstream `develop` @ 81a5cd6, no patches.)
 
-To sync upstream changes into our fork's `snoopmcp`:
+To sync upstream changes into our fork's `snoopmcp` (run with `git -C E:/GitHub/SnoopMCP/external/snoopwpf`):
 
-    cd E:/GitHub/SnoopMCP/external/snoopwpf
     git fetch upstream
-    git checkout main
-    git merge upstream/main
-    git push origin main
+    git checkout develop
+    git merge upstream/develop
+    git push origin develop
     git checkout snoopmcp
-    git merge main
+    git merge develop
     git push origin snoopmcp
 
 To bump SnoopMCP's submodule pin after fork commits land:
@@ -9973,20 +10005,25 @@ To bump SnoopMCP's submodule pin after fork commits land:
 
 To upstream a fork-side patch:
 
-    cd E:/GitHub/SnoopMCP/external/snoopwpf
-    git checkout main
-    git cherry-pick <commit-on-snoopmcp>
-    git push origin main
-    gh pr create --repo snoopwpf/snoopwpf --base main --head JackalopeTechnologies:main
+    git -C E:/GitHub/SnoopMCP/external/snoopwpf checkout develop
+    git -C E:/GitHub/SnoopMCP/external/snoopwpf cherry-pick <commit-on-snoopmcp>
+    git -C E:/GitHub/SnoopMCP/external/snoopwpf push origin develop
+    gh pr create --repo snoopwpf/snoopwpf --base develop --head JackalopeTechnologies:develop
 ```
 
-- [ ] **Step 8: Build the wrapper**
+- [ ] **Step 8: Build + verify staging**
 
 ```text
 dotnet build src/SnoopMCP.Injection/SnoopMCP.Injection.csproj -c Debug
 ```
 
-Expected: build succeeds and produces `SnoopMCP.Injection.dll` plus `Snoop.GenericInjector.dll` (the latter from the fork) in the output. If the upstream project on the `snoopmcp` branch fails to build under .NET 10's SDK, the fix lives on the fork: commit the framework-bump (or whatever the compatibility patch is) to `snoopmcp`, push, then `git submodule update --remote` and rebuild.
+Expected: `BuildSnoopInjector` runs the full MSBuild.exe on both submodule projects (native DLL + launcher exe), then the `Content` items stage them. Verify the launcher + native DLL landed in the project output:
+
+```text
+dir src\SnoopMCP.Injection\bin\Debug\net10.0-windows\injector
+```
+
+Expected to contain at least `Snoop.InjectorLauncher.x64.exe`, `Snoop.InjectorLauncher.x64.exe.config`, `Snoop.GenericInjector.x64.dll`, and `CommandLine.dll`. If `injector/` is empty on a from-scratch build, apply the dynamic-`ItemGroup` fix from Step 6's glob-timing note and rebuild.
 
 - [ ] **Step 9: Commit**
 
@@ -10000,35 +10037,45 @@ git -C E:/GitHub/SnoopMCP commit -F E:/tmp/msg-task-28.txt
 `E:/tmp/msg-task-28.txt`:
 
 ```text
-Task 30: fork snoopwpf into JackalopeTechnologies and pin via git submodule
+Task 30: pin snoopwpf fork as submodule + build-and-stage SnoopMCP.Injection
 
-External dependency model: our fork at github.com/JackalopeTechnologies/snoopwpf
-carries main (tracking upstream) + snoopmcp (our active branch). The submodule
-under external/snoopwpf pins commits on snoopmcp; SnoopMCP.Injection is a thin
-wrapper csproj that ProjectReferences the upstream Snoop.GenericInjector
-project so we can patch .NET 10 issues without waiting on upstream review.
+External dependency model: fork JackalopeTechnologies/snoopwpf carries develop
+(tracks upstream) + snoopmcp (our pin branch, == upstream develop @ 81a5cd6,
+no patches for v1). The submodule under external/snoopwpf pins snoopmcp.
+
+SnoopMCP.Injection builds Snoop's NATIVE injector (Snoop.GenericInjector.vcxproj,
+x64) and managed launcher (Snoop.InjectorLauncher.csproj, x64) from the submodule
+via the full MSBuild.exe, then stages the binaries under injector/ next to the
+host. The host subprocesses Snoop.InjectorLauncher.x64.exe (Task 31) rather than
+referencing Snoop types — required because the launcher must match the target's
+bitness. License: Ms-PL.
 ```
 
 ---
 
 ## Task 31: Host — InjectorService + ProcessProbe
 
-**Goal:** Replace `NullInjectorService` (Task 29) with a real implementation that wraps the submoduled `Snoop.GenericInjector.Injector` and a process probe. Failures map to structured `ErrorCode`s: `AttachFailed` (process not found / not WPF / wrong arch), `PayloadLoadFailed` (assembly conflict in target's load context), `AccessDenied` (elevation mismatch).
+**Goal:** Replace `NullInjectorService` (Task 29) with a real implementation that **subprocesses the staged `Snoop.InjectorLauncher.x64.exe`** (from Task 30) plus a process probe. Failures map to structured `ErrorCode`s: `AttachFailed` (process not found / not WPF / wrong arch / launcher non-zero exit), `PayloadLoadFailed` (payload DLL missing), `AccessDenied` (elevation mismatch / launcher access-denied exit).
 
-`ProcessProbe` inspects the target's process to confirm bitness, .NET runtime version (.NET 10+), and that it is a WPF host (`PresentationFramework.dll` loaded).
+`ProcessProbe` inspects the target's process to confirm bitness, .NET runtime version (.NET 10+), and that it is a WPF host (`PresentationFramework.dll` loaded). v1 is **x64-only**: a non-x64 target is rejected in the probe with `AttachFailed` before any injection attempt (the launcher could self-redirect to x86, but we don't ship the x86 payload in v1).
 
 **Files:**
 - Create: `src\SnoopMCP.Host\Injection\ProcessProbe.cs`
 - Create: `src\SnoopMCP.Host\Injection\InjectorService.cs`
 - Modify: `src\SnoopMCP.Host\Program.cs` (swap `NullInjectorService` for `InjectorService`)
-- Modify: `src\SnoopMCP.Host\SnoopMCP.Host.csproj` (add `SnoopMCP.Injection` reference)
+- Modify: `src\SnoopMCP.Host\SnoopMCP.Host.csproj` (reference `SnoopMCP.Injection` content + stage the payload)
 
-- [ ] **Step 1: Add the injection project reference** — modify `src\SnoopMCP.Host\SnoopMCP.Host.csproj`
+- [ ] **Step 1: Wire the injection + payload binaries into the host output** — modify `src\SnoopMCP.Host\SnoopMCP.Host.csproj`
 
 ```xml
 <ItemGroup>
     <ProjectReference Include="..\SnoopMCP.Protocol\SnoopMCP.Protocol.csproj" />
-    <ProjectReference Include="..\SnoopMCP.Injection\SnoopMCP.Injection.csproj" />
+    <!-- Build Snoop's injector and flow its staged injector/ content into our output. -->
+    <ProjectReference Include="..\SnoopMCP.Injection\SnoopMCP.Injection.csproj">
+        <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <!-- Build SnoopMCP.Payload.dll beside the host so the launcher can inject it; the
+         host never loads it (no CLR reference). -->
     <ProjectReference Include="..\SnoopMCP.Payload\SnoopMCP.Payload.csproj">
         <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         <OutputItemType>Content</OutputItemType>
@@ -10037,7 +10084,9 @@ project so we can patch .NET 10 issues without waiting on upstream review.
 </ItemGroup>
 ```
 
-The `Payload` reference with `ReferenceOutputAssembly=false` builds `SnoopMCP.Payload.dll` alongside the host (so the injector can find it at runtime) without making the host load it. The host is fully decoupled from payload types at the CLR level.
+The `SnoopMCP.Injection` reference (`ReferenceOutputAssembly=false`) builds the injector and its `injector/`-linked content; MSBuild propagates that content's `CopyToOutputDirectory` transitively so `injector/Snoop.InjectorLauncher.x64.exe` etc. land under the host output. The `Payload` reference builds `SnoopMCP.Payload.dll` next to the host (the launcher's `--assembly` target) without a CLR reference — host stays decoupled from payload + WPF types.
+
+> If transitive content propagation doesn't carry the `injector/` files to the host output, add an explicit post-build `<Target>` in the host csproj that copies `$(MSBuildThisFileDirectory)..\SnoopMCP.Injection\bin\$(Configuration)\net10.0-windows\injector\**` into `$(OutDir)injector\`. Verify at execution time and use whichever works.
 
 - [ ] **Step 2: `ProcessProbe`** — `src\SnoopMCP.Host\Injection\ProcessProbe.cs`
 
@@ -10071,12 +10120,24 @@ public sealed class ProcessProbe
             string bitness = DetermineBitness(process);
             (string runtime, string framework) = DetermineRuntime(process);
             EnsureWpfLoaded(process);
+            EnsureX64(bitness);
 
             return new ProcessProbeResult(
                 ProcessName: processName,
                 RuntimeVersion: runtime,
                 FrameworkVersion: framework,
                 Bitness: bitness);
+        }
+    }
+
+    private static void EnsureX64(string bitness)
+    {
+        bool isX64 = string.Equals(bitness, "x64", StringComparison.Ordinal);
+        if (!isX64)
+        {
+            throw new SnoopMcpException(
+                ErrorCode.AttachFailed,
+                $"Target is {bitness}; SnoopMCP v1 supports x64 targets only.");
         }
     }
 
@@ -10145,16 +10206,27 @@ public sealed class ProcessProbe
 
 - [ ] **Step 3: `InjectorService`** — `src\SnoopMCP.Host\Injection\InjectorService.cs`
 
-The actual call into the upstream `Injector` depends on its surface — at execution time, inspect `external/snoopwpf/Snoop.GenericInjector/...` to find the public entry method and its namespace. The historical shape has been `Snoop.GenericInjector.Injector.Inject(int processId, string payloadPath, string typeName, string methodName, string args)`. Adjust both the namespace and the call below to match what you find in the pinned submodule commit.
+Subprocesses the staged `injector/Snoop.InjectorLauncher.x64.exe` with the validated CLI. The launcher loads the native `Snoop.GenericInjector.x64.dll` (beside it) into the target via `CreateRemoteThread`+`LoadLibraryW`, which uses `ICLRRuntimeHost::ExecuteInDefaultAppDomain` to call `SnoopMCP.Payload.PayloadEntryPoint.Inject(pipeName)` inside the target. Our `Inject` starts the pipe server and returns 0, so the launcher exits 0 once the server is up — then the host's `SessionManager.OpenAsync` connects (`PipeClient` has a 5 s connect timeout, which covers the window).
+
+`--settingsFile` carries the **pipe name** (it becomes the single `string` argument the CLR delivers to `Inject`). `--assembly` is the full path to our payload DLL.
 
 ```csharp
 namespace SnoopMCP.Host.Injection;
 
+using System.Diagnostics;
+using System.IO;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using SnoopMCP.Protocol.Errors;
 
 public sealed class InjectorService : IInjectorService
 {
+    private const string LauncherRelativePath = @"injector\Snoop.InjectorLauncher.x64.exe";
+    private const string PayloadFileName = "SnoopMCP.Payload.dll";
+    private const string PayloadClassName = "SnoopMCP.Payload.PayloadEntryPoint";
+    private const string PayloadMethodName = "Inject";
+    private const int AccessDeniedExitCode = 5;
+
     private readonly ProcessProbe mProbe;
     private readonly ILogger<InjectorService> mLogger;
 
@@ -10171,54 +10243,110 @@ public sealed class InjectorService : IInjectorService
         return Task.FromResult(mProbe.Probe(processId));
     }
 
-    public Task InjectAsync(int processId, string pipeName, CancellationToken cancellationToken)
+    public async Task InjectAsync(int processId, string pipeName, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(pipeName);
 
-        string payloadPath = LocatePayloadDll();
-        try
+        string launcherPath = LocateLauncher();
+        string payloadPath = LocatePayload();
+
+        var startInfo = new ProcessStartInfo(launcherPath)
         {
-            // Replace the namespace + signature below with what you find in the submoduled
-            // upstream Snoop.GenericInjector at execution time.
-            Snoop.GenericInjector.Injector.Inject(
-                processId,
-                payloadPath,
-                "SnoopMCP.Payload.PayloadEntryPoint",
-                "Inject",
-                pipeName);
-            mLogger.LogInformation("Payload injected into pid {Pid} on pipe {PipeName}.", processId, pipeName);
-        }
-        catch (UnauthorizedAccessException ex)
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            WorkingDirectory = Path.GetDirectoryName(launcherPath) ?? AppContext.BaseDirectory
+        };
+        startInfo.ArgumentList.Add("--targetPID");
+        startInfo.ArgumentList.Add(processId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        startInfo.ArgumentList.Add("--assembly");
+        startInfo.ArgumentList.Add(payloadPath);
+        startInfo.ArgumentList.Add("--className");
+        startInfo.ArgumentList.Add(PayloadClassName);
+        startInfo.ArgumentList.Add("--methodName");
+        startInfo.ArgumentList.Add(PayloadMethodName);
+        startInfo.ArgumentList.Add("--settingsFile");
+        startInfo.ArgumentList.Add(pipeName);
+
+        using Process launcher = Process.Start(startInfo)
+            ?? throw new SnoopMcpException(ErrorCode.AttachFailed, "Failed to start the injector launcher.");
+
+        var stdout = new StringBuilder();
+        var stderr = new StringBuilder();
+        launcher.OutputDataReceived += (_, e) => AppendLine(stdout, e.Data);
+        launcher.ErrorDataReceived += (_, e) => AppendLine(stderr, e.Data);
+        launcher.BeginOutputReadLine();
+        launcher.BeginErrorReadLine();
+
+        await launcher.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+        int exitCode = launcher.ExitCode;
+        bool succeeded = exitCode == 0;
+        if (succeeded)
         {
-            throw new SnoopMcpException(
-                ErrorCode.AccessDenied,
-                "Access denied — the target may be running elevated while the host is not.",
-                ex);
+            mLogger.LogInjectionSucceeded(processId, pipeName);
         }
-        catch (Exception ex)
+        else
         {
-            throw new SnoopMcpException(
-                ErrorCode.PayloadLoadFailed,
-                $"Payload injection failed: {ex.GetType().Name}: {ex.Message}",
-                ex);
+            string detail = $"launcher exit {exitCode}. stdout: {stdout}; stderr: {stderr}";
+            ErrorCode code = exitCode == AccessDeniedExitCode ? ErrorCode.AccessDenied : ErrorCode.PayloadLoadFailed;
+            throw new SnoopMcpException(code, $"Injection into pid {processId} failed: {detail}");
         }
-        return Task.CompletedTask;
     }
 
-    private static string LocatePayloadDll()
+    private static void AppendLine(StringBuilder sink, string? line)
     {
-        string hostDir = AppContext.BaseDirectory;
-        string candidate = Path.Combine(hostDir, "SnoopMCP.Payload.dll");
-        if (!File.Exists(candidate))
+        if (!string.IsNullOrEmpty(line))
+        {
+            sink.AppendLine(line);
+        }
+    }
+
+    private static string LocateLauncher()
+    {
+        string candidate = Path.Combine(AppContext.BaseDirectory, LauncherRelativePath);
+        bool exists = File.Exists(candidate);
+        if (!exists)
+        {
+            throw new SnoopMcpException(
+                ErrorCode.AttachFailed,
+                $"Injector launcher not found at {candidate}. Was SnoopMCP.Injection built and staged (Task 30)?");
+        }
+        return candidate;
+    }
+
+    private static string LocatePayload()
+    {
+        string candidate = Path.Combine(AppContext.BaseDirectory, PayloadFileName);
+        bool exists = File.Exists(candidate);
+        if (!exists)
         {
             throw new SnoopMcpException(
                 ErrorCode.PayloadLoadFailed,
-                $"SnoopMCP.Payload.dll not found at {candidate}. Verify the project reference in Task 31 Step 1.");
+                $"{PayloadFileName} not found at {candidate}. Verify the payload ProjectReference in Task 31 Step 1.");
         }
         return candidate;
     }
 }
 ```
+
+> The `mLogger.LogInjectionSucceeded(...)` call is a `[LoggerMessage]` source-generated method (CA1848). Add a `Logging` partial or an extension:
+>
+> ```csharp
+> namespace SnoopMCP.Host.Injection;
+>
+> using Microsoft.Extensions.Logging;
+>
+> internal static partial class InjectorServiceLog
+> {
+>     [LoggerMessage(Level = LogLevel.Information,
+>         Message = "Payload injected into pid {processId} on pipe {pipeName}.")]
+>     public static partial void LogInjectionSucceeded(this ILogger logger, int processId, string pipeName);
+> }
+> ```
+>
+> (One type per file — put `InjectorServiceLog` in its own file `InjectorServiceLog.cs`.)
 
 - [ ] **Step 4: Swap the registration in `Program.cs`** — modify `src\SnoopMCP.Host\Program.cs`
 
