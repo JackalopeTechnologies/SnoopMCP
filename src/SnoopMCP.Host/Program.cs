@@ -33,7 +33,8 @@ public static class Program
         builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenLocalhost(ListenPort));
 
         builder.Services.AddSingleton<SessionManager>();
-        builder.Services.AddSingleton<IInjectorService, NullInjectorService>();
+        builder.Services.AddSingleton<Injection.ProcessProbe>();
+        builder.Services.AddSingleton<IInjectorService, Injection.InjectorService>();
 
         builder.Services
             .AddMcpServer(options => options.ServerInfo = new Implementation
