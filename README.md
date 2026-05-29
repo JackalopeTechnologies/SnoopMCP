@@ -1,0 +1,171 @@
+# SnoopMCP
+
+An MCP server that injects a payload DLL into a running WPF process so an LLM
+client can diagnose styling, binding, and dependency-property resolution
+problems live. **v1 is read-only.**
+
+The host speaks MCP over **Streamable HTTP** (Kestrel, `http://127.0.0.1:6300`,
+endpoint `/mcp`) to the LLM client, and length-prefixed JSON over a named pipe to
+the payload injected into the target. Cross-process injection reuses
+[snoopwpf](https://github.com/snoopwpf/snoopwpf)'s injector (pinned as a git
+submodule); SnoopMCP ships its own payload with LLM-shaped read-only tools.
+
+## How it works
+
+```
+LLM client ──HTTP /mcp──▶ SnoopMCP.Host.exe
+                              │  attach(pid): subprocess the Snoop launcher
+                              ▼
+                          Snoop.InjectorLauncher.x64.exe
+                              │  CreateRemoteThread + LoadLibrary
+                              ▼
+                          target WPF process
+                          SnoopMCP.Payload.dll  ◀── injected
+                              │  named pipe (length-prefixed JSON)
+                              ▲
+                          host ◀── tool calls marshalled onto the UI Dispatcher
+```
+
+## Quickstart
+
+### Prerequisites
+
+- Windows 10/11 (x64)
+- **.NET 10 SDK**
+- **Visual Studio 2022/2026 with the "Desktop development with C++" workload**
+  (`VC.Tools.x86.x64` + Windows SDK). The build compiles Snoop's *native* injector
+  (`Snoop.GenericInjector.vcxproj`) via the full MSBuild.exe — `dotnet build` alone
+  cannot build the native component.
+- A WPF app to attach to, running on **.NET 10+ (x64)**.
+- The host must run at the **same elevation** as the target. If the target runs as
+  Administrator, run the host as Administrator too.
+
+### Clone with submodules
+
+This repo references the snoopwpf fork as a git submodule under `external/snoopwpf/`:
+
+```text
+git clone --recurse-submodules https://github.com/JackalopeTechnologies/SnoopMCP.git
+```
+
+If you already cloned without `--recurse-submodules`:
+
+```text
+git submodule update --init --recursive
+```
+
+### Build
+
+```text
+dotnet build SnoopMCP.sln -c Release
+```
+
+This also builds Snoop's native injector + managed launcher (x64) from the
+submodule and stages them under the host output. The host is at:
+
+```text
+src\SnoopMCP.Host\bin\Release\net10.0-windows\SnoopMCP.Host.exe
+```
+
+Two folders are staged next to it and **must travel with the exe** if you copy it:
+
+- `injector\` — `Snoop.InjectorLauncher.x64.exe` + `Snoop.GenericInjector.x64.dll` (the injection tooling)
+- `payload\` — `SnoopMCP.Payload.dll` + its dependency closure (the assembly injected into the target)
+
+### Run the host
+
+SnoopMCP is an HTTP MCP server, not a stdio subprocess. Start it directly:
+
+```text
+src\SnoopMCP.Host\bin\Release\net10.0-windows\SnoopMCP.Host.exe
+```
+
+It binds Kestrel to `http://127.0.0.1:6300` (localhost only) and serves the MCP
+endpoint at `/mcp`.
+
+### Attach via the MCP client
+
+Point your MCP client at the HTTP endpoint:
+
+```json
+{
+  "mcpServers": {
+    "snoopmcp": {
+      "type": "http",
+      "url": "http://127.0.0.1:6300/mcp"
+    }
+  }
+}
+```
+
+Then ask the LLM:
+
+> Attach to the WPF process with PID 12345, list its visual roots, then describe
+> the Save button.
+
+The LLM will call:
+
+1. `attach(pid: 12345)` — injects the payload, opens the session, returns process info
+2. `listVisualRoots()` — returns `{ roots: [...] }`
+3. `findElements(rootId, predicate: { type: "Button", name: "Save" })`
+4. `describeElement(matchedId)`
+
+## Tool surface
+
+Nineteen read-only tools, plus `attach`/`detach`:
+
+| Tool | Use it for |
+|---|---|
+| `attach(pid)` | Open a session by process id |
+| `detach()` | Close the current session |
+| `listVisualRoots()` | Find windows, popups, tooltip layers |
+| `describeElement(id)` | Per-node identity: type, name, bounds, path, binding-error flag |
+| `getChildren(id, tree)` | Walk visual or logical tree, virtualization-aware |
+| `getParent(id, tree)` | Climb upward |
+| `getTemplatedParent(id)` | Climb out of a template |
+| `findElements(rootId, predicate)` | Search by type, name, AutomationId, text, DP value, has-ancestor, has-descendant, in-template-of |
+| `hitTest(rootId, x, y)` | Deepest visual at a point |
+| `resolvePath(rootId, pathString)` | Path string back to element |
+| `describeDataContext(id)` | CLR type shape of the DataContext |
+| `readDataContextPath(id, path)` | Read a dotted path off the DataContext |
+| `listDependencyProperties(id)` | All DPs available on an element |
+| `getDependencyProperty(id, name)` | Current value + precedence trace |
+| `resolveStyle(id)` | Applied style, BasedOn chain, setters, triggers |
+| `resolveTemplate(id)` | Applied template, runtime tree, named parts |
+| `inspectBinding(id, propName)` | BindingExpression state, source, path, mode, value (deep dive on one binding) |
+| `listBindings(id, includeDescendants)` | Every binding on an element / under a subtree — wide audit |
+| `exportXaml(id)` | `XamlWriter` snapshot of the element's live state (bindings appear as evaluated values; use `listBindings` for binding shape) |
+
+## Error codes
+
+| Code | Meaning |
+|---|---|
+| `AttachFailed` | Target not found, not WPF, or non-x64 |
+| `PayloadLoadFailed` | Payload or its dependencies failed to load in the target |
+| `DispatcherTimeout` | Per-call timeout (5s default) |
+| `SessionLost` | Target exited or pipe closed |
+| `AccessDenied` | Elevation mismatch |
+| `ElementExpired` | Element id has been garbage collected |
+| `InvalidArgument` | Bad tool argument |
+| `PathParseError` | Malformed path string |
+
+## Known v1 limitations
+
+- **Read-only.** No property writes, no method invocation, no scripting.
+- **One target at a time.** Phase 2 may add multi-target.
+- **x64 only.** x86/ARM64 targets are rejected at probe time.
+- **No cross-process discovery.** Use `Get-Process` to find PIDs.
+- **No persistent reattach.** Sessions die with the target process.
+- **`textContains` searches capped visible text** (~200 chars per element).
+- **`propertyEquals` does not support attached properties.**
+- **`recentTraceLines` always empty** on `inspectBinding`. Phase 2 will wire up `PresentationTraceSources`.
+
+See [`docs/superpowers/specs/2026-05-27-snoopmcp-investigation-design.md`](docs/superpowers/specs/2026-05-27-snoopmcp-investigation-design.md)
+for the Phase 2 candidate list (writes, method invocation, scripting, web inspector UI).
+
+## License
+
+The injector built from the snoopwpf submodule under `external/snoopwpf/` is from
+the snoopwpf project and retains its upstream **Ms-PL** license; see
+[`src/SnoopMCP.Injection/THIRD_PARTY_NOTICES.md`](src/SnoopMCP.Injection/THIRD_PARTY_NOTICES.md).
+Everything else is Copyright (c) 2026 Jackalope Technologies.
