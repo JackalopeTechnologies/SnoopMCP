@@ -1,0 +1,31 @@
+<Project>
+    <!--
+        Per-tree overrides for test projects.
+
+        The repository-wide Directory.Build.props turns on the Jackalope
+        CodeStructure analyzers + dotnet-analyzers (latest-recommended)
+        with TreatWarningsAsErrors. Several of those rules collide with
+        universal xUnit conventions that have no idiomatic workaround:
+
+          CA1707   — underscores in member names. xUnit tests use
+                     Method_Scenario_Expected naming by convention.
+          STY0006  — PascalCase method naming. Same as above.
+          STY0008  — magic strings. Test payloads are inline JSON.
+          NUM0002  — magic numbers. Test fixtures use literal data.
+          STY0002  — null-forgiving operator. Standard xUnit pattern
+                     is `Assert.NotNull(x); use x!` to satisfy the
+                     compiler after the assertion.
+          xUnit1051 — TestContext.Current.CancellationToken. Optional
+                     responsiveness improvement; CancellationToken.None
+                     is acceptable for fast in-memory round-trips.
+
+        These suppressions are scoped to tests/ only via this file's
+        directory placement; production source under src/ keeps the
+        full ruleset.
+    -->
+    <Import Project="..\Directory.Build.props" />
+
+    <PropertyGroup>
+        <NoWarn>$(NoWarn);CA1707;STY0006;STY0008;NUM0002;STY0002;xUnit1051</NoWarn>
+    </PropertyGroup>
+</Project>
