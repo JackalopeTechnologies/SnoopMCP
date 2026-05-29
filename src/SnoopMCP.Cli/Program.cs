@@ -3,6 +3,8 @@
 
 namespace SnoopMCP.Cli;
 
+using SnoopMCP.ClientIntegration;
+
 /// <summary>
 /// Management CLI for SnoopMCP: registers the MCP server in LLM clients, manages the per-user logon
 /// autostart task, and supervises the host process. Verbs are dispatched from <see cref="Main"/>;
@@ -27,8 +29,8 @@ public static class Program
         string verb = args.Length > 0 ? args[0] : string.Empty;
         Task<int> dispatched = verb switch
         {
-            VerbRegisterClients => Task.FromResult(ExitUsage),
-            VerbUnregisterClients => Task.FromResult(ExitUsage),
+            VerbRegisterClients => Task.FromResult(RegisterClients(args)),
+            VerbUnregisterClients => Task.FromResult(UnregisterClients(args)),
             VerbInstallAutostart => Task.FromResult(InstallAutostart()),
             VerbUninstallAutostart => Task.FromResult(UninstallAutostart()),
             VerbStatus => Task.FromResult(ExitUsage),
@@ -66,5 +68,40 @@ public static class Program
         bool ok = AutostartTask.Remove();
         Console.WriteLine(ok ? MsgAutostartRemoved : MsgAutostartRemoveFailed);
         return ok ? ExitOk : ExitFailure;
+    }
+
+    private const string FlagVsCode = "--vscode";
+    private const string FlagClaudeCode = "--claude-code";
+
+    private static List<IClientWriter> SelectWriters(string[] args)
+    {
+        bool wantVsCode = HasFlag(args, FlagVsCode);
+        bool wantClaude = HasFlag(args, FlagClaudeCode);
+        bool both = !wantVsCode && !wantClaude;
+        var writers = new List<IClientWriter>();
+        if (wantClaude || both)
+        {
+            writers.Add(ClaudeCodeWriter.ForCurrentUser());
+        }
+        if (wantVsCode || both)
+        {
+            writers.Add(VsCodeMcpWriter.ForCurrentUser());
+        }
+        return writers;
+    }
+
+    private static bool HasFlag(string[] args, string flag)
+    {
+        return Array.Exists(args, a => string.Equals(a, flag, StringComparison.Ordinal));
+    }
+
+    private static int RegisterClients(string[] args)
+    {
+        return ClientRegistration.RegisterAll(SelectWriters(args), McpEndpoint.Default, Console.Out);
+    }
+
+    private static int UnregisterClients(string[] args)
+    {
+        return ClientRegistration.UnregisterAll(SelectWriters(args), Console.Out);
     }
 }
