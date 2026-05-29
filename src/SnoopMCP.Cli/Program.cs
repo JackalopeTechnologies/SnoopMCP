@@ -33,9 +33,9 @@ public static class Program
             VerbUnregisterClients => Task.FromResult(UnregisterClients(args)),
             VerbInstallAutostart => Task.FromResult(InstallAutostart()),
             VerbUninstallAutostart => Task.FromResult(UninstallAutostart()),
-            VerbStatus => Task.FromResult(ExitUsage),
-            VerbStart => Task.FromResult(ExitUsage),
-            VerbStop => Task.FromResult(ExitUsage),
+            VerbStatus => StatusAsync(),
+            VerbStart => Task.FromResult(Start()),
+            VerbStop => Task.FromResult(Stop()),
             _ => Task.FromResult(PrintUsage())
         };
         return await dispatched.ConfigureAwait(false);
@@ -47,6 +47,40 @@ public static class Program
     private const string MsgAutostartCreateFailed = "Failed to create autostart task.";
     private const string MsgAutostartRemoved = "Autostart task removed.";
     private const string MsgAutostartRemoveFailed = "Failed to remove autostart task.";
+    private const string MsgAutostartPresent = "Autostart task: present.";
+    private const string MsgAutostartAbsent = "Autostart task: absent.";
+    private const string MsgHostReachable = "Host: reachable on :6300.";
+    private const string MsgHostNotReachable = "Host: not reachable.";
+    private const string MsgHostStarted = "Host started.";
+    private const string MsgHostStartFailed = "Host failed to start.";
+    private static readonly System.Text.CompositeFormat smMsgHostStopped =
+        System.Text.CompositeFormat.Parse("Stopped {0} host process(es).");
+
+    private static async Task<int> StatusAsync()
+    {
+        ClientRegistration.Status(SelectWriters([]), Console.Out);
+        Console.WriteLine(AutostartTask.Exists() ? MsgAutostartPresent : MsgAutostartAbsent);
+        using var client = new HttpClient();
+        bool healthy = await HostHealthProbe
+            .IsHealthyAsync(client, HostHealthProbe.HealthUrl, default)
+            .ConfigureAwait(false);
+        Console.WriteLine(healthy ? MsgHostReachable : MsgHostNotReachable);
+        return ExitOk;
+    }
+
+    private static int Start()
+    {
+        bool started = HostProcess.Start();
+        Console.WriteLine(started ? MsgHostStarted : MsgHostStartFailed);
+        return started ? ExitOk : ExitFailure;
+    }
+
+    private static int Stop()
+    {
+        int stopped = HostProcess.Stop();
+        Console.WriteLine(string.Format(System.Globalization.CultureInfo.InvariantCulture, smMsgHostStopped, stopped));
+        return ExitOk;
+    }
 
     private static int PrintUsage()
     {
