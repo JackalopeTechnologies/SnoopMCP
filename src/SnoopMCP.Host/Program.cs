@@ -32,6 +32,8 @@ public static class Program
 
         builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenLocalhost(ListenPort));
 
+        builder.Services.AddSingleton<SessionManager>();
+
         builder.Services
             .AddMcpServer(options => options.ServerInfo = new Implementation
             {
