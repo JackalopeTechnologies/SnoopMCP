@@ -1,0 +1,35 @@
+<Project>
+    <PropertyGroup>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+        <AnalysisLevel>latest-recommended</AnalysisLevel>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <NeutralLanguage>en-US</NeutralLanguage>
+        <Deterministic>true</Deterministic>
+        <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Authors>Jackalope Technologies</Authors>
+        <Product>SnoopMCP</Product>
+        <Copyright>Copyright (c) 2026 Jackalope Technologies</Copyright>
+        <RepositoryUrl>https://github.com/JackalopeTechnologies/SnoopMCP</RepositoryUrl>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Using Include="System" />
+        <Using Include="System.Collections.Generic" />
+        <Using Include="System.Threading" />
+        <Using Include="System.Threading.Tasks" />
+    </ItemGroup>
+
+    <!--
+        Jackalope code-standards analyzer (same package SaddleRAG uses).
+        Applied to every project automatically via Directory.Build.props.
+    -->
+    <ItemGroup>
+        <PackageReference Include="CodeStructure.Analyzers" Version="1.0.7" PrivateAssets="all" />
+    </ItemGroup>
+</Project>
