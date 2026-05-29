@@ -28,7 +28,8 @@ if ($LASTEXITCODE -ne 0) { throw "Host publish failed." }
 Copy-Item (Join-Path $hostBin "injector") (Join-Path $stage "injector") -Recurse -Force
 Copy-Item (Join-Path $hostBin "payload")  (Join-Path $stage "payload")  -Recurse -Force
 
-# Publish the CLI alongside the host (shared deps overwrite identically).
+# Publish the CLI alongside the host. Safe in one dir: the host (net10.0-windows) and CLI
+# (net10.0) have disjoint app-dependency graphs, so no shared app DLL collides.
 dotnet publish $cliProj -c $Configuration -o $stage
 if ($LASTEXITCODE -ne 0) { throw "CLI publish failed." }
 
@@ -42,13 +43,13 @@ Get-ChildItem -Path $stage -Recurse -Filter "*.pdb" | Remove-Item -Force
 # Build the MSI.
 $msi = Join-Path $here "SnoopMCP.msi"
 wix build (Join-Path $here "Package.wxs") `
-    -d Version=$Version `
-    -d PublishDir=$stage `
+    -d "Version=$Version" `
+    -d "PublishDir=$stage" `
     -ext WixToolset.Util.wixext `
     -ext WixToolset.UI.wixext `
     -arch x64 `
-    -b $here `
-    -o $msi
+    -b "$here" `
+    -o "$msi"
 if ($LASTEXITCODE -ne 0) { throw "wix build failed." }
 
 Write-Host "Built $msi (version $Version)."
