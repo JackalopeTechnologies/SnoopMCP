@@ -115,6 +115,41 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
         JsonElement templatedParent = await mTools.GetTemplatedParent(templatedChild, ct);
         mTranscript.Add("Navigation", "getTemplatedParent", new { id = templatedChild }, templatedParent);
 
+        // --- Search & spatial ---
+        JsonElement byName = await mTools.FindElements(rootId, new ElementPredicateDto { Name = "SaveButton" }, ct);
+        mTranscript.Add("Search", "findElements", new { rootId, predicate = new { name = "SaveButton" } }, byName);
+
+        JsonElement byText = await mTools.FindElements(rootId, new ElementPredicateDto { TextContains = "Springfield" }, ct);
+        mTranscript.Add("Search", "findElements", new { rootId, predicate = new { textContains = "Springfield" } }, byText);
+
+        JsonElement hit = await mTools.HitTest(rootId, 50, 50, ct);
+        mTranscript.Add("Search", "hitTest", new { rootId, x = 50, y = 50 }, hit);
+
+        string rootPath = desc.GetProperty("path").GetString() ?? "/Window";
+        JsonElement resolved = await mTools.ResolvePath(rootId, rootPath, ct);
+        mTranscript.Add("Search", "resolvePath", new { rootId, pathString = rootPath }, resolved);
+
+        // --- DataContext ---
+        int brokenBindingId = await FindFirstIdAsync(rootId, new ElementPredicateDto { Name = "BrokenBinding" }, ct);
+
+        JsonElement dcShape = await mTools.DescribeDataContext(brokenBindingId, ct);
+        mTranscript.Add("DataContext", "describeDataContext", new { id = brokenBindingId }, dcShape);
+
+        JsonElement dcOk = await mTools.ReadDataContextPath(rootId, "SelectedCustomer.Name", ct);
+        mTranscript.Add("DataContext", "readDataContextPath", new { id = rootId, path = "SelectedCustomer.Name" }, dcOk);
+
+        JsonElement dcBroken = await mTools.ReadDataContextPath(brokenBindingId, "Address.Country.Name", ct);
+        mTranscript.Add("DataContext", "readDataContextPath", new { id = brokenBindingId, path = "Address.Country.Name" }, dcBroken);
+
+        // --- Dependency properties ---
+        int deleteButtonId = await FindFirstIdAsync(rootId, new ElementPredicateDto { Name = "DeleteButton" }, ct);
+
+        JsonElement dps = await mTools.ListDependencyProperties(saveButtonId, ct);
+        mTranscript.Add("DependencyProperties", "listDependencyProperties", new { id = saveButtonId }, dps);
+
+        JsonElement bg = await mTools.GetDependencyProperty(deleteButtonId, "Background", ct);
+        mTranscript.Add("DependencyProperties", "getDependencyProperty", new { id = deleteButtonId, propertyName = "Background" }, bg);
+
         await mTranscript.WriteAsync();
     }
 }
