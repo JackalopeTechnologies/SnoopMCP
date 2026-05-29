@@ -18,12 +18,29 @@
             <Directory Id="INSTALLFOLDER" Name="SnoopMCP" />
         </StandardDirectory>
 
+        <StandardDirectory Id="ProgramMenuFolder">
+            <Directory Id="AppShortcutFolder" Name="SnoopMCP" />
+        </StandardDirectory>
+
         <ComponentGroup Id="PublishOutput" Directory="INSTALLFOLDER">
             <Files Include="$(var.PublishDir)\**" />
         </ComponentGroup>
 
+        <Component Id="SampleShortcut" Directory="AppShortcutFolder"
+                   Guid="1B9D4C6E-3A2F-4E7B-9C5D-8F1A0E2B6D34">
+            <Shortcut Id="SampleStartMenuShortcut"
+                      Name="SnoopMCP Sample App"
+                      Description="A WPF app with authored styling/binding bugs to try SnoopMCP against."
+                      Target="[INSTALLFOLDER]samples\SampleWpfApp.exe"
+                      WorkingDirectory="INSTALLFOLDER" />
+            <RemoveFolder Id="RemoveAppShortcutFolder" Directory="AppShortcutFolder" On="uninstall" />
+            <RegistryValue Root="HKCU" Key="Software\JackalopeTechnologies\SnoopMCP"
+                           Name="installed" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+
         <Feature Id="Main" Title="SnoopMCP" Level="1">
             <ComponentGroupRef Id="PublishOutput" />
+            <ComponentRef Id="SampleShortcut" />
         </Feature>
 
         <ui:WixUI Id="WixUI_Minimal" />
