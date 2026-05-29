@@ -3,42 +3,47 @@
 
 namespace SnoopMCP.Host;
 
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Protocol;
 
 /// <summary>
-/// Entry point for the SnoopMCP host. Hosts an MCP server over stdio so an LLM client can drive
-/// the WPF inspection tools. All logging is routed to stderr because stdout is reserved for the
-/// MCP transport's framed JSON.
+/// Entry point for the SnoopMCP host. Hosts an MCP server over Streamable HTTP (Kestrel, bound to
+/// <c>http://127.0.0.1:6300</c>, endpoint <c>/mcp</c>) so an LLM client can drive the WPF inspection
+/// tools. The MCP transport is host-to-client only and is independent of the host-to-payload named
+/// pipe, so logging is plain console — stdout is not reserved.
 /// </summary>
 public static class Program
 {
+    private const string McpEndpointPattern = "/mcp";
+    private const string ServerName = "SnoopMCP — WPF live-inspection MCP server";
+    private const int ListenPort = 6300;
+
     /// <summary>
-    /// Builds and runs the MCP stdio host.
+    /// Builds and runs the MCP Streamable-HTTP host on localhost:6300.
     /// </summary>
     /// <param name="args">Process command-line arguments.</param>
-    /// <returns>The process exit code.</returns>
-    public static async Task<int> Main(string[] args)
+    public static async Task Main(string[] args)
     {
         ArgumentNullException.ThrowIfNull(args);
 
-        HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
+        WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-        builder.Logging.ClearProviders();
-        builder.Logging.AddConsole(options =>
-        {
-            options.LogToStandardErrorThreshold = LogLevel.Trace;
-        });
-        builder.Logging.SetMinimumLevel(LogLevel.Information);
+        builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenLocalhost(ListenPort));
 
         builder.Services
-            .AddMcpServer()
-            .WithStdioServerTransport()
+            .AddMcpServer(options => options.ServerInfo = new Implementation
+            {
+                Name = ServerName,
+                Version = ThisAssembly.InformationalVersion
+            })
+            .WithHttpTransport(transport => transport.Stateless = true)
             .WithToolsFromAssembly();
 
-        using IHost host = builder.Build();
-        await host.RunAsync().ConfigureAwait(false);
-        return 0;
+        WebApplication app = builder.Build();
+        app.MapMcp(McpEndpointPattern);
+
+        await app.RunAsync().ConfigureAwait(false);
     }
 }
