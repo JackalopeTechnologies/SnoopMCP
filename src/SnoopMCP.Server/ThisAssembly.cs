@@ -6,7 +6,7 @@ namespace SnoopMCP.Host;
 using System.Reflection;
 
 /// <summary>
-/// Exposes the host assembly's informational version without a magic string. Untagged developer
+/// Exposes this (server) assembly's informational version without a magic string. Untagged developer
 /// builds fall back to <see cref="DefaultDevVersion"/> so clients can tell they are not running a
 /// tagged release.
 /// </summary>
