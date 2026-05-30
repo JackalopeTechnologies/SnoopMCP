@@ -158,8 +158,8 @@ public sealed class TrayIcon : IDisposable
     private void AddOrModify(uint message)
     {
         NOTIFYICONDATAW data = CreateData(NifMessage | NifIcon | NifTip);
-        data.hIcon = mIcon;
-        data.szTip = ServerStateInfo.Tooltip(mController.State);
+        data.pmHIcon = mIcon;
+        data.pmSzTip = ServerStateInfo.Tooltip(mController.State);
         bool ok = Shell_NotifyIconW(message, ref data);
         if (ok && message == NimAdd)
         {
@@ -170,8 +170,8 @@ public sealed class TrayIcon : IDisposable
     private void ShowBalloon(string text)
     {
         NOTIFYICONDATAW data = CreateData(NifInfo);
-        data.szInfo = text;
-        data.szInfoTitle = BalloonTitle;
+        data.pmSzInfo = text;
+        data.pmSzInfoTitle = BalloonTitle;
         Shell_NotifyIconW(NimModify, ref data);
     }
 
@@ -179,14 +179,14 @@ public sealed class TrayIcon : IDisposable
     {
         return new NOTIFYICONDATAW
         {
-            cbSize = (uint)Marshal.SizeOf<NOTIFYICONDATAW>(),
-            hWnd = mSource.Handle,
-            uID = TrayIconId,
-            uFlags = flags,
-            uCallbackMessage = WmTrayIcon,
-            szTip = string.Empty,
-            szInfo = string.Empty,
-            szInfoTitle = string.Empty
+            pmCbSize = (uint)Marshal.SizeOf<NOTIFYICONDATAW>(),
+            pmHWnd = mSource.Handle,
+            pmUID = TrayIconId,
+            pmUFlags = flags,
+            pmUCallbackMessage = WmTrayIcon,
+            pmSzTip = string.Empty,
+            pmSzInfo = string.Empty,
+            pmSzInfoTitle = string.Empty
         };
     }
 
@@ -224,33 +224,28 @@ public sealed class TrayIcon : IDisposable
         PostMessageW(mSource.Handle, WmNull, IntPtr.Zero, IntPtr.Zero);
     }
 
-    // STY0004 suppression: this is the Win32 NOTIFYICONDATAW interop layout. The field names mirror
-    // the documented shell32 struct contract one-for-one; renaming them to the pm-prefixed house style
-    // would sever that mapping and make the marshalling impossible to verify against the Win32 headers.
-#pragma warning disable STY0004
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct NOTIFYICONDATAW
     {
-        public uint cbSize;
-        public IntPtr hWnd;
-        public uint uID;
-        public uint uFlags;
-        public uint uCallbackMessage;
-        public IntPtr hIcon;
+        internal uint pmCbSize;
+        internal IntPtr pmHWnd;
+        internal uint pmUID;
+        internal uint pmUFlags;
+        internal uint pmUCallbackMessage;
+        internal IntPtr pmHIcon;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = TipCapacity)]
-        public string szTip;
-        public uint dwState;
-        public uint dwStateMask;
+        internal string pmSzTip;
+        internal uint pmDwState;
+        internal uint pmDwStateMask;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = InfoCapacity)]
-        public string szInfo;
-        public uint uVersion;
+        internal string pmSzInfo;
+        internal uint pmUVersion;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = InfoTitleCapacity)]
-        public string szInfoTitle;
-        public uint dwInfoFlags;
-        public Guid guidItem;
-        public IntPtr hBalloonIcon;
+        internal string pmSzInfoTitle;
+        internal uint pmDwInfoFlags;
+        internal Guid pmGuidItem;
+        internal IntPtr pmHBalloonIcon;
     }
-#pragma warning restore STY0004
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

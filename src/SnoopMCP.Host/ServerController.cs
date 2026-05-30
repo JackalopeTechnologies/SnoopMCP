@@ -42,6 +42,8 @@ public sealed class ServerController : IAsyncDisposable
         {
             SetState(ServerState.Starting);
             WebApplication app = ServerHost.Build(mArgs);
+            // ConfigureAwait(true) is required: the post-await SetState must run on the UI thread,
+            // where the tray toggles MenuItem.IsEnabled and calls Shell_NotifyIcon.
             bool started = await TryStartAsync(app).ConfigureAwait(true);
             if (started)
             {
@@ -63,6 +65,8 @@ public sealed class ServerController : IAsyncDisposable
         {
             WebApplication app = mApp;
             mApp = null;
+            // ConfigureAwait(true) is required: the post-await SetState must run on the UI thread,
+            // where the tray toggles MenuItem.IsEnabled and calls Shell_NotifyIcon.
             await app.StopAsync().ConfigureAwait(true);
             await app.DisposeAsync().ConfigureAwait(true);
             SetState(ServerState.Stopped);
@@ -76,6 +80,8 @@ public sealed class ServerController : IAsyncDisposable
         {
             WebApplication app = mApp;
             mApp = null;
+            // ConfigureAwait(false) is required: App.OnExit blocks on this via GetAwaiter().GetResult()
+            // on the dispatcher thread, so resuming on that captured context would deadlock.
             await app.DisposeAsync().ConfigureAwait(false);
         }
     }
@@ -87,7 +93,7 @@ public sealed class ServerController : IAsyncDisposable
         {
             await app.StartAsync().ConfigureAwait(true);
         }
-        catch (IOException)
+        catch (Exception)
         {
             ok = false;
         }
