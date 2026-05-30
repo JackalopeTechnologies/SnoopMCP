@@ -41,18 +41,28 @@ public sealed class ServerController : IAsyncDisposable
         if (ServerStateInfo.CanStart(State))
         {
             SetState(ServerState.Starting);
-            WebApplication app = ServerHost.Build(mArgs);
-            // ConfigureAwait(true) is required: the post-await SetState must run on the UI thread,
-            // where the tray toggles MenuItem.IsEnabled and calls Shell_NotifyIcon.
-            bool started = await TryStartAsync(app).ConfigureAwait(true);
-            if (started)
+            try
             {
-                mApp = app;
-                SetState(ServerState.Running);
+                WebApplication app = ServerHost.Build(mArgs);
+                // ConfigureAwait(true) is required: the post-await SetState must run on the UI thread,
+                // where StateChanged updates the tray view model (INotifyPropertyChanged / ICommand).
+                bool started = await TryStartAsync(app).ConfigureAwait(true);
+                if (started)
+                {
+                    mApp = app;
+                    SetState(ServerState.Running);
+                }
+                else
+                {
+                    await app.DisposeAsync().ConfigureAwait(true);
+                    SetState(ServerState.Faulted);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                await app.DisposeAsync().ConfigureAwait(true);
+                // StartAsync is invoked fire-and-forget from the tray, so it must never surface an
+                // unobserved task fault: funnel any unexpected failure (e.g. Build throwing) to Faulted.
+                HostLog.Error("MCP server start faulted.", ex);
                 SetState(ServerState.Faulted);
             }
         }
@@ -65,11 +75,23 @@ public sealed class ServerController : IAsyncDisposable
         {
             WebApplication app = mApp;
             mApp = null;
-            // ConfigureAwait(true) is required: the post-await SetState must run on the UI thread,
-            // where the tray toggles MenuItem.IsEnabled and calls Shell_NotifyIcon.
-            await app.StopAsync().ConfigureAwait(true);
-            await app.DisposeAsync().ConfigureAwait(true);
-            SetState(ServerState.Stopped);
+            try
+            {
+                // ConfigureAwait(true) is required: the post-await SetState must run on the UI thread,
+                // where StateChanged updates the tray view model (INotifyPropertyChanged / ICommand).
+                await app.StopAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                // A faulted stop must not skip disposal: that would leak the Kestrel socket (the port
+                // stays bound) and strand the tray in a Running state with no way to recover.
+                HostLog.Error("MCP server stop faulted; disposing anyway.", ex);
+            }
+            finally
+            {
+                await app.DisposeAsync().ConfigureAwait(true);
+                SetState(ServerState.Stopped);
+            }
         }
     }
 
@@ -93,8 +115,11 @@ public sealed class ServerController : IAsyncDisposable
         {
             await app.StartAsync().ConfigureAwait(true);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            // Bind failures (port in use) are the common case, but DI/transport/tool-load errors
+            // surface here too; log the real cause so a Faulted tray isn't a dead end to diagnose.
+            HostLog.Error("MCP server failed to start.", ex);
             ok = false;
         }
         return ok;

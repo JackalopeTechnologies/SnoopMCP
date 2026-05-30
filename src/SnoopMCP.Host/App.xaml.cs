@@ -20,6 +20,11 @@ public partial class App : Application
 {
     private const string SingleInstanceMutexName = @"Local\SnoopMCP.Host";
     private const string TrayIconResourceKey = "TrayIcon";
+    private const string AppTitle = "SnoopMCP";
+    private const string AlreadyRunningMessage = "SnoopMCP is already running — check the system tray.";
+
+    private static readonly TimeSpan smExitDisposeTimeout = TimeSpan.FromSeconds(5);
+
     private Mutex? mInstanceMutex;
     private ServerController? mController;
     private TaskbarIcon? mTrayIcon;
@@ -31,6 +36,9 @@ public partial class App : Application
         mInstanceMutex = new Mutex(initiallyOwned: false, SingleInstanceMutexName, out bool createdNew);
         if (!createdNew)
         {
+            // Without feedback a second launch just vanishes; tell the user where the running one is.
+            HostLog.Info("Another SnoopMCP instance is already running; exiting.");
+            MessageBox.Show(AlreadyRunningMessage, AppTitle, MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown();
         }
         else
@@ -41,6 +49,7 @@ public partial class App : Application
             mTrayIcon.ForceCreate();
             SessionEnding += OnSessionEnding;
             _ = mController.StartAsync();
+            HostLog.Info("SnoopMCP host started.");
         }
     }
 
@@ -52,12 +61,24 @@ public partial class App : Application
     /// <inheritdoc />
     protected override void OnExit(ExitEventArgs e)
     {
-        mTrayIcon?.Dispose();
-        if (mController is not null)
+        // Order matters: the mutex release and base.OnExit run in finally so a faulting or hanging
+        // dispose can never strand the single-instance mutex or skip WPF's own shutdown.
+        try
         {
-            mController.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            mTrayIcon?.Dispose();
+            if (mController is not null && !mController.DisposeAsync().AsTask().Wait(smExitDisposeTimeout))
+            {
+                HostLog.Warn("Server dispose timed out on exit.");
+            }
         }
-        mInstanceMutex?.Dispose();
-        base.OnExit(e);
+        catch (Exception ex)
+        {
+            HostLog.Error("Teardown faulted on exit.", ex);
+        }
+        finally
+        {
+            mInstanceMutex?.Dispose();
+            base.OnExit(e);
+        }
     }
 }
