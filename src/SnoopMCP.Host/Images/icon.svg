@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" viewBox="0 0 128 128">
+  <title id="title">SnoopMCP application icon</title>
+  <desc id="desc">A compact SnoopMCP app icon with an SM monogram, inspection lens, and MCP node accent.</desc>
+  <defs>
+    <linearGradient id="bg" x1="18" y1="8" x2="110" y2="122" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6B4635"/>
+      <stop offset="0.45" stop-color="#492F24"/>
+      <stop offset="1" stop-color="#2B1B14"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="24" y1="103" x2="104" y2="103" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFC425"/>
+      <stop offset="1" stop-color="#D89616"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="25" fill="url(#bg)"/>
+  <path d="M18 33c0-9 7-16 16-16h60c9 0 16 7 16 16" fill="none" stroke="#8A634B" stroke-width="4" stroke-linecap="round" opacity="0.72"/>
+  <path d="M27 100h74" stroke="url(#accent)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M31 83h30" stroke="#FFF4CF" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+  <path d="M31 71h23" stroke="#FFF4CF" stroke-width="5" stroke-linecap="round" opacity="0.68"/>
+  <text x="24" y="76" fill="#FFF4CF" font-family="Segoe UI, Arial, sans-serif" font-size="57" font-weight="800" letter-spacing="0">S</text>
+  <text x="60" y="76" fill="#FFC425" font-family="Segoe UI, Arial, sans-serif" font-size="55" font-weight="900" letter-spacing="0">M</text>
+  <circle cx="100" cy="31" r="9" fill="none" stroke="#FFC425" stroke-width="5"/>
+  <path d="M106 38l8 8" fill="none" stroke="#FFC425" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="96" cy="27" r="3.5" fill="#FFF4CF"/>
+  <circle cx="109" cy="32" r="3.5" fill="#FFC425"/>
+  <circle cx="100" cy="43" r="3.5" fill="#FFF4CF"/>
+</svg>
