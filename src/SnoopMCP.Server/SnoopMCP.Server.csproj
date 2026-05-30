@@ -12,19 +12,13 @@
     </ItemGroup>
 
     <!--
-        This code came from a Microsoft.NET.Sdk.Web project, which supplied ASP.NET Core implicit
-        global usings. Microsoft.NET.Sdk does not, so re-add them here to keep the moved files and
-        ServerHost compiling unchanged (Kestrel config, Results, MapMcp, AddMcpServer, ILogger, etc.).
+        The old project used Microsoft.NET.Sdk.Web, which globally imported these ASP.NET namespaces.
+        Under the plain SDK only these two are needed globally (ConfigureKestrel/ListenLocalhost and
+        Results); everything else is imported in-file.
     -->
     <ItemGroup>
-        <Using Include="Microsoft.AspNetCore.Builder" />
         <Using Include="Microsoft.AspNetCore.Hosting" />
         <Using Include="Microsoft.AspNetCore.Http" />
-        <Using Include="Microsoft.AspNetCore.Routing" />
-        <Using Include="Microsoft.Extensions.Configuration" />
-        <Using Include="Microsoft.Extensions.DependencyInjection" />
-        <Using Include="Microsoft.Extensions.Hosting" />
-        <Using Include="Microsoft.Extensions.Logging" />
     </ItemGroup>
 
     <ItemGroup>
