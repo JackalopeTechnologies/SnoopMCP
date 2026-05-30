@@ -48,7 +48,11 @@ jobs:
 
       - name: Rename MSI with version
         shell: pwsh
-        run: Copy-Item SnoopMCP.Installer/SnoopMCP.msi "SnoopMCP.Installer/SnoopMCP-${{ steps.ver.outputs.version }}.msi"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msi = 'SnoopMCP.Installer/SnoopMCP.msi'
+          if (-not (Test-Path $msi)) { throw "Installer build did not produce $msi" }
+          Copy-Item $msi "SnoopMCP.Installer/SnoopMCP-${{ steps.ver.outputs.version }}.msi"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
