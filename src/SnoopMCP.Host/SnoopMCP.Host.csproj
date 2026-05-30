@@ -6,7 +6,6 @@
         <AssemblyName>SnoopMCP.Host</AssemblyName>
         <PlatformTarget>x64</PlatformTarget>
         <UseWPF>true</UseWPF>
-        <InvariantGlobalization>true</InvariantGlobalization>
         <ApplicationIcon>Images\icon.ico</ApplicationIcon>
         <InjectorStageDir>$(MSBuildThisFileDirectory)..\SnoopMCP.Injection\bin\$(Configuration)\net10.0-windows\injector\</InjectorStageDir>
         <PayloadOutputDir>$(MSBuildThisFileDirectory)..\SnoopMCP.Payload\bin\$(Configuration)\net10.0-windows\</PayloadOutputDir>
@@ -16,15 +15,19 @@
         <FrameworkReference Include="Microsoft.AspNetCore.App" />
     </ItemGroup>
 
+    <ItemGroup>
+        <PackageReference Include="H.NotifyIcon.Wpf" Version="2.4.1" />
+    </ItemGroup>
+
     <!-- UseWPF drops System.IO from the SDK implicit-usings set; restore it (matches IntegrationTests). -->
     <ItemGroup>
         <Using Include="System.IO" />
     </ItemGroup>
 
+    <!-- icon.ico (regenerated from icon.svg with WIC-safe BMP frames + a 256 PNG frame) serves both
+         the exe's Win32 icon via ApplicationIcon and the WPF tray IconSource as an embedded Resource. -->
     <ItemGroup>
-        <Content Include="Images\icon.ico">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </Content>
+        <Resource Include="Images\icon.ico" />
     </ItemGroup>
 
     <ItemGroup>
