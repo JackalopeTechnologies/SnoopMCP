@@ -16,11 +16,14 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout (with submodules)
+      - name: Checkout (with submodules + LFS)
         uses: actions/checkout@v4
         with:
           # external/snoopwpf is a submodule the native injector builds from.
           submodules: recursive
+          # icon.ico and other binary assets are stored in Git LFS; without this the MSI would embed
+          # LFS pointer files instead of the real binaries.
+          lfs: true
 
       - name: Set up .NET 10 SDK
         uses: actions/setup-dotnet@v4
