@@ -38,6 +38,24 @@ public class ServerStateInfoTests
         Assert.False(ServerStateInfo.CanStop(ServerState.Stopped));
     }
 
+    [Fact]
+    public void CanStart_WhenStarting_IsFalse()
+    {
+        Assert.False(ServerStateInfo.CanStart(ServerState.Starting));
+    }
+
+    [Fact]
+    public void CanStop_WhenStarting_IsFalse()
+    {
+        Assert.False(ServerStateInfo.CanStop(ServerState.Starting));
+    }
+
+    [Fact]
+    public void CanStop_WhenFaulted_IsFalse()
+    {
+        Assert.False(ServerStateInfo.CanStop(ServerState.Faulted));
+    }
+
     [Theory]
     [InlineData(ServerState.Stopped)]
     [InlineData(ServerState.Starting)]
@@ -46,5 +64,24 @@ public class ServerStateInfoTests
     public void Tooltip_IsNeverEmpty(ServerState state)
     {
         Assert.False(string.IsNullOrWhiteSpace(ServerStateInfo.Tooltip(state)));
+    }
+
+    [Fact]
+    public void Tooltip_WhenRunning_MentionsListenAddress()
+    {
+        Assert.Contains("127.0.0.1:6300", ServerStateInfo.Tooltip(ServerState.Running), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Tooltip_IsDistinctForEveryState()
+    {
+        string[] tips =
+        [
+            ServerStateInfo.Tooltip(ServerState.Stopped),
+            ServerStateInfo.Tooltip(ServerState.Starting),
+            ServerStateInfo.Tooltip(ServerState.Running),
+            ServerStateInfo.Tooltip(ServerState.Faulted)
+        ];
+        Assert.Equal(tips.Length, new HashSet<string>(tips).Count);
     }
 }

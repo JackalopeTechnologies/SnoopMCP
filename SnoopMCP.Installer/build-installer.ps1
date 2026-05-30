@@ -30,6 +30,10 @@ if ($LASTEXITCODE -ne 0) { throw "Host publish failed." }
 Copy-Item (Join-Path $hostBin "injector") (Join-Path $stage "injector") -Recurse -Force
 Copy-Item (Join-Path $hostBin "payload")  (Join-Path $stage "payload")  -Recurse -Force
 
+# Fail loudly on a partial/empty copy: an injector- or payload-less stage produces a silently broken MSI.
+if (-not (Get-ChildItem (Join-Path $stage "injector") -File -Recurse -ErrorAction SilentlyContinue)) { throw "Staged injector folder is empty." }
+if (-not (Get-ChildItem (Join-Path $stage "payload")  -File -Recurse -ErrorAction SilentlyContinue)) { throw "Staged payload folder is empty." }
+
 # Publish the CLI alongside the host. Safe in one dir: the host (net10.0-windows) and CLI
 # (net10.0) have disjoint app-dependency graphs, so no shared app DLL collides.
 dotnet publish $cliProj -c $Configuration -o $stage
@@ -53,5 +57,6 @@ wix build (Join-Path $here "Package.wxs") `
     -b "$here" `
     -o "$msi"
 if ($LASTEXITCODE -ne 0) { throw "wix build failed." }
+if (-not (Test-Path $msi)) { throw "wix reported success but $msi was not produced." }
 
 Write-Host "Built $msi (version $Version)."

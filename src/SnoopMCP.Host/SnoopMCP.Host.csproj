@@ -19,11 +19,6 @@
         <PackageReference Include="H.NotifyIcon.Wpf" Version="2.4.1" />
     </ItemGroup>
 
-    <!-- UseWPF drops System.IO from the SDK implicit-usings set; restore it (matches IntegrationTests). -->
-    <ItemGroup>
-        <Using Include="System.IO" />
-    </ItemGroup>
-
     <!-- icon.ico (regenerated from icon.svg with WIC-safe BMP frames + a 256 PNG frame) serves both
          the exe's Win32 icon via ApplicationIcon and the WPF tray IconSource as an embedded Resource. -->
     <ItemGroup>

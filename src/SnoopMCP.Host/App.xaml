@@ -5,7 +5,8 @@
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
 
-        <!-- x:Shared=False so a fresh menu instance is built each time it opens, never reusing a stale DataContext. -->
+        <!-- x:Shared=False yields a fresh ContextMenu per resource lookup, so the menu can never
+             bind to a stale DataContext if the resource is ever resolved more than once. -->
         <ContextMenu x:Key="TrayMenu" x:Shared="False">
             <MenuItem Header="Start MCP" Command="{Binding StartCommand}" />
             <MenuItem Header="Stop MCP" Command="{Binding StopCommand}" />
