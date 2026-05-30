@@ -21,21 +21,18 @@ public sealed class InjectorService : IInjectorService
     private const string ArgMethodName = "--methodName";
     private const string ArgSettingsFile = "--settingsFile";
 
-    private readonly ProcessProbe mProbe;
     private readonly ILogger<InjectorService> mLogger;
 
-    public InjectorService(ProcessProbe probe, ILogger<InjectorService> logger)
+    public InjectorService(ILogger<InjectorService> logger)
     {
-        ArgumentNullException.ThrowIfNull(probe);
         ArgumentNullException.ThrowIfNull(logger);
-        mProbe = probe;
         mLogger = logger;
     }
 
     public Task<ProcessProbeResult> ProbeAsync(int processId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(mProbe.Probe(processId));
+        return Task.FromResult(ProcessProbe.Probe(processId));
     }
 
     public async Task InjectAsync(int processId, string pipeName, CancellationToken cancellationToken)

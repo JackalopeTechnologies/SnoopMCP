@@ -46,11 +46,10 @@ public sealed class McpTools
     /// <returns>The set of candidate WPF processes with pid, name, window title, bitness, and attachability.</returns>
     [McpServerTool, Description(
         "List running WPF processes that can be attached to (pid, name, window title, bitness).")]
-    public Task<JsonElement> ListWpfProcesses(CancellationToken cancellationToken)
+    public static Task<JsonElement> ListWpfProcesses(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var enumerator = new ProcessEnumerator();
-        var response = new ListWpfProcessesResponse(enumerator.ListWpfProcesses());
+        var response = new ListWpfProcessesResponse(ProcessEnumerator.ListWpfProcesses());
         return Task.FromResult(SerializeResult(response));
     }
 
@@ -62,7 +61,7 @@ public sealed class McpTools
         "Attach to a running WPF process by PID. Generates a pipe, injects the payload, opens the session.")]
     public async Task<JsonElement> Attach(int pid, CancellationToken cancellationToken)
     {
-        string pipeName = mSession.AllocatePipeName();
+        string pipeName = SessionManager.AllocatePipeName();
         ProcessProbeResult probe = await mInjector.ProbeAsync(pid, cancellationToken).ConfigureAwait(false);
         await mInjector.InjectAsync(pid, pipeName, cancellationToken).ConfigureAwait(false);
         await mSession.OpenAsync(pipeName, cancellationToken).ConfigureAwait(false);

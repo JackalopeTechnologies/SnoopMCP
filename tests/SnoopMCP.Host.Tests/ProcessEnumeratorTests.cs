@@ -18,9 +18,7 @@ public sealed class ProcessEnumeratorTests
     [Fact]
     public void ListWpfProcesses_ReturnsNonNullList_AndDoesNotThrow()
     {
-        var enumerator = new ProcessEnumerator();
-
-        IReadOnlyList<WpfProcessDto> results = enumerator.ListWpfProcesses();
+        IReadOnlyList<WpfProcessDto> results = ProcessEnumerator.ListWpfProcesses();
 
         Assert.NotNull(results);
     }

@@ -46,8 +46,7 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
         await Task.Delay(TimeSpan.FromSeconds(WindowInitDelaySeconds));
 
         mSession = new SessionManager(NullLogger<SessionManager>.Instance, NullLoggerFactory.Instance);
-        var probe = new ProcessProbe();
-        var injector = new InjectorService(probe, NullLogger<InjectorService>.Instance);
+        var injector = new InjectorService(NullLogger<InjectorService>.Instance);
         mTools = new McpTools(mSession, injector);
     }
 
@@ -95,7 +94,7 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
         CancellationToken ct = TestContext.Current.CancellationToken;
 
         // --- Discovery & lifecycle ---
-        JsonElement procs = await mTools!.ListWpfProcesses(ct);
+        JsonElement procs = await McpTools.ListWpfProcesses(ct);
         mTranscript.Add("Discovery", "listWpfProcesses", new { }, procs);
 
         var attachReq = new { pid = mSampleProcess!.Id };

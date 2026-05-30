@@ -22,8 +22,8 @@ public sealed class SessionManagerTests
     public void AllocatePipeName_ReturnsUnique()
     {
         var manager = CreateManager();
-        string a = manager.AllocatePipeName();
-        string b = manager.AllocatePipeName();
+        string a = SessionManager.AllocatePipeName();
+        string b = SessionManager.AllocatePipeName();
         Assert.NotEqual(a, b);
     }
 
@@ -41,7 +41,7 @@ public sealed class SessionManagerTests
     public async Task OpenAsync_ConnectsAndSendsThroughClient()
     {
         await using var manager = CreateManager();
-        string pipeName = manager.AllocatePipeName();
+        string pipeName = SessionManager.AllocatePipeName();
 
         Task serverTask = Task.Run(async () =>
         {
@@ -75,7 +75,7 @@ public sealed class SessionManagerTests
     public async Task OpenAsync_TwiceWithoutClose_Throws()
     {
         await using var manager = CreateManager();
-        string pipeName = manager.AllocatePipeName();
+        string pipeName = SessionManager.AllocatePipeName();
 
         Task serverTask = Task.Run(async () =>
         {

@@ -14,7 +14,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\SnoopMCP.Host\SnoopMCP.Host.csproj" />
+        <ProjectReference Include="..\..\src\SnoopMCP.Server\SnoopMCP.Server.csproj" />
         <ProjectReference Include="..\..\src\SnoopMCP.Protocol\SnoopMCP.Protocol.csproj" />
     </ItemGroup>
 </Project>
