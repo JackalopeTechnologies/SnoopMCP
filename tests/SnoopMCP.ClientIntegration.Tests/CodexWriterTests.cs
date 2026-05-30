@@ -133,4 +133,40 @@ public sealed class CodexWriterTests : IDisposable
 
         Assert.True(writer.GetStatus().IsRegistered);
     }
+
+    [Fact]
+    public void Register_WhenUrlChanged_OverwritesExistingEntry()
+    {
+        File.WriteAllText(mConfigPath, "[mcp_servers.snoopmcp]\nurl = \"http://old:1/mcp\"\n");
+        var writer = new CodexWriter(mConfigPath);
+
+        writer.Register(McpEndpoint.Default);
+
+        Assert.Equal("http://127.0.0.1:6300/mcp", EntryUrl(ReadConfig(), "snoopmcp"));
+    }
+
+    [Fact]
+    public void Unregister_WhenEntryAbsentButFileExists_IsSuccessfulNoOp()
+    {
+        File.WriteAllText(mConfigPath, "[mcp_servers.other]\nurl = \"http://x\"\n");
+        var writer = new CodexWriter(mConfigPath);
+
+        UnregisterResult result = writer.Unregister();
+
+        Assert.True(result.Success, result.Message);
+        Assert.True(Servers(ReadConfig()).ContainsKey("other"));
+    }
+
+    [Fact]
+    public void Register_OnModelConflict_FailsWithoutThrowing()
+    {
+        File.WriteAllText(mConfigPath,
+            "[mcp_servers]\nsnoopmcp = \"not-a-table\"\n\n[mcp_servers.snoopmcp]\nurl = \"http://y\"\n");
+        var writer = new CodexWriter(mConfigPath);
+
+        RegisterResult result = writer.Register(McpEndpoint.Default);
+
+        Assert.False(result.Success);
+        Assert.False(writer.GetStatus().IsRegistered);
+    }
 }

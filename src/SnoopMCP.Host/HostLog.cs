@@ -9,9 +9,10 @@ using System.Text;
 
 /// <summary>
 /// Minimal best-effort file logger for the windowless tray host, which has no console to surface
-/// errors. Writes timestamped lines to <c>%LOCALAPPDATA%\SnoopMCP\logs\host.log</c>, rolling the
-/// file when it grows past <see cref="MaxLogBytes"/>. Every write is guarded so a logging failure
-/// can never crash the app; on any I/O error the message is silently dropped.
+/// errors. Writes timestamped lines to <c>%LOCALAPPDATA%\SnoopMCP\logs\host.log</c>; once the file
+/// grows past <see cref="MaxLogBytes"/> it is deleted and started fresh (a hard reset, not a
+/// rotation - no prior segment is kept). Every write is guarded so a logging failure can never
+/// crash the app; on any I/O error the message is silently dropped.
 /// </summary>
 internal static class HostLog
 {

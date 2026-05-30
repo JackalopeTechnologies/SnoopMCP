@@ -44,6 +44,8 @@ public sealed class CodexWriter : IClientWriter
     }
 
     /// <inheritdoc />
+    /// <remarks>Only <see cref="McpEndpoint.Url"/> is written: Codex infers HTTP transport from the
+    /// presence of <c>url</c>, so <see cref="McpEndpoint.Type"/> is intentionally not persisted.</remarks>
     public RegisterResult Register(McpEndpoint endpoint)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
@@ -130,8 +132,20 @@ public sealed class CodexWriter : IClientWriter
             }
             else
             {
-                root = doc.ToModel();
-                ok = true;
+                // ToModel runs a second (model-build) pass that can throw even when parsing
+                // succeeded - e.g. a key defined both as a value and a table - so treat that as a
+                // clean failure rather than letting it escape the "never throws" contract.
+                try
+                {
+                    root = doc.ToModel();
+                    ok = true;
+                }
+                catch (TomlException ex)
+                {
+                    root = new TomlTable();
+                    error = ex.Message;
+                    ok = false;
+                }
             }
         }
         return ok;
