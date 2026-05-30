@@ -44,9 +44,18 @@
 
     <Message Importance="high" Text="SnoopMCP.Injection: building Snoop native injector (x64) via $(FullMSBuildPath)" />
 
-    <Exec Command="&quot;$(FullMSBuildPath)&quot; &quot;$(SnoopRepoRoot)Snoop.GenericInjector\Snoop.GenericInjector.vcxproj&quot; -p:Configuration=Release -p:Platform=x64 -v:minimal -nologo" />
+    <!--
+      '-nodeReuse:false' on each nested MSBuild is deliberate. MSBuild worker nodes are persistent
+      and reused across processes for the same user; Visual Studio spawns such nodes with an
+      environment that carries a duplicate-cased PATH (both 'PATH' and 'Path'). When the native VC
+      build reuses one of those nodes, CL.exe's ToolTask throws
+      "Item has already been added: 'PATH'/'Path'" as it copies the env into a case-insensitive
+      dictionary. Disabling node reuse forces a fresh node that inherits this build's clean
+      (single-PATH) environment, and leaves no node behind to pollute later builds.
+    -->
+    <Exec Command="&quot;$(FullMSBuildPath)&quot; &quot;$(SnoopRepoRoot)Snoop.GenericInjector\Snoop.GenericInjector.vcxproj&quot; -p:Configuration=Release -p:Platform=x64 -nodeReuse:false -v:minimal -nologo" />
 
-    <Exec Command="&quot;$(FullMSBuildPath)&quot; &quot;$(SnoopRepoRoot)Snoop.InjectorLauncher\Snoop.InjectorLauncher.csproj&quot; -t:restore;build -p:Configuration=Release -p:Platform=x64 -v:minimal -nologo" />
+    <Exec Command="&quot;$(FullMSBuildPath)&quot; &quot;$(SnoopRepoRoot)Snoop.InjectorLauncher\Snoop.InjectorLauncher.csproj&quot; -t:restore;build -p:Configuration=Release -p:Platform=x64 -nodeReuse:false -v:minimal -nologo" />
 
     <ItemGroup>
       <SnoopInjectorArtifact Include="$(SnoopBinDir)**\*.*"
