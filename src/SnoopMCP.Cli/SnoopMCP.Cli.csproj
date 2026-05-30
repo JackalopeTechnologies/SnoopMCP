@@ -4,6 +4,7 @@
         <TargetFramework>net10.0</TargetFramework>
         <RootNamespace>SnoopMCP.Cli</RootNamespace>
         <AssemblyName>SnoopMCP.Cli</AssemblyName>
+        <ApplicationIcon>..\SnoopMCP.Host\Images\icon.ico</ApplicationIcon>
     </PropertyGroup>
 
     <ItemGroup>
