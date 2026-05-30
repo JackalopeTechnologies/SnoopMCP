@@ -24,6 +24,7 @@ public static class Program
     private const int ExitFailure = 2;
     private const string FlagVsCode = "--vscode";
     private const string FlagClaudeCode = "--claude-code";
+    private const string FlagCodex = "--codex";
     private const string MsgAutostartCreated = "Autostart task created.";
     private const string MsgAutostartCreateFailed = "Failed to create autostart task.";
     private const string MsgAutostartRemoved = "Autostart task removed.";
@@ -85,7 +86,7 @@ public static class Program
     {
         Console.Error.WriteLine(
             "Usage: SnoopMCP.Cli <register-clients|unregister-clients|install-autostart|"
-            + "uninstall-autostart|status|start|stop> [--vscode] [--claude-code]");
+            + "uninstall-autostart|status|start|stop> [--vscode] [--claude-code] [--codex]");
         return ExitUsage;
     }
 
@@ -107,15 +108,20 @@ public static class Program
     {
         bool wantVsCode = HasFlag(args, FlagVsCode);
         bool wantClaude = HasFlag(args, FlagClaudeCode);
-        bool both = !wantVsCode && !wantClaude;
+        bool wantCodex = HasFlag(args, FlagCodex);
+        bool all = !wantVsCode && !wantClaude && !wantCodex;
         var writers = new List<IClientWriter>();
-        if (wantClaude || both)
+        if (wantClaude || all)
         {
             writers.Add(ClaudeCodeWriter.ForCurrentUser());
         }
-        if (wantVsCode || both)
+        if (wantVsCode || all)
         {
             writers.Add(VsCodeMcpWriter.ForCurrentUser());
+        }
+        if (wantCodex || all)
+        {
+            writers.Add(CodexWriter.ForCurrentUser());
         }
         return writers;
     }

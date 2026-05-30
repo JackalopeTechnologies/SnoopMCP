@@ -5,4 +5,9 @@
         <AssemblyName>SnoopMCP.ClientIntegration</AssemblyName>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
+    <!-- Pinned to the stable 0.x API (Toml.Parse / ToModel / FromModel + the syntax model). Tomlyn 2.x
+         is a serializer-focused rewrite that drops that model-round-trip surface this writer relies on. -->
+    <ItemGroup>
+        <PackageReference Include="Tomlyn" Version="0.17.0" />
+    </ItemGroup>
 </Project>
