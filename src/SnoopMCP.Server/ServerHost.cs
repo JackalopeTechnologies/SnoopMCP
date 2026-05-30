@@ -18,6 +18,7 @@ public static class ServerHost
 {
     private const string McpEndpointPattern = "/mcp";
     private const string HealthEndpointPattern = "/health";
+    private const string RootPath = "/";
     private const string ServerName = "SnoopMCP — WPF live-inspection MCP server";
     private const int ListenPort = 6300;
 
@@ -44,6 +45,18 @@ public static class ServerHost
             .WithToolsFromAssembly(typeof(McpTools).Assembly);
 
         WebApplication app = builder.Build();
+
+        // A client pointed at the bare site root (/) instead of /mcp still reaches the MCP handler:
+        // rewrite root requests to the MCP endpoint before routing, transparently for every HTTP method.
+        app.Use(async (context, next) =>
+        {
+            if (context.Request.Path == RootPath)
+            {
+                context.Request.Path = McpEndpointPattern;
+            }
+            await next(context);
+        });
+
         app.MapMcp(McpEndpointPattern);
         app.MapGet(HealthEndpointPattern, (SessionManager session) =>
             Results.Ok(HealthStatus.Create(ThisAssembly.InformationalVersion, session.IsAttached)));
