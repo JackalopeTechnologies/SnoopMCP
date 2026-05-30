@@ -12,7 +12,7 @@ using SnoopMCP.Protocol.Tools;
 /// debug target. No injection is involved; processes the host cannot inspect (access denied, exited,
 /// cross-architecture) are skipped silently.
 /// </summary>
-public sealed class ProcessEnumerator
+public static class ProcessEnumerator
 {
     private const string WpfModule = "PresentationFramework.dll";
     private const string HostFxrModule = "hostfxr.dll";
@@ -20,7 +20,7 @@ public sealed class ProcessEnumerator
     private const string X64 = "x64";
     private const string X86 = "x86";
 
-    public IReadOnlyList<WpfProcessDto> ListWpfProcesses()
+    public static IReadOnlyList<WpfProcessDto> ListWpfProcesses()
     {
         var results = new List<WpfProcessDto>();
         Process[] all = Process.GetProcesses();

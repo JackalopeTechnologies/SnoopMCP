@@ -36,8 +36,7 @@ public sealed class EndToEndTests : IAsyncLifetime
         await Task.Delay(TimeSpan.FromSeconds(WindowInitDelaySeconds));
 
         mSession = new SessionManager(NullLogger<SessionManager>.Instance, NullLoggerFactory.Instance);
-        var probe = new ProcessProbe();
-        var injector = new InjectorService(probe, NullLogger<InjectorService>.Instance);
+        var injector = new InjectorService(NullLogger<InjectorService>.Instance);
         mTools = new McpTools(mSession, injector);
 
         await mTools.Attach(mSampleProcess.Id, TestContext.Current.CancellationToken);
@@ -147,7 +146,7 @@ public sealed class EndToEndTests : IAsyncLifetime
         Assert.NotNull(mSampleProcess);
         CancellationToken ct = TestContext.Current.CancellationToken;
 
-        JsonElement result = await mTools!.ListWpfProcesses(ct);
+        JsonElement result = await McpTools.ListWpfProcesses(ct);
 
         JsonElement processes = result.GetProperty("processes");
         Assert.Equal(JsonValueKind.Array, processes.ValueKind);

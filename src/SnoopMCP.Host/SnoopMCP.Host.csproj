@@ -11,21 +11,14 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\SnoopMCP.Server\SnoopMCP.Server.csproj" />
         <ProjectReference Include="..\SnoopMCP.Protocol\SnoopMCP.Protocol.csproj" />
-        <!-- Build ordering only: ensures Snoop's injector is built + staged before us. -->
         <ProjectReference Include="..\SnoopMCP.Injection\SnoopMCP.Injection.csproj">
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
-        <!-- Build ordering only: the host never loads the payload (no CLR reference). The payload's
-             full dependency closure is staged into payload/ by CopyPayloadBinaries below so the
-             payload's AssemblyResolve bootstrap can find its deps inside the target process. -->
         <ProjectReference Include="..\SnoopMCP.Payload\SnoopMCP.Payload.csproj">
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
-    </ItemGroup>
-
-    <ItemGroup>
-        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.3.0" />
     </ItemGroup>
 
     <ItemGroup>

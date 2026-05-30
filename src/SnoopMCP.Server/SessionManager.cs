@@ -44,7 +44,7 @@ public sealed partial class SessionManager : IAsyncDisposable
     /// Allocates a unique pipe name for a new session.
     /// </summary>
     /// <returns>A process-unique pipe name.</returns>
-    public string AllocatePipeName()
+    public static string AllocatePipeName()
     {
         return $"snoopmcp-{Guid.NewGuid():N}";
     }

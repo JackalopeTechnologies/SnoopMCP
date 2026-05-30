@@ -25,7 +25,7 @@
 
     <ItemGroup>
         <!-- Host assemblies flow in normally (host + protocol + MCP SDK). -->
-        <ProjectReference Include="..\..\src\SnoopMCP.Host\SnoopMCP.Host.csproj" />
+        <ProjectReference Include="..\..\src\SnoopMCP.Server\SnoopMCP.Server.csproj" />
         <!-- Build ordering only; their outputs are staged by the copy targets below. -->
         <ProjectReference Include="..\..\src\SnoopMCP.Injection\SnoopMCP.Injection.csproj">
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>

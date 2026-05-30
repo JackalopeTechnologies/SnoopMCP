@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using SnoopMCP.Protocol.Errors;
 
-public sealed class ProcessProbe
+public static class ProcessProbe
 {
     private const string HostFxrModule = "hostfxr.dll";
     private const string WpfModule = "PresentationFramework.dll";
@@ -12,7 +12,7 @@ public sealed class ProcessProbe
     private const string X64 = "x64";
     private const string X86 = "x86";
 
-    public ProcessProbeResult Probe(int processId)
+    public static ProcessProbeResult Probe(int processId)
     {
         Process process;
         try
