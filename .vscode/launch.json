@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Host (Debug)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-solution",
+            "program": "${workspaceFolder}/src/SnoopMCP.Host/bin/Debug/net10.0-windows/SnoopMCP.Host.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/SnoopMCP.Host",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        }
+    ]
+}
