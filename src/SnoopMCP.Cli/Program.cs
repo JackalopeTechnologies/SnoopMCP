@@ -24,7 +24,9 @@ public static class Program
     private const int ExitFailure = 2;
     private const string FlagVsCode = "--vscode";
     private const string FlagClaudeCode = "--claude-code";
+    private const string FlagClaudeDesktop = "--claude-desktop";
     private const string FlagCodex = "--codex";
+    private const string FlagCopilotCli = "--copilot-cli";
     private const string MsgAutostartCreated = "Autostart task created.";
     private const string MsgAutostartCreateFailed = "Failed to create autostart task.";
     private const string MsgAutostartRemoved = "Autostart task removed.";
@@ -86,7 +88,8 @@ public static class Program
     {
         Console.Error.WriteLine(
             "Usage: SnoopMCP.Cli <register-clients|unregister-clients|install-autostart|"
-            + "uninstall-autostart|status|start|stop> [--vscode] [--claude-code] [--codex]");
+            + "uninstall-autostart|status|start|stop> [--claude-code] [--claude-desktop] "
+            + "[--vscode] [--codex] [--copilot-cli]");
         return ExitUsage;
     }
 
@@ -106,14 +109,20 @@ public static class Program
 
     private static List<IClientWriter> SelectWriters(string[] args)
     {
-        bool wantVsCode = HasFlag(args, FlagVsCode);
         bool wantClaude = HasFlag(args, FlagClaudeCode);
+        bool wantClaudeDesktop = HasFlag(args, FlagClaudeDesktop);
+        bool wantVsCode = HasFlag(args, FlagVsCode);
         bool wantCodex = HasFlag(args, FlagCodex);
-        bool all = !wantVsCode && !wantClaude && !wantCodex;
+        bool wantCopilot = HasFlag(args, FlagCopilotCli);
+        bool all = !wantClaude && !wantClaudeDesktop && !wantVsCode && !wantCodex && !wantCopilot;
         var writers = new List<IClientWriter>();
         if (wantClaude || all)
         {
             writers.Add(ClaudeCodeWriter.ForCurrentUser());
+        }
+        if (wantClaudeDesktop || all)
+        {
+            writers.Add(ClaudeDesktopWriter.ForCurrentUser());
         }
         if (wantVsCode || all)
         {
@@ -122,6 +131,10 @@ public static class Program
         if (wantCodex || all)
         {
             writers.Add(CodexWriter.ForCurrentUser());
+        }
+        if (wantCopilot || all)
+        {
+            writers.Add(CopilotCliWriter.ForCurrentUser());
         }
         return writers;
     }
