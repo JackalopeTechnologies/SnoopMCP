@@ -16,11 +16,18 @@
         <Using Include="System.IO" />
     </ItemGroup>
 
+    <!-- ServerHost returns a WebApplication; the test names that type, so it needs the ASP.NET
+         framework reference directly (FrameworkReference does not flow transitively). -->
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <!-- Microsoft.Extensions.Logging.Abstractions (NullLogger, used by the E2E test) now comes from
+         the Microsoft.AspNetCore.App framework reference above, so no explicit package is needed. -->
     <ItemGroup>
         <PackageReference Include="xunit.v3" Version="3.2.2" />
         <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
     </ItemGroup>
 
     <ItemGroup>
