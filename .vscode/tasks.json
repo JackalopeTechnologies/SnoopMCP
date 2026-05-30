@@ -8,6 +8,7 @@
             "args": [
                 "build",
                 "${workspaceFolder}/SnoopMCP.sln",
+                "-nodeReuse:false",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],

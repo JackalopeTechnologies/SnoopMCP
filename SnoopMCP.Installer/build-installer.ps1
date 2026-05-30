@@ -17,7 +17,9 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage | Out-Null
 
 # Build the host first so its AfterBuild copy targets stage injector/ + payload/ into bin.
-dotnet build $hostProj -c $Configuration
+# -nodeReuse:false: never adopt a persistent MSBuild node spawned by Visual Studio, whose
+# duplicate-cased PATH otherwise crashes the nested native (CL.exe) build.
+dotnet build $hostProj -c $Configuration -nodeReuse:false
 if ($LASTEXITCODE -ne 0) { throw "Host build failed." }
 
 # Publish host (exe + framework-dependent deps) into the stage root.
