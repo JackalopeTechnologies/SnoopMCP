@@ -44,6 +44,21 @@
                            Name="installed" Type="integer" Value="1" KeyPath="yes" />
         </Component>
 
+        <!-- Remember the install dir so RemoveFolderEx can resolve it during uninstall. -->
+        <Property Id="INSTALLDIRSAVED">
+            <RegistrySearch Id="FindInstallDir" Root="HKCU"
+                            Key="Software\JackalopeTechnologies\SnoopMCP" Name="InstallDir" Type="directory" />
+        </Property>
+
+        <!-- Remove the whole install folder on uninstall, including runtime-created files such as
+             logs\ that MSI never tracked (the install folder is %LOCALAPPDATA%\SnoopMCP). -->
+        <Component Id="CleanupInstallFolder" Directory="INSTALLFOLDER"
+                   Guid="7C1A2B3D-4E5F-4061-8A9B-0C1D2E3F4A5B">
+            <RegistryValue Root="HKCU" Key="Software\JackalopeTechnologies\SnoopMCP"
+                           Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+            <util:RemoveFolderEx On="uninstall" Property="INSTALLDIRSAVED" />
+        </Component>
+
         <!-- Install: register clients, create the logon task. -->
         <SetProperty Id="RegisterClients" Before="RegisterClients" Sequence="execute"
                      Value="&quot;[INSTALLFOLDER]SnoopMCP.Cli.exe&quot; register-clients" />
@@ -69,6 +84,7 @@
         <Feature Id="Main" Title="SnoopMCP" Level="1">
             <ComponentGroupRef Id="PublishOutput" />
             <ComponentRef Id="SampleShortcut" />
+            <ComponentRef Id="CleanupInstallFolder" />
         </Feature>
 
         <InstallExecuteSequence>
