@@ -46,7 +46,8 @@ public partial class App : Application
             mController = new ServerController(e.Args);
             mTrayIcon = (TaskbarIcon)FindResource(TrayIconResourceKey);
             mTrayIcon.DataContext = new TrayViewModel(mController, Shutdown,
-                (title, message) => mTrayIcon.ShowNotification(title, message));
+                (title, message) => mTrayIcon.ShowNotification(title, message),
+                ShowOwnedDialog);
             mTrayIcon.ForceCreate();
             SessionEnding += OnSessionEnding;
             _ = mController.StartAsync();
@@ -57,6 +58,33 @@ public partial class App : Application
     private void OnSessionEnding(object sender, SessionEndingCancelEventArgs e)
     {
         Shutdown();
+    }
+
+    // A tray app has no main window, so an ownerless MessageBox opens unactivated and the closing
+    // context menu's input dismisses it before the user can read it. Give it a tiny, off-screen,
+    // topmost owner that is activated first, so the dialog stays modal and on top until OK is clicked.
+    private static void ShowOwnedDialog(string title, string message)
+    {
+        var owner = new Window
+        {
+            Width = 1,
+            Height = 1,
+            Left = -10000,
+            Top = -10000,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            Topmost = true,
+            ShowActivated = true
+        };
+        try
+        {
+            owner.Show();
+            MessageBox.Show(owner, message, title, MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        finally
+        {
+            owner.Close();
+        }
     }
 
     /// <inheritdoc />

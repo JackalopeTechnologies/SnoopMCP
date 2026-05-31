@@ -20,9 +20,15 @@
     </ItemGroup>
 
     <!-- icon.ico (regenerated from icon.svg with WIC-safe BMP frames + a 256 PNG frame) serves both
-         the exe's Win32 icon via ApplicationIcon and the WPF tray IconSource as an embedded Resource. -->
+         the exe's Win32 icon via ApplicationIcon and the WPF tray IconSource as an embedded Resource.
+         The tray-*.ico files are the same logo with a colored status dot in the corner (green=running,
+         orange=starting, gray=stopped, red=faulted), swapped onto the tray IconSource per server state. -->
     <ItemGroup>
         <Resource Include="Images\icon.ico" />
+        <Resource Include="Images\tray-running.ico" />
+        <Resource Include="Images\tray-starting.ico" />
+        <Resource Include="Images\tray-stopped.ico" />
+        <Resource Include="Images\tray-faulted.ico" />
     </ItemGroup>
 
     <ItemGroup>
