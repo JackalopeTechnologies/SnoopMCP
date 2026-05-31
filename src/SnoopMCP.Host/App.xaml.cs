@@ -45,7 +45,8 @@ public partial class App : Application
         {
             mController = new ServerController(e.Args);
             mTrayIcon = (TaskbarIcon)FindResource(TrayIconResourceKey);
-            mTrayIcon.DataContext = new TrayViewModel(mController, Shutdown);
+            mTrayIcon.DataContext = new TrayViewModel(mController, Shutdown,
+                (title, message) => mTrayIcon.ShowNotification(title, message));
             mTrayIcon.ForceCreate();
             SessionEnding += OnSessionEnding;
             _ = mController.StartAsync();

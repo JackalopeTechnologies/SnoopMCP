@@ -27,6 +27,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\SnoopMCP.Server\SnoopMCP.Server.csproj" />
+        <ProjectReference Include="..\SnoopMCP.ClientIntegration\SnoopMCP.ClientIntegration.csproj" />
         <ProjectReference Include="..\SnoopMCP.Injection\SnoopMCP.Injection.csproj">
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
