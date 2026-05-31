@@ -64,9 +64,11 @@
             <MenuItem Header="Exit" Command="{Binding ExitCommand}" />
         </ContextMenu>
 
-        <!-- Instantiated from App.OnStartup via FindResource + ForceCreate; DataContext is a TrayViewModel. -->
+        <!-- Instantiated from App.OnStartup via FindResource + ForceCreate; DataContext is a TrayViewModel.
+             IconSource is bound to the view model so the logo carries a colored status dot that tracks the
+             server state live (the VM hands out a frozen pack:// BitmapImage, the H.NotifyIcon-safe path). -->
         <tb:TaskbarIcon x:Key="TrayIcon"
-                        IconSource="/Images/icon.ico"
+                        IconSource="{Binding IconSource}"
                         ToolTipText="{Binding ToolTipText}"
                         ContextMenu="{StaticResource TrayMenu}"
                         MenuActivation="LeftOrRightClick"
