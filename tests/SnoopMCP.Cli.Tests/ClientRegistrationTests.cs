@@ -4,8 +4,8 @@
 namespace SnoopMCP.Cli.Tests;
 
 using SnoopMCP.ClientIntegration;
-using SnoopMCP.Cli;
 using Xunit;
+using ClientRegistration = SnoopMCP.Cli.ClientRegistration;
 
 public sealed class ClientRegistrationTests : IDisposable
 {

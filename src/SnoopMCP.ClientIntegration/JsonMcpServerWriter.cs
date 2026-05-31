@@ -25,16 +25,23 @@ public abstract class JsonMcpServerWriter : IClientWriter
 
     private readonly string mConfigPath;
     private readonly string mServersKey;
+    private readonly string? mServerType;
 
     /// <summary>Initialises the writer.</summary>
     /// <param name="configPath">Absolute path to the client's JSON config file.</param>
     /// <param name="serversKey">Name of the object holding server entries (e.g. <c>mcpServers</c>).</param>
-    protected JsonMcpServerWriter(string configPath, string serversKey)
+    /// <param name="serverType">
+    /// Transport written under <c>type</c>; when <see langword="null"/> the endpoint's own
+    /// <see cref="McpEndpoint.Type"/> is used. Clients that need a fixed transport (e.g. Copilot CLI's
+    /// <c>sse</c>) supply it here.
+    /// </param>
+    protected JsonMcpServerWriter(string configPath, string serversKey, string? serverType = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(configPath);
         ArgumentException.ThrowIfNullOrEmpty(serversKey);
         mConfigPath = configPath;
         mServersKey = serversKey;
+        mServerType = serverType;
     }
 
     /// <inheritdoc />
@@ -51,7 +58,7 @@ public abstract class JsonMcpServerWriter : IClientWriter
             JsonObject servers = GetOrAddObject(root, mServersKey);
             servers[endpoint.Name] = new JsonObject
             {
-                [TypeKey] = endpoint.Type,
+                [TypeKey] = mServerType ?? endpoint.Type,
                 [UrlKey] = endpoint.Url
             };
             WriteAtomic(root);

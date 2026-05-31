@@ -59,12 +59,9 @@
             <util:RemoveFolderEx On="uninstall" Property="INSTALLDIRSAVED" />
         </Component>
 
-        <!-- Install: register clients, create the logon task. -->
-        <SetProperty Id="RegisterClients" Before="RegisterClients" Sequence="execute"
-                     Value="&quot;[INSTALLFOLDER]SnoopMCP.Cli.exe&quot; register-clients" />
-        <CustomAction Id="RegisterClients" BinaryRef="Wix4UtilCA_X86" DllEntry="WixQuietExec"
-                      Execute="deferred" Return="ignore" Impersonate="yes" />
-
+        <!-- Install: create the logon task. Client registration is intentionally NOT done here;
+             it is user-initiated from the tray "Register in" menu (or the CLI register-clients verb),
+             so the installer never writes into a client's config without the user asking. -->
         <SetProperty Id="InstallAutostart" Before="InstallAutostart" Sequence="execute"
                      Value="&quot;[INSTALLFOLDER]SnoopMCP.Cli.exe&quot; install-autostart" />
         <CustomAction Id="InstallAutostart" BinaryRef="Wix4UtilCA_X86" DllEntry="WixQuietExec"
@@ -88,8 +85,7 @@
         </Feature>
 
         <InstallExecuteSequence>
-            <Custom Action="RegisterClients" After="InstallFiles" Condition="NOT Installed OR REINSTALL" />
-            <Custom Action="InstallAutostart" After="RegisterClients" Condition="NOT Installed OR REINSTALL" />
+            <Custom Action="InstallAutostart" After="InstallFiles" Condition="NOT Installed OR REINSTALL" />
             <Custom Action="UninstallAutostart" Before="UnregisterClients" Condition="REMOVE = &quot;ALL&quot;" />
             <Custom Action="UnregisterClients" Before="RemoveFiles" Condition="REMOVE = &quot;ALL&quot;" />
         </InstallExecuteSequence>
@@ -108,7 +104,6 @@
         </InstallUISequence>
 
         <UI>
-            <ProgressText Action="RegisterClients" Message="Registering SnoopMCP with your AI tools..." />
             <ProgressText Action="InstallAutostart" Message="Creating the logon autostart task..." />
             <ProgressText Action="UninstallAutostart" Message="Removing the logon autostart task..." />
             <ProgressText Action="UnregisterClients" Message="Removing SnoopMCP from your AI tools..." />
