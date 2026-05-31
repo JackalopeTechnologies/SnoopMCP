@@ -18,8 +18,11 @@ public sealed class ClientRegistrationTests : IDisposable
         Directory.CreateDirectory(mDir);
         mWriters =
         [
-            new ClaudeCodeWriter(Path.Combine(mDir, ".claude.json")),
-            new VsCodeMcpWriter(Path.Combine(mDir, "mcp.json"))
+            new ClaudeCodeWriter(
+                Path.Combine(mDir, ".claude.json"),
+                Path.Combine(mDir, ".claude", "settings.json"),
+                Path.Combine(mDir, ".claude", "skills")),
+            new VsCodeMcpWriter(Path.Combine(mDir, "mcp.json"), mDir)
         ];
     }
 
