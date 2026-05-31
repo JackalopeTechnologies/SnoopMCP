@@ -37,17 +37,24 @@ public sealed class ClaudeDesktopWriter : IClientWriter
     private static readonly UTF8Encoding smNoBomUtf8 = new(encoderShouldEmitUTF8Identifier: false);
 
     private readonly string mConfigPath;
+    private readonly string mDetectionPath;
 
-    /// <summary>Initialises the writer against an explicit config path (used by tests).</summary>
+    /// <summary>Initialises the writer against explicit paths (used by tests).</summary>
     /// <param name="configPath">Absolute path to Claude Desktop's <c>claude_desktop_config.json</c>.</param>
-    public ClaudeDesktopWriter(string configPath)
+    /// <param name="detectionPath">Directory whose existence means Claude Desktop is installed.</param>
+    public ClaudeDesktopWriter(string configPath, string detectionPath)
     {
         ArgumentException.ThrowIfNullOrEmpty(configPath);
+        ArgumentException.ThrowIfNullOrEmpty(detectionPath);
         mConfigPath = configPath;
+        mDetectionPath = detectionPath;
     }
 
     /// <inheritdoc />
     public string ClientName => ClaudeDesktopClientName;
+
+    /// <inheritdoc />
+    public bool IsDetected() => Directory.Exists(mDetectionPath) || File.Exists(mConfigPath);
 
     /// <summary>
     /// Creates a writer targeting the current user's
@@ -56,7 +63,8 @@ public sealed class ClaudeDesktopWriter : IClientWriter
     public static ClaudeDesktopWriter ForCurrentUser()
     {
         string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return new ClaudeDesktopWriter(Path.Combine(appData, ClaudeDirName, ConfigFileName));
+        string dir = Path.Combine(appData, ClaudeDirName);
+        return new ClaudeDesktopWriter(Path.Combine(dir, ConfigFileName), dir);
     }
 
     /// <inheritdoc />

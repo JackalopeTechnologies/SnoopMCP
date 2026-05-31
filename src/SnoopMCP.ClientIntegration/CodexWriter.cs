@@ -16,6 +16,8 @@ using Tomlyn.Syntax;
 public sealed class CodexWriter : IClientWriter
 {
     private const string ServersTableKey = "mcp_servers";
+    private const string FeaturesTableKey = "features";
+    private const string RmcpFlagKey = "experimental_use_rmcp_client";
     private const string UrlKey = "url";
     private const string CodexDirName = ".codex";
     private const string ConfigFileName = "config.toml";
@@ -24,28 +26,38 @@ public sealed class CodexWriter : IClientWriter
     private const string ParseErrorFallback = "parse error";
 
     private readonly string mConfigPath;
+    private readonly string mDetectionPath;
 
-    /// <summary>Initialises the writer against an explicit config path (used by tests).</summary>
+    /// <summary>Initialises the writer against explicit paths (used by tests).</summary>
     /// <param name="configPath">Absolute path to Codex's <c>config.toml</c>.</param>
-    public CodexWriter(string configPath)
+    /// <param name="detectionPath">Directory whose existence means Codex is installed.</param>
+    public CodexWriter(string configPath, string detectionPath)
     {
         ArgumentException.ThrowIfNullOrEmpty(configPath);
+        ArgumentException.ThrowIfNullOrEmpty(detectionPath);
         mConfigPath = configPath;
+        mDetectionPath = detectionPath;
     }
 
     /// <inheritdoc />
     public string ClientName => CodexClientName;
 
+    /// <inheritdoc />
+    public bool IsDetected() => Directory.Exists(mDetectionPath) || File.Exists(mConfigPath);
+
     /// <summary>Creates a writer targeting the current user's <c>~/.codex/config.toml</c>.</summary>
     public static CodexWriter ForCurrentUser()
     {
         string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return new CodexWriter(Path.Combine(profile, CodexDirName, ConfigFileName));
+        string dir = Path.Combine(profile, CodexDirName);
+        return new CodexWriter(Path.Combine(dir, ConfigFileName), dir);
     }
 
     /// <inheritdoc />
-    /// <remarks>Only <see cref="McpEndpoint.Url"/> is written: Codex infers HTTP transport from the
-    /// presence of <c>url</c>, so <see cref="McpEndpoint.Type"/> is intentionally not persisted.</remarks>
+    /// <remarks>Only <see cref="McpEndpoint.Url"/> is written under the server table: Codex infers HTTP
+    /// transport from the presence of <c>url</c>, so <see cref="McpEndpoint.Type"/> is intentionally not
+    /// persisted. A top-level <c>[features] experimental_use_rmcp_client = true</c> flag is also written:
+    /// Codex gates streamable-HTTP MCP servers behind it.</remarks>
     public RegisterResult Register(McpEndpoint endpoint)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
@@ -54,6 +66,8 @@ public sealed class CodexWriter : IClientWriter
         {
             TomlTable servers = GetOrAddTable(root, ServersTableKey);
             servers[endpoint.Name] = new TomlTable { { UrlKey, endpoint.Url } };
+            TomlTable features = GetOrAddTable(root, FeaturesTableKey);
+            features[RmcpFlagKey] = true;
             WriteAtomic(root);
             result = new RegisterResult(true, $"Registered '{endpoint.Name}' in {ClientName}.");
         }
@@ -65,6 +79,8 @@ public sealed class CodexWriter : IClientWriter
     }
 
     /// <inheritdoc />
+    /// <remarks>Only the server-table entry is removed; the <c>[features]</c> flag is left in place — it
+    /// is harmless and may be shared by other Codex MCP servers.</remarks>
     public UnregisterResult Unregister()
     {
         UnregisterResult result;

@@ -20,4 +20,11 @@ public interface IClientWriter
 
     /// <summary>Reports whether the SnoopMCP entry is currently present with the expected URL.</summary>
     StatusResult GetStatus();
+
+    /// <summary>
+    /// True when the target agent appears to be installed on this machine (its well-known config
+    /// directory or file exists). "All"/installer runs use this so absent agents are never touched;
+    /// an explicit single-agent register ignores it.
+    /// </summary>
+    bool IsDetected();
 }

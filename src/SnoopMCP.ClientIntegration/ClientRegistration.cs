@@ -24,6 +24,10 @@ public static class ClientRegistration
             McpClient.VsCode => VsCodeMcpWriter.ForCurrentUser(),
             McpClient.Codex => CodexWriter.ForCurrentUser(),
             McpClient.CopilotCli => CopilotCliWriter.ForCurrentUser(),
+            McpClient.Cursor => CursorWriter.ForCurrentUser(),
+            McpClient.GeminiCli => GeminiCliWriter.ForCurrentUser(),
+            McpClient.Windsurf => WindsurfWriter.ForCurrentUser(),
+            McpClient.VisualStudio2022 => VisualStudio2022Writer.ForCurrentUser(),
             _ => throw new ArgumentOutOfRangeException(nameof(client), client, "Unknown client.")
         };
     }
@@ -33,6 +37,12 @@ public static class ClientRegistration
     {
         ArgumentNullException.ThrowIfNull(clients);
         return clients.Select(CreateWriter).ToArray();
+    }
+
+    /// <summary>The writers for every client whose agent is detected as installed on this machine.</summary>
+    public static IReadOnlyList<IClientWriter> DetectedWriters()
+    {
+        return AllClients.Select(CreateWriter).Where(w => w.IsDetected()).ToArray();
     }
 
     /// <summary>Registers the endpoint with every supplied writer.</summary>
