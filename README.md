@@ -112,24 +112,30 @@ The LLM will call:
 
 ## Install (MSI)
 
-A per-user MSI installs SnoopMCP without administrator rights to
-`%LocalAppData%\SnoopMCP`, registers the MCP server in Claude Code and VS Code,
-and creates a logon autostart task. The finish page offers a **"Launch SnoopMCP
-now"** checkbox (checked by default) to start the host immediately; either way
-the logon task starts it on the next sign-in. An upgrade or uninstall first
-terminates the running host (so the locked exe doesn't block file replacement).
+Download the latest `SnoopMCP-<version>.msi` from the
+[**Releases page**](https://github.com/JackalopeTechnologies/SnoopMCP/releases/latest) and run it
+(double-click, or `msiexec /i SnoopMCP-<version>.msi`).
 
-**Build the installer** (needs the .NET 10 SDK, the VS C++ x64 workload, and the
+The per-user MSI installs SnoopMCP without administrator rights to `%LocalAppData%\SnoopMCP`, creates
+a logon autostart task (so the tray host starts at sign-in), and adds a "SnoopMCP Sample App"
+Start-menu shortcut. The finish page offers a **"Launch SnoopMCP now"** checkbox (checked by default)
+to start the host immediately; either way the logon task starts it on the next sign-in. An upgrade or
+uninstall first terminates the running host (so the locked exe doesn't block file replacement).
+
+The installer does **not** register SnoopMCP with any AI client — you choose which clients to wire up
+from the tray **Register in** menu after install (see [Using the tray app](#using-the-tray-app)).
+Confirm overall state any time with `SnoopMCP.Cli status`.
+
+**Build the installer yourself** (needs the .NET 10 SDK, the VS C++ x64 workload, and the
 [WiX 5 toolset](https://wixtoolset.org) — `dotnet tool install --global wix`):
 
 ```text
 pwsh -File SnoopMCP.Installer/build-installer.ps1 -Version 1.1.0
 ```
 
-This produces `SnoopMCP.Installer/SnoopMCP.msi`. Double-click it (or
-`msiexec /i SnoopMCP.Installer\SnoopMCP.msi`) to install. After install, both AI clients point at
-`http://127.0.0.1:6300/mcp` and a "SnoopMCP Sample App" Start-menu shortcut is
-available. Confirm with `SnoopMCP.Cli status`.
+This produces `SnoopMCP.Installer/SnoopMCP.msi`. Releases are cut by pushing a `v*` tag
+(e.g. `git tag v1.1.0 && git push origin v1.1.0`); CI builds the MSI and publishes it to the Releases
+page automatically.
 
 **Limitations (v1.1):** non-elevated targets only (the host attaches to
 same-elevation WPF apps — see Known limitations); single user per machine (port
@@ -140,11 +146,35 @@ same-elevation WPF apps — see Known limitations); single user per machine (por
 After running the MSI on a test machine:
 1. `%LocalAppData%\SnoopMCP\` contains (among other runtime DLLs) `SnoopMCP.Host.exe`, `SnoopMCP.Cli.exe`, `injector\`, `payload\`, and `samples\SampleWpfApp.exe`.
 2. `schtasks /Query /TN "SnoopMCP Host"` shows the logon task.
-3. `~/.claude.json` and `%APPDATA%\Code\User\mcp.json` each carry a `snoopmcp` HTTP entry — and nothing else was disturbed.
-4. With **"Launch SnoopMCP now"** ticked on the finish page, `http://127.0.0.1:6300/health` returns 200 (otherwise the host starts at next sign-in via the logon task). Either way, `SnoopMCP.Cli status` reports the state.
-5. The "SnoopMCP Sample App" Start-menu shortcut launches the sample.
+3. With **"Launch SnoopMCP now"** ticked on the finish page, `http://127.0.0.1:6300/health` returns 200 (otherwise the host starts at next sign-in via the logon task). Either way, `SnoopMCP.Cli status` reports the state.
+4. The "SnoopMCP Sample App" Start-menu shortcut launches the sample.
+5. Register a client from the tray **Register in** menu (or `SnoopMCP.Cli register-clients`), then confirm that client's config carries a `snoopmcp` entry — and nothing else was disturbed.
 6. An **upgrade** (install a higher `-Version` over the running install) succeeds without a locked-file error — the running host is terminated first.
-7. Uninstall (Apps & features, or `msiexec /x`) removes the task, the client entries, and the files — leaving other MCP servers intact.
+7. Uninstall (Apps & features, or `msiexec /x`) removes the task, any client entries SnoopMCP added, and the files — leaving other MCP servers intact.
+
+## Using the tray app
+
+`SnoopMCP.Host` runs as a system-tray app. Left- or right-click the tray icon for the menu:
+
+- **Start MCP** / **Stop MCP** — start or stop the MCP server (it starts automatically when the host launches).
+- **Register in ▸** — register SnoopMCP with an AI client. Pick a single client (**Claude Code**, **Claude Desktop**, **VS Code**, **Codex**, **Copilot CLI**) or **All**. A summary dialog reports what was written.
+- **Exit** — quit the host.
+
+Registering writes the client's MCP configuration so your agent can find the SnoopMCP endpoint. The
+transport per client is HTTP for Claude Code, VS Code, and Codex; SSE for Copilot CLI; and an
+`npx mcp-remote` stdio bridge for Claude Desktop (which has no native HTTP MCP transport — this
+requires [Node.js](https://nodejs.org) on `PATH`). Restart the target client after registering so it
+picks up the new config.
+
+The same registration is available from the command line via `SnoopMCP.Cli`:
+
+```text
+SnoopMCP.Cli register-clients     # all clients; or target specific ones:
+SnoopMCP.Cli register-clients --claude-code --claude-desktop --vscode --codex --copilot-cli
+```
+
+The CLI also supports `unregister-clients`, `status`, `install-autostart`, `uninstall-autostart`,
+`start`, and `stop`.
 
 ## Tool surface
 
