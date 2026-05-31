@@ -16,9 +16,11 @@ public sealed class VsCodeMcpWriter : JsonMcpServerWriter
     private const string ConfigFileName = "mcp.json";
     private const string VsCodeClientName = "VS Code";
 
-    /// <summary>Initialises the writer against an explicit config path (used by tests).</summary>
+    /// <summary>Initialises the writer against explicit paths (used by tests).</summary>
     /// <param name="configPath">Absolute path to VS Code's user <c>mcp.json</c>.</param>
-    public VsCodeMcpWriter(string configPath) : base(configPath, ServersKey)
+    /// <param name="detectionPath">Directory whose existence means VS Code is installed.</param>
+    public VsCodeMcpWriter(string configPath, string detectionPath)
+        : base(configPath, ServersKey, detectionPath)
     {
     }
 
@@ -29,6 +31,8 @@ public sealed class VsCodeMcpWriter : JsonMcpServerWriter
     public static VsCodeMcpWriter ForCurrentUser()
     {
         string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return new VsCodeMcpWriter(Path.Combine(appData, CodeDirName, UserDirName, ConfigFileName));
+        string config = Path.Combine(appData, CodeDirName, UserDirName, ConfigFileName);
+        string detect = Path.Combine(appData, CodeDirName);
+        return new VsCodeMcpWriter(config, detect);
     }
 }

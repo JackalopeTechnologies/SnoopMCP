@@ -19,5 +19,17 @@ public enum McpClient
     Codex,
 
     /// <summary>GitHub Copilot CLI (<c>~/.copilot/mcp-config.json</c>).</summary>
-    CopilotCli
+    CopilotCli,
+
+    /// <summary>Cursor (<c>~/.cursor/mcp.json</c>).</summary>
+    Cursor,
+
+    /// <summary>Gemini CLI (<c>~/.gemini/settings.json</c>).</summary>
+    GeminiCli,
+
+    /// <summary>Windsurf (<c>~/.codeium/windsurf/mcp_config.json</c>).</summary>
+    Windsurf,
+
+    /// <summary>Visual Studio 2022 (<c>~/.mcp.json</c>).</summary>
+    VisualStudio2022
 }

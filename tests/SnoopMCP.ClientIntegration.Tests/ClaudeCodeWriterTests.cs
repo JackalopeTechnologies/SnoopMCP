@@ -12,12 +12,16 @@ public sealed class ClaudeCodeWriterTests : IDisposable
 {
     private readonly string mDir;
     private readonly string mConfigPath;
+    private readonly string mSettingsPath;
+    private readonly string mSkillsDir;
 
     public ClaudeCodeWriterTests()
     {
         mDir = Path.Combine(Path.GetTempPath(), "snoopmcp-cc-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(mDir);
         mConfigPath = Path.Combine(mDir, ".claude.json");
+        mSettingsPath = Path.Combine(mDir, ".claude", "settings.json");
+        mSkillsDir = Path.Combine(mDir, ".claude", "skills");
     }
 
     public void Dispose()
@@ -38,7 +42,7 @@ public sealed class ClaudeCodeWriterTests : IDisposable
     [Fact]
     public void Register_OnMissingFile_CreatesConfigWithHttpEntry()
     {
-        var writer = new ClaudeCodeWriter(mConfigPath);
+        var writer = new ClaudeCodeWriter(mConfigPath, mSettingsPath, mSkillsDir);
 
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
@@ -54,7 +58,7 @@ public sealed class ClaudeCodeWriterTests : IDisposable
     {
         File.WriteAllText(mConfigPath,
             "{\"mcpServers\":{\"other\":{\"type\":\"http\",\"url\":\"http://x\"}},\"numStartups\":7}");
-        var writer = new ClaudeCodeWriter(mConfigPath);
+        var writer = new ClaudeCodeWriter(mConfigPath, mSettingsPath, mSkillsDir);
 
         writer.Register(McpEndpoint.Default);
 
@@ -68,7 +72,7 @@ public sealed class ClaudeCodeWriterTests : IDisposable
     public void Register_OnFileWithNoServersSection_AddsTheSection()
     {
         File.WriteAllText(mConfigPath, "{\"numStartups\":3}");
-        var writer = new ClaudeCodeWriter(mConfigPath);
+        var writer = new ClaudeCodeWriter(mConfigPath, mSettingsPath, mSkillsDir);
 
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
@@ -81,7 +85,7 @@ public sealed class ClaudeCodeWriterTests : IDisposable
     [Fact]
     public void Register_WhenAlreadyPresent_IsIdempotent()
     {
-        var writer = new ClaudeCodeWriter(mConfigPath);
+        var writer = new ClaudeCodeWriter(mConfigPath, mSettingsPath, mSkillsDir);
         writer.Register(McpEndpoint.Default);
 
         RegisterResult second = writer.Register(McpEndpoint.Default);
@@ -95,7 +99,7 @@ public sealed class ClaudeCodeWriterTests : IDisposable
     public void Register_OnMalformedJson_FailsWithoutThrowing()
     {
         File.WriteAllText(mConfigPath, "{ this is not json ");
-        var writer = new ClaudeCodeWriter(mConfigPath);
+        var writer = new ClaudeCodeWriter(mConfigPath, mSettingsPath, mSkillsDir);
 
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
@@ -108,7 +112,7 @@ public sealed class ClaudeCodeWriterTests : IDisposable
         File.WriteAllText(mConfigPath,
             "{\"mcpServers\":{\"snoopmcp\":{\"type\":\"http\",\"url\":\"http://127.0.0.1:6300/mcp\"}," +
             "\"other\":{\"type\":\"http\",\"url\":\"http://x\"}}}");
-        var writer = new ClaudeCodeWriter(mConfigPath);
+        var writer = new ClaudeCodeWriter(mConfigPath, mSettingsPath, mSkillsDir);
 
         UnregisterResult result = writer.Unregister();
 
@@ -121,7 +125,7 @@ public sealed class ClaudeCodeWriterTests : IDisposable
     [Fact]
     public void Unregister_OnMissingFile_IsSuccessfulNoOp()
     {
-        var writer = new ClaudeCodeWriter(mConfigPath);
+        var writer = new ClaudeCodeWriter(mConfigPath, mSettingsPath, mSkillsDir);
 
         UnregisterResult result = writer.Unregister();
 
@@ -132,7 +136,7 @@ public sealed class ClaudeCodeWriterTests : IDisposable
     [Fact]
     public void GetStatus_ReflectsRegistration()
     {
-        var writer = new ClaudeCodeWriter(mConfigPath);
+        var writer = new ClaudeCodeWriter(mConfigPath, mSettingsPath, mSkillsDir);
         Assert.False(writer.GetStatus().IsRegistered);
 
         writer.Register(McpEndpoint.Default);
