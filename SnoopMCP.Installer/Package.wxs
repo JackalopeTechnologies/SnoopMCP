@@ -59,9 +59,9 @@
             <util:RemoveFolderEx On="uninstall" Property="INSTALLDIRSAVED" />
         </Component>
 
-        <!-- Install: create the logon task. Client registration is intentionally NOT done here;
-             it is user-initiated from the tray "Register in" menu (or the CLI register-clients verb),
-             so the installer never writes into a client's config without the user asking. -->
+        <!-- Install: create the logon task. Agent registration is offered as an opt-in checkbox on the
+             finish page (see RegisterAgents below), so the installer never writes into a client's config
+             unless the user asks; it is also available any time from the tray or the CLI. -->
         <SetProperty Id="InstallAutostart" Before="InstallAutostart" Sequence="execute"
                      Value="&quot;[INSTALLFOLDER]SnoopMCP.Cli.exe&quot; install-autostart" />
         <CustomAction Id="InstallAutostart" BinaryRef="Wix4UtilCA_X86" DllEntry="WixQuietExec"
@@ -93,22 +93,34 @@
         <ui:WixUI Id="WixUI_Minimal" />
         <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
 
-        <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch SnoopMCP now" />
+        <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Register SnoopMCP into detected AI agents now" />
         <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
         <CustomAction Id="SetLaunchTarget" Property="WixShellExecTarget"
                       Value="[INSTALLFOLDER]SnoopMCP.Host.exe" />
         <CustomAction Id="LaunchSnoopMcp" BinaryRef="Wix4UtilCA_X86" DllEntry="WixShellExec"
                       Execute="immediate" Impersonate="yes" Return="ignore" />
+        <!-- Best-effort: register SnoopMCP into the AI agents detected on this machine when the user
+             leaves the finish-page checkbox ticked. Return=ignore so a missing agent or a write error
+             never fails the install; the detected-only switch skips agents that are not present. -->
+        <CustomAction Id="SetRegisterAgentsCmd" Property="WixQuietExecCmdLine"
+                      Value="&quot;[INSTALLFOLDER]SnoopMCP.Cli.exe&quot; register-clients --detected-only" />
+        <CustomAction Id="RegisterAgents" BinaryRef="Wix4UtilCA_X86" DllEntry="WixQuietExec"
+                      Execute="immediate" Impersonate="yes" Return="ignore" />
         <InstallUISequence>
             <Custom Action="SetLaunchTarget" After="CostFinalize" />
+            <Custom Action="SetRegisterAgentsCmd" After="SetLaunchTarget" />
         </InstallUISequence>
 
         <UI>
             <ProgressText Action="InstallAutostart" Message="Creating the logon autostart task..." />
             <ProgressText Action="UninstallAutostart" Message="Removing the logon autostart task..." />
             <ProgressText Action="UnregisterClients" Message="Removing SnoopMCP from your AI tools..." />
-            <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchSnoopMcp"
+            <!-- Register only when the user opts in; always launch the tray host on a fresh install so
+                 the notification-area app comes up immediately (the logon task handles later sessions). -->
+            <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="RegisterAgents"
                      Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+            <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchSnoopMcp"
+                     Condition="NOT Installed" />
         </UI>
 
     </Package>
