@@ -1,17 +1,141 @@
 // Program.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Cli;
+#region Usings
 
 using SnoopMCP.ClientIntegration;
 
+#endregion
+
+namespace SnoopMCP.Cli;
+
 /// <summary>
-/// Management CLI for SnoopMCP: registers the MCP server in LLM clients, manages the per-user logon
-/// autostart task, and supervises the host process. Verbs are dispatched from <see cref="Main"/>;
-/// each returns a process exit code (0 = success, 2 = failure, 64 = usage error).
+///     Management CLI for SnoopMCP: registers the MCP server in LLM clients, manages the per-user logon
+///     autostart task, and supervises the host process. Verbs are dispatched from <see cref="Main" />;
+///     each returns a process exit code (0 = success, 2 = failure, 64 = usage error).
 /// </summary>
 public static class Program
 {
+    /// <summary>Parses the verb and dispatches; returns the process exit code.</summary>
+    /// <param name="args">Command-line arguments; <c>args[0]</c> is the verb.</param>
+    public static async Task<int> Main(string[] args)
+    {
+        ArgumentNullException.ThrowIfNull(args);
+        var verb = args.Length > 0 ? args[0] : string.Empty;
+        Task<int> dispatched = verb switch
+        {
+            VerbRegisterClients => Task.FromResult(RegisterClients(args)),
+            VerbUnregisterClients => Task.FromResult(UnregisterClients(args)),
+            VerbInstallAutostart => Task.FromResult(InstallAutostart()),
+            VerbUninstallAutostart => Task.FromResult(UninstallAutostart()),
+            VerbStatus => StatusAsync(),
+            VerbStart => Task.FromResult(Start()),
+            VerbStop => Task.FromResult(Stop()),
+            _ => Task.FromResult(PrintUsage())
+        };
+        return await dispatched.ConfigureAwait(false);
+    }
+
+    private static async Task<int> StatusAsync()
+    {
+        ClientRegistration.Status(SelectWriters([]), Console.Out);
+        Console.WriteLine(AutostartTask.Exists() ? MsgAutostartPresent : MsgAutostartAbsent);
+        using var client = new HttpClient();
+        var healthy = await HostHealthProbe
+            .IsHealthyAsync(client, HostHealthProbe.HealthUrl, default)
+            .ConfigureAwait(false);
+        Console.WriteLine(healthy ? MsgHostReachable : MsgHostNotReachable);
+        return ExitOk;
+    }
+
+    private static int Start()
+    {
+        var started = HostProcess.Start();
+        Console.WriteLine(started ? MsgHostStarted : MsgHostStartFailed);
+        return started ? ExitOk : ExitFailure;
+    }
+
+    private static int Stop()
+    {
+        var stopped = HostProcess.Stop();
+        Console.WriteLine($"Stopped {stopped} host process(es).");
+        return ExitOk;
+    }
+
+    private static int PrintUsage()
+    {
+        Console.Error.WriteLine(
+            "Usage: SnoopMCP.Cli <register-clients|unregister-clients|install-autostart|"
+            + "uninstall-autostart|status|start|stop> [--claude-code] [--claude-desktop] "
+            + "[--vscode] [--codex] [--copilot-cli] [--cursor] [--gemini-cli] [--windsurf] "
+            + "[--visual-studio] [--detected-only]");
+        return ExitUsage;
+    }
+
+    private static int InstallAutostart()
+    {
+        var ok = AutostartTask.Create(HostProcess.ExePath());
+        Console.WriteLine(ok ? MsgAutostartCreated : MsgAutostartCreateFailed);
+        return ok ? ExitOk : ExitFailure;
+    }
+
+    private static int UninstallAutostart()
+    {
+        var ok = AutostartTask.Remove();
+        Console.WriteLine(ok ? MsgAutostartRemoved : MsgAutostartRemoveFailed);
+        return ok ? ExitOk : ExitFailure;
+    }
+
+    internal static IReadOnlyList<McpClient> SelectClients(string[] args)
+    {
+        var selected = smClientFlags
+            .Where(m => HasFlag(args, m.Flag))
+            .Select(m => m.Client)
+            .ToList();
+        return selected.Count > 0 ? selected : ClientIntegration.ClientRegistration.AllClients;
+    }
+
+    private static List<IClientWriter> SelectWriters(string[] args)
+    {
+        IEnumerable<IClientWriter> writers = SelectClients(args)
+            .Select(ClientIntegration.ClientRegistration.CreateWriter);
+        if (HasFlag(args, FlagDetectedOnly)) writers = writers.Where(w => w.IsDetected());
+        return writers.ToList();
+    }
+
+    internal static bool HasFlag(string[] args, string flag)
+    {
+        return Array.Exists(args, a => string.Equals(a, flag, StringComparison.Ordinal));
+    }
+
+    private static int RegisterClients(string[] args)
+    {
+        return ClientRegistration.RegisterAll(SelectWriters(args), McpEndpoint.Default, Console.Out);
+    }
+
+    private static int UnregisterClients(string[] args)
+    {
+        return ClientRegistration.UnregisterAll(SelectWriters(args), Console.Out);
+    }
+
     private const string VerbRegisterClients = "register-clients";
     private const string VerbUnregisterClients = "unregister-clients";
     private const string VerbInstallAutostart = "install-autostart";
@@ -43,121 +167,11 @@ public static class Program
     private const string MsgHostStarted = "Host started.";
     private const string MsgHostStartFailed = "Host failed to start.";
 
-    /// <summary>Parses the verb and dispatches; returns the process exit code.</summary>
-    /// <param name="args">Command-line arguments; <c>args[0]</c> is the verb.</param>
-    public static async Task<int> Main(string[] args)
-    {
-        ArgumentNullException.ThrowIfNull(args);
-        string verb = args.Length > 0 ? args[0] : string.Empty;
-        Task<int> dispatched = verb switch
-        {
-            VerbRegisterClients => Task.FromResult(RegisterClients(args)),
-            VerbUnregisterClients => Task.FromResult(UnregisterClients(args)),
-            VerbInstallAutostart => Task.FromResult(InstallAutostart()),
-            VerbUninstallAutostart => Task.FromResult(UninstallAutostart()),
-            VerbStatus => StatusAsync(),
-            VerbStart => Task.FromResult(Start()),
-            VerbStop => Task.FromResult(Stop()),
-            _ => Task.FromResult(PrintUsage())
-        };
-        return await dispatched.ConfigureAwait(false);
-    }
-
-    private static async Task<int> StatusAsync()
-    {
-        ClientRegistration.Status(SelectWriters([]), Console.Out);
-        Console.WriteLine(AutostartTask.Exists() ? MsgAutostartPresent : MsgAutostartAbsent);
-        using var client = new HttpClient();
-        bool healthy = await HostHealthProbe
-            .IsHealthyAsync(client, HostHealthProbe.HealthUrl, default)
-            .ConfigureAwait(false);
-        Console.WriteLine(healthy ? MsgHostReachable : MsgHostNotReachable);
-        return ExitOk;
-    }
-
-    private static int Start()
-    {
-        bool started = HostProcess.Start();
-        Console.WriteLine(started ? MsgHostStarted : MsgHostStartFailed);
-        return started ? ExitOk : ExitFailure;
-    }
-
-    private static int Stop()
-    {
-        int stopped = HostProcess.Stop();
-        Console.WriteLine($"Stopped {stopped} host process(es).");
-        return ExitOk;
-    }
-
-    private static int PrintUsage()
-    {
-        Console.Error.WriteLine(
-            "Usage: SnoopMCP.Cli <register-clients|unregister-clients|install-autostart|"
-            + "uninstall-autostart|status|start|stop> [--claude-code] [--claude-desktop] "
-            + "[--vscode] [--codex] [--copilot-cli] [--cursor] [--gemini-cli] [--windsurf] "
-            + "[--visual-studio] [--detected-only]");
-        return ExitUsage;
-    }
-
-    private static int InstallAutostart()
-    {
-        bool ok = AutostartTask.Create(HostProcess.ExePath());
-        Console.WriteLine(ok ? MsgAutostartCreated : MsgAutostartCreateFailed);
-        return ok ? ExitOk : ExitFailure;
-    }
-
-    private static int UninstallAutostart()
-    {
-        bool ok = AutostartTask.Remove();
-        Console.WriteLine(ok ? MsgAutostartRemoved : MsgAutostartRemoveFailed);
-        return ok ? ExitOk : ExitFailure;
-    }
-
     private static readonly (string Flag, McpClient Client)[] smClientFlags =
     {
-        (FlagClaudeCode, McpClient.ClaudeCode),
-        (FlagClaudeDesktop, McpClient.ClaudeDesktop),
-        (FlagVsCode, McpClient.VsCode),
-        (FlagCodex, McpClient.Codex),
-        (FlagCopilotCli, McpClient.CopilotCli),
-        (FlagCursor, McpClient.Cursor),
-        (FlagGemini, McpClient.GeminiCli),
-        (FlagWindsurf, McpClient.Windsurf),
+        (FlagClaudeCode, McpClient.ClaudeCode), (FlagClaudeDesktop, McpClient.ClaudeDesktop),
+        (FlagVsCode, McpClient.VsCode), (FlagCodex, McpClient.Codex), (FlagCopilotCli, McpClient.CopilotCli),
+        (FlagCursor, McpClient.Cursor), (FlagGemini, McpClient.GeminiCli), (FlagWindsurf, McpClient.Windsurf),
         (FlagVisualStudio, McpClient.VisualStudio2022)
     };
-
-    internal static IReadOnlyList<McpClient> SelectClients(string[] args)
-    {
-        List<McpClient> selected = smClientFlags
-            .Where(m => HasFlag(args, m.Flag))
-            .Select(m => m.Client)
-            .ToList();
-        return selected.Count > 0 ? selected : SnoopMCP.ClientIntegration.ClientRegistration.AllClients;
-    }
-
-    private static List<IClientWriter> SelectWriters(string[] args)
-    {
-        IEnumerable<IClientWriter> writers = SelectClients(args)
-            .Select(SnoopMCP.ClientIntegration.ClientRegistration.CreateWriter);
-        if (HasFlag(args, FlagDetectedOnly))
-        {
-            writers = writers.Where(w => w.IsDetected());
-        }
-        return writers.ToList();
-    }
-
-    internal static bool HasFlag(string[] args, string flag)
-    {
-        return Array.Exists(args, a => string.Equals(a, flag, StringComparison.Ordinal));
-    }
-
-    private static int RegisterClients(string[] args)
-    {
-        return ClientRegistration.RegisterAll(SelectWriters(args), McpEndpoint.Default, Console.Out);
-    }
-
-    private static int UnregisterClients(string[] args)
-    {
-        return ClientRegistration.UnregisterAll(SelectWriters(args), Console.Out);
-    }
 }

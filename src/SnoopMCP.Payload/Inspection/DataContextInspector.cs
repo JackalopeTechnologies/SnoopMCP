@@ -1,30 +1,52 @@
 // DataContextInspector.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Payload.Inspection;
+#region Usings
 
 using System.Globalization;
 using System.Reflection;
 using System.Windows;
 using SnoopMCP.Protocol.Tools;
 
+#endregion
+
+namespace SnoopMCP.Payload.Inspection;
+
 /// <summary>
-/// Inspects the CLR object hanging off an element's <c>DataContext</c>: type shape (Task 17)
-/// and dotted-path reads (Task 18). The same class hosts both methods because they share
-/// the "walk into the DataContext" intent.
+///     Inspects the CLR object hanging off an element's <c>DataContext</c>: type shape (Task 17)
+///     and dotted-path reads (Task 18). The same class hosts both methods because they share
+///     the "walk into the DataContext" intent.
 /// </summary>
 public sealed class DataContextInspector
 {
     /// <summary>
-    /// Snapshots the CLR type shape of an element's DataContext.
+    ///     Snapshots the CLR type shape of an element's DataContext.
     /// </summary>
     /// <param name="element">The element to inspect.</param>
     /// <returns>
-    /// A response whose <see cref="DescribeDataContextResponse.DataContext"/> is the type-shape info,
-    /// or <c>null</c> when the element has no DataContext.
+    ///     A response whose <see cref="DescribeDataContextResponse.DataContext" /> is the type-shape info,
+    ///     or <c>null</c> when the element has no DataContext.
     /// </returns>
     /// <remarks>
-    /// CA1822 disabled: scaffolded for DI in handler; will gain instance state in follow-up phases.
+    ///     CA1822 disabled: scaffolded for DI in handler; will gain instance state in follow-up phases.
     /// </remarks>
 #pragma warning disable CA1822
     public DescribeDataContextResponse DescribeDataContext(DependencyObject element)
@@ -32,24 +54,24 @@ public sealed class DataContextInspector
     {
         ArgumentNullException.ThrowIfNull(element);
 
-        object? dataContext = ResolveDataContext(element);
+        var dataContext = ResolveDataContext(element);
         DataContextInfo? info = dataContext is null ? null : BuildInfo(dataContext);
         return new DescribeDataContextResponse(info);
     }
 
     /// <summary>
-    /// Reads a dot-separated property path off an element's DataContext, e.g.
-    /// <c>SelectedCustomer.Address.Street</c>.
+    ///     Reads a dot-separated property path off an element's DataContext, e.g.
+    ///     <c>SelectedCustomer.Address.Street</c>.
     /// </summary>
     /// <param name="element">The element whose DataContext roots the walk.</param>
     /// <param name="path">The dot-separated property path. Must be non-empty.</param>
     /// <returns>
-    /// The stringified leaf value and its runtime type when the path is reachable; otherwise a
-    /// response whose <see cref="ReadDataContextPathResponse.PathReachable"/> is <c>false</c> and
-    /// <see cref="ReadDataContextPathResponse.FailureAt"/> locates the offending segment.
+    ///     The stringified leaf value and its runtime type when the path is reachable; otherwise a
+    ///     response whose <see cref="ReadDataContextPathResponse.PathReachable" /> is <c>false</c> and
+    ///     <see cref="ReadDataContextPathResponse.FailureAt" /> locates the offending segment.
     /// </returns>
     /// <remarks>
-    /// CA1822 disabled: scaffolded for DI in handler; will gain instance state in follow-up phases.
+    ///     CA1822 disabled: scaffolded for DI in handler; will gain instance state in follow-up phases.
     /// </remarks>
 #pragma warning disable CA1822
     public ReadDataContextPathResponse ReadPath(DependencyObject element, string path)
@@ -58,7 +80,7 @@ public sealed class DataContextInspector
         ArgumentNullException.ThrowIfNull(element);
         ArgumentException.ThrowIfNullOrEmpty(path);
 
-        object? root = ResolveDataContext(element);
+        var root = ResolveDataContext(element);
         ReadDataContextPathResponse response = root is null
             ? new ReadDataContextPathResponse(null, null, false, string.Empty)
             : WalkPath(root, path);
@@ -67,17 +89,17 @@ public sealed class DataContextInspector
 
     private static ReadDataContextPathResponse WalkPath(object root, string path)
     {
-        string[] segments = path.Split('.', StringSplitOptions.RemoveEmptyEntries);
-        object? current = root;
-        string traversed = string.Empty;
-        bool failed = false;
+        var segments = path.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        var current = root;
+        var traversed = string.Empty;
+        var failed = false;
         string? failedAt = null;
 
-        for (int i = 0; i < segments.Length && !failed; i++)
+        for (var i = 0; i < segments.Length && !failed; i++)
         {
-            string segment = segments[i];
-            string nextTraversed = traversed.Length == 0 ? segment : $"{traversed}.{segment}";
-            (object? value, string newTraversed, bool stepFailed, string? stepFailedAt) =
+            var segment = segments[i];
+            var nextTraversed = traversed.Length == 0 ? segment : $"{traversed}.{segment}";
+            var (value, newTraversed, stepFailed, stepFailedAt) =
                 StepInto(current, segment, traversed, nextTraversed);
             current = value;
             traversed = newTraversed;
@@ -108,6 +130,7 @@ public sealed class DataContextInspector
                 ? (readable.GetValue(current), nextTraversed, false, null)
                 : (null, traversed, true, nextTraversed);
         }
+
         return result;
     }
 
@@ -120,16 +143,17 @@ public sealed class DataContextInspector
         }
         else
         {
-            string? value = current is null ? null : Convert.ToString(current, CultureInfo.InvariantCulture);
-            string? valueType = current?.GetType().FullName;
+            var value = current is null ? null : Convert.ToString(current, CultureInfo.InvariantCulture);
+            var valueType = current?.GetType().FullName;
             result = new ReadDataContextPathResponse(value, valueType, true, null);
         }
+
         return result;
     }
 
     private static object? ResolveDataContext(DependencyObject element)
     {
-        object? value = element switch
+        var value = element switch
         {
             FrameworkElement fe => fe.DataContext,
             FrameworkContentElement fce => fce.DataContext,
@@ -141,8 +165,8 @@ public sealed class DataContextInspector
     private static DataContextInfo BuildInfo(object dataContext)
     {
         Type type = dataContext.GetType();
-        string typeName = type.Name;
-        string ns = type.Namespace ?? string.Empty;
+        var typeName = type.Name;
+        var ns = type.Namespace ?? string.Empty;
         List<string> baseTypes = CollectBaseTypes(type);
         List<string> interfaces = CollectInterfaces(type);
         List<DeclaredPropertyDto> properties = CollectDeclaredProperties(type);
@@ -159,6 +183,7 @@ public sealed class DataContextInspector
             names.Add(current.FullName ?? current.Name);
             current = current.BaseType;
         }
+
         return names;
     }
 
@@ -166,10 +191,7 @@ public sealed class DataContextInspector
     {
         Type[] interfaces = type.GetInterfaces();
         var names = new List<string>(interfaces.Length);
-        foreach (Type iface in interfaces)
-        {
-            names.Add(iface.FullName ?? iface.Name);
-        }
+        foreach (Type iface in interfaces) names.Add(iface.FullName ?? iface.Name);
         return names;
     }
 
@@ -180,13 +202,14 @@ public sealed class DataContextInspector
         var dtos = new List<DeclaredPropertyDto>(props.Length);
         foreach (PropertyInfo prop in props)
         {
-            string propType = prop.PropertyType.FullName ?? prop.PropertyType.Name;
+            var propType = prop.PropertyType.FullName ?? prop.PropertyType.Name;
             dtos.Add(new DeclaredPropertyDto(
-                Name: prop.Name,
-                Type: propType,
-                CanRead: prop.CanRead,
-                CanWrite: prop.CanWrite));
+                prop.Name,
+                propType,
+                prop.CanRead,
+                prop.CanWrite));
         }
+
         return dtos;
     }
 }

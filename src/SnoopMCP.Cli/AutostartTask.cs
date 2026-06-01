@@ -1,31 +1,40 @@
 // AutostartTask.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Cli;
+#region Usings
 
 using System.Diagnostics;
 
+#endregion
+
+namespace SnoopMCP.Cli;
+
 /// <summary>
-/// Manages the per-user logon scheduled task that launches the SnoopMCP host. Wraps
-/// <c>schtasks.exe</c>: the argument builders are pure (and unit-tested); the create/remove/exists
-/// methods shell out. The task runs at logon, non-elevated (<c>/RL LIMITED</c>), matching the
-/// per-user run model.
+///     Manages the per-user logon scheduled task that launches the SnoopMCP host. Wraps
+///     <c>schtasks.exe</c>: the argument builders are pure (and unit-tested); the create/remove/exists
+///     methods shell out. The task runs at logon, non-elevated (<c>/RL LIMITED</c>), matching the
+///     per-user run model.
 /// </summary>
 public static class AutostartTask
 {
-    private const string SchTasksExe = "schtasks.exe";
-    private const string TaskName = "SnoopMCP Host";
-    private const string CreateSwitch = "/Create";
-    private const string DeleteSwitch = "/Delete";
-    private const string QuerySwitch = "/Query";
-    private const string TaskNameSwitch = "/TN";
-    private const string ScheduleSwitch = "/SC";
-    private const string OnLogon = "ONLOGON";
-    private const string RunLevelSwitch = "/RL";
-    private const string Limited = "LIMITED";
-    private const string TaskRunSwitch = "/TR";
-    private const string ForceSwitch = "/F";
-
     /// <summary>Builds the <c>schtasks</c> arguments that create the logon task for the host exe.</summary>
     /// <param name="hostExePath">Absolute path to <c>SnoopMCP.Host.exe</c>.</param>
     public static IReadOnlyList<string> BuildCreateArguments(string hostExePath)
@@ -80,12 +89,9 @@ public static class AutostartTask
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        foreach (string arg in arguments)
-        {
-            psi.ArgumentList.Add(arg);
-        }
+        foreach (var arg in arguments) psi.ArgumentList.Add(arg);
         int exit;
-        using (Process? process = Process.Start(psi))
+        using (var process = Process.Start(psi))
         {
             if (process is null)
             {
@@ -101,6 +107,20 @@ public static class AutostartTask
                 exit = process.ExitCode;
             }
         }
+
         return exit;
     }
+
+    private const string SchTasksExe = "schtasks.exe";
+    private const string TaskName = "SnoopMCP Host";
+    private const string CreateSwitch = "/Create";
+    private const string DeleteSwitch = "/Delete";
+    private const string QuerySwitch = "/Query";
+    private const string TaskNameSwitch = "/TN";
+    private const string ScheduleSwitch = "/SC";
+    private const string OnLogon = "ONLOGON";
+    private const string RunLevelSwitch = "/RL";
+    private const string Limited = "LIMITED";
+    private const string TaskRunSwitch = "/TR";
+    private const string ForceSwitch = "/F";
 }

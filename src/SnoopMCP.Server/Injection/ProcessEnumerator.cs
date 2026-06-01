@@ -1,25 +1,43 @@
-namespace SnoopMCP.Host.Injection;
+// ProcessEnumerator.cs
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#region Usings
 
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.InteropServices;
 using SnoopMCP.Protocol.Tools;
 
+#endregion
+
+namespace SnoopMCP.Host.Injection;
+
 /// <summary>
-/// Host-side, pre-attach discovery of WPF processes. Enumerates running processes that have a main
-/// window and have WPF loaded (<c>PresentationFramework.dll</c>), reporting each as a candidate
-/// debug target. No injection is involved; processes the host cannot inspect (access denied, exited,
-/// cross-architecture) are skipped silently.
+///     Host-side, pre-attach discovery of WPF processes. Enumerates running processes that have a main
+///     window and have WPF loaded (<c>PresentationFramework.dll</c>), reporting each as a candidate
+///     debug target. No injection is involved; processes the host cannot inspect (access denied, exited,
+///     cross-architecture) are skipped silently.
 /// </summary>
 public static class ProcessEnumerator
 {
-    private const string WpfModule = "PresentationFramework.dll";
-    private const string HostFxrModule = "hostfxr.dll";
-    private const string UnknownVersion = "Unknown";
-    private const string X64 = "x64";
-    private const string X86 = "x86";
-
     public static IReadOnlyList<WpfProcessDto> ListWpfProcesses()
     {
         var results = new List<WpfProcessDto>();
@@ -29,19 +47,14 @@ public static class ProcessEnumerator
             foreach (Process process in all)
             {
                 WpfProcessDto? dto = TryClassify(process);
-                if (dto is not null)
-                {
-                    results.Add(dto);
-                }
+                if (dto is not null) results.Add(dto);
             }
         }
         finally
         {
-            foreach (Process process in all)
-            {
-                process.Dispose();
-            }
+            foreach (Process process in all) process.Dispose();
         }
+
         return results;
     }
 
@@ -50,21 +63,21 @@ public static class ProcessEnumerator
         WpfProcessDto? dto = null;
         try
         {
-            bool hasWindow = process.MainWindowHandle != IntPtr.Zero;
+            var hasWindow = process.MainWindowHandle != IntPtr.Zero;
             if (hasWindow)
             {
-                (bool isWpf, string framework, string runtime) = ScanModules(process);
+                var (isWpf, framework, runtime) = ScanModules(process);
                 if (isWpf)
                 {
-                    string bitness = DetermineBitness(process);
+                    var bitness = DetermineBitness(process);
                     dto = new WpfProcessDto(
-                        Pid: process.Id,
-                        ProcessName: process.ProcessName,
-                        MainWindowTitle: process.MainWindowTitle,
-                        Bitness: bitness,
-                        RuntimeVersion: runtime,
-                        FrameworkVersion: framework,
-                        Attachable: string.Equals(bitness, X64, StringComparison.Ordinal));
+                        process.Id,
+                        process.ProcessName,
+                        process.MainWindowTitle,
+                        bitness,
+                        runtime,
+                        framework,
+                        string.Equals(bitness, X64, StringComparison.Ordinal));
                 }
             }
         }
@@ -72,45 +85,53 @@ public static class ProcessEnumerator
         {
             dto = null;
         }
+
         return dto;
     }
 
     private static (bool IsWpf, string Framework, string Runtime) ScanModules(Process process)
     {
-        bool isWpf = false;
-        string framework = UnknownVersion;
-        string runtime = UnknownVersion;
+        var isWpf = false;
+        var framework = UnknownVersion;
+        var runtime = UnknownVersion;
         foreach (ProcessModule module in process.Modules.Cast<ProcessModule>())
         {
-            string name = module.ModuleName ?? string.Empty;
-            bool isWpfModule = string.Equals(name, WpfModule, StringComparison.OrdinalIgnoreCase);
+            var name = module.ModuleName ?? string.Empty;
+            var isWpfModule = string.Equals(name, WpfModule, StringComparison.OrdinalIgnoreCase);
             if (isWpfModule)
             {
                 isWpf = true;
                 framework = module.FileVersionInfo.FileVersion ?? UnknownVersion;
             }
-            bool isHostFxr = string.Equals(name, HostFxrModule, StringComparison.OrdinalIgnoreCase);
-            if (isHostFxr)
-            {
-                runtime = module.FileVersionInfo.FileVersion ?? UnknownVersion;
-            }
+
+            var isHostFxr = string.Equals(name, HostFxrModule, StringComparison.OrdinalIgnoreCase);
+            if (isHostFxr) runtime = module.FileVersionInfo.FileVersion ?? UnknownVersion;
         }
+
         return (isWpf, framework, runtime);
     }
 
     private static string DetermineBitness(Process process)
     {
-        string bitness = string.Empty;
-        bool ok = IsWow64Process(process.Handle, out bool isWow64);
+        var bitness = string.Empty;
+        var ok = IsWow64Process(process.Handle, out var isWow64);
         if (ok)
         {
-            bool osIs64 = Environment.Is64BitOperatingSystem;
-            bitness = (osIs64 && !isWow64) ? X64 : X86;
+            var osIs64 = Environment.Is64BitOperatingSystem;
+            bitness = osIs64 && !isWow64 ? X64 : X86;
         }
+
         return bitness;
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool IsWow64Process(IntPtr processHandle, [MarshalAs(UnmanagedType.Bool)] out bool wow64Process);
+    private static extern bool IsWow64Process(IntPtr processHandle,
+        [MarshalAs(UnmanagedType.Bool)] out bool wow64Process);
+
+    private const string WpfModule = "PresentationFramework.dll";
+    private const string HostFxrModule = "hostfxr.dll";
+    private const string UnknownVersion = "Unknown";
+    private const string X64 = "x64";
+    private const string X86 = "x86";
 }

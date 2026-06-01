@@ -1,23 +1,43 @@
 // DispatcherMarshalTests.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Payload.Tests;
+#region Usings
 
-using System.Threading;
 using System.Windows.Threading;
-using SnoopMCP.Payload;
 using SnoopMCP.Protocol.Errors;
 using Xunit;
+
+#endregion
+
+namespace SnoopMCP.Payload.Tests;
 
 public sealed class DispatcherMarshalTests
 {
     [StaFact]
     public void Invoke_FastFunction_ReturnsResult()
     {
-        var dispatcher = Dispatcher.CurrentDispatcher;
+        Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
         var marshal = new DispatcherMarshal(dispatcher, TimeSpan.FromSeconds(2));
 
-        int result = marshal.Invoke(() => 42 + 8, CancellationToken.None);
+        var result = marshal.Invoke(() => 42 + 8, CancellationToken.None);
 
         Assert.Equal(50, result);
     }
@@ -25,11 +45,11 @@ public sealed class DispatcherMarshalTests
     [StaFact]
     public void Invoke_OnSameThread_RunsInline()
     {
-        var dispatcher = Dispatcher.CurrentDispatcher;
+        Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
         var marshal = new DispatcherMarshal(dispatcher, TimeSpan.FromSeconds(2));
 
-        int dispatcherThreadId = Environment.CurrentManagedThreadId;
-        int observedThreadId = marshal.Invoke(() => Environment.CurrentManagedThreadId, CancellationToken.None);
+        var dispatcherThreadId = Environment.CurrentManagedThreadId;
+        var observedThreadId = marshal.Invoke(() => Environment.CurrentManagedThreadId, CancellationToken.None);
 
         Assert.Equal(dispatcherThreadId, observedThreadId);
     }
@@ -37,10 +57,10 @@ public sealed class DispatcherMarshalTests
     [StaFact]
     public void Invoke_FromForeignThread_RunsOnDispatcherThread()
     {
-        var dispatcher = Dispatcher.CurrentDispatcher;
+        Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
         var marshal = new DispatcherMarshal(dispatcher, TimeSpan.FromSeconds(2));
-        int dispatcherThreadId = Environment.CurrentManagedThreadId;
-        int observed = 0;
+        var dispatcherThreadId = Environment.CurrentManagedThreadId;
+        var observed = 0;
 
         var worker = new Thread(() =>
         {
@@ -48,7 +68,7 @@ public sealed class DispatcherMarshalTests
         });
         worker.Start();
 
-        DispatcherFrame frame = new();
+        DispatcherFrame frame = new DispatcherFrame();
         var pump = new Thread(() =>
         {
             worker.Join();
@@ -82,8 +102,8 @@ public sealed class DispatcherMarshalTests
 
         workerDispatcher!.BeginInvoke(() => Thread.Sleep(TimeSpan.FromSeconds(1)));
 
-        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(
-            () => slowMarshal.Invoke(() => 1, CancellationToken.None));
+        SnoopMcpException ex =
+            Assert.Throws<SnoopMcpException>(() => slowMarshal.Invoke(() => 1, CancellationToken.None));
         Assert.Equal(ErrorCode.DispatcherTimeout, ex.Code);
 
         workerDispatcher.InvokeShutdown();
@@ -111,7 +131,6 @@ public sealed class DispatcherMarshalTests
 
         var marshal = new DispatcherMarshal(workerDispatcher, TimeSpan.FromSeconds(1));
 
-        Assert.Throws<InvalidOperationException>(
-            () => marshal.Invoke(() => 1, CancellationToken.None));
+        Assert.Throws<InvalidOperationException>(() => marshal.Invoke(() => 1, CancellationToken.None));
     }
 }

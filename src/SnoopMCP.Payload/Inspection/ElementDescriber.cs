@@ -1,7 +1,25 @@
 // ElementDescriber.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Payload.Inspection;
+#region Usings
 
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -10,23 +28,22 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using SnoopMCP.Payload.PathStrings;
 using SnoopMCP.Protocol.Tools;
 
+#endregion
+
+namespace SnoopMCP.Payload.Inspection;
+
 /// <summary>
-/// Builds a <see cref="DescribeElementResponse"/> snapshot for a single
-/// <see cref="DependencyObject"/>: identity, bounds, visible text, binding state, and canonical path.
+///     Builds a <see cref="DescribeElementResponse" /> snapshot for a single
+///     <see cref="DependencyObject" />: identity, bounds, visible text, binding state, and canonical path.
 /// </summary>
 public sealed class ElementDescriber
 {
-    private const int VisibleTextCharCap = 200;
-    private const string EllipsisChar = "…";
-
-    private readonly ElementRegistry mRegistry;
-    private readonly PathStringEmitter mEmitter;
-
     /// <summary>
-    /// Initialises a new <see cref="ElementDescriber"/>.
+    ///     Initialises a new <see cref="ElementDescriber" />.
     /// </summary>
     /// <param name="registry">The element registry that assigns stable ids.</param>
     /// <param name="emitter">The path emitter (Task 9) that produces canonical path strings.</param>
@@ -38,42 +55,46 @@ public sealed class ElementDescriber
         mEmitter = emitter;
     }
 
+    private readonly PathStringEmitter mEmitter;
+
+    private readonly ElementRegistry mRegistry;
+
     /// <summary>
-    /// Describes <paramref name="element"/> as a self-contained snapshot suitable for wire transport.
+    ///     Describes <paramref name="element" /> as a self-contained snapshot suitable for wire transport.
     /// </summary>
     /// <param name="element">The element to describe. Must not be <c>null</c>.</param>
-    /// <returns>A populated <see cref="DescribeElementResponse"/>.</returns>
+    /// <returns>A populated <see cref="DescribeElementResponse" />.</returns>
     public DescribeElementResponse Describe(DependencyObject element)
     {
         ArgumentNullException.ThrowIfNull(element);
 
-        int id = mRegistry.GetOrAssign(element);
-        string typeName = element.GetType().Name;
-        string? name = (element as FrameworkElement)?.Name;
-        string? automationId = AutomationProperties.GetAutomationId(element);
+        var id = mRegistry.GetOrAssign(element);
+        var typeName = element.GetType().Name;
+        var name = (element as FrameworkElement)?.Name;
+        var automationId = AutomationProperties.GetAutomationId(element);
         BoundsDto bounds = ComputeBounds(element);
-        string visibleText = ExtractVisibleText(element);
-        bool isInTemplate = ResolveTemplatedParent(element) is not null;
-        bool hasBindingErrors = AnyBindingHasError(element);
-        string path = mEmitter.Emit(element);
-        int childCount = SafeChildCount(element);
-        string? dataContextType = (element as FrameworkElement)?.DataContext?.GetType().FullName;
-        int hashCode = RuntimeHelpers.GetHashCode(element);
+        var visibleText = ExtractVisibleText(element);
+        var isInTemplate = ResolveTemplatedParent(element) is not null;
+        var hasBindingErrors = AnyBindingHasError(element);
+        var path = mEmitter.Emit(element);
+        var childCount = SafeChildCount(element);
+        var dataContextType = (element as FrameworkElement)?.DataContext?.GetType().FullName;
+        var hashCode = RuntimeHelpers.GetHashCode(element);
 
         return new DescribeElementResponse(
-            Id: id,
-            Type: typeName,
-            Name: string.IsNullOrEmpty(name) ? null : name,
-            AutomationId: string.IsNullOrEmpty(automationId) ? null : automationId,
-            Bounds: bounds,
-            VisibleText: visibleText,
-            IsInTemplate: isInTemplate,
-            HasBindingErrors: hasBindingErrors,
-            Path: path,
-            ChildCount: childCount,
-            DataContextType: dataContextType,
-            HashCode: hashCode,
-            IsAlive: true);
+            id,
+            typeName,
+            string.IsNullOrEmpty(name) ? null : name,
+            string.IsNullOrEmpty(automationId) ? null : automationId,
+            bounds,
+            visibleText,
+            isInTemplate,
+            hasBindingErrors,
+            path,
+            childCount,
+            dataContextType,
+            hashCode,
+            true);
     }
 
     private static DependencyObject? ResolveTemplatedParent(DependencyObject element)
@@ -89,12 +110,9 @@ public sealed class ElementDescriber
 
     private static int SafeChildCount(DependencyObject element)
     {
-        int count = 0;
-        bool isVisual = element is Visual or System.Windows.Media.Media3D.Visual3D;
-        if (isVisual)
-        {
-            count = VisualTreeHelper.GetChildrenCount(element);
-        }
+        var count = 0;
+        var isVisual = element is Visual or Visual3D;
+        if (isVisual) count = VisualTreeHelper.GetChildrenCount(element);
         return count;
     }
 
@@ -102,7 +120,6 @@ public sealed class ElementDescriber
     {
         BoundsDto bounds = new(0, 0, 0, 0);
         if (element is UIElement ui && ui.IsArrangeValid)
-        {
             try
             {
                 Visual? rootVisual = FindRootVisual(ui);
@@ -116,7 +133,7 @@ public sealed class ElementDescriber
             catch (InvalidOperationException)
             {
             }
-        }
+
         return bounds;
     }
 
@@ -129,6 +146,7 @@ public sealed class ElementDescriber
             lastVisual = current;
             current = VisualTreeHelper.GetParent(current);
         }
+
         return lastVisual as Visual;
     }
 
@@ -136,8 +154,8 @@ public sealed class ElementDescriber
     {
         var builder = new StringBuilder();
         AppendVisibleText(element, builder);
-        string trimmed = builder.ToString().Trim();
-        string result = trimmed.Length > VisibleTextCharCap
+        var trimmed = builder.ToString().Trim();
+        var result = trimmed.Length > VisibleTextCharCap
             ? trimmed[..VisibleTextCharCap] + EllipsisChar
             : trimmed;
         return result;
@@ -145,19 +163,16 @@ public sealed class ElementDescriber
 
     private static void AppendVisibleText(DependencyObject element, StringBuilder builder)
     {
-        bool budgetExceeded = builder.Length >= VisibleTextCharCap;
+        var budgetExceeded = builder.Length >= VisibleTextCharCap;
         if (!budgetExceeded)
         {
             AppendOwnText(element, builder);
 
-            bool isVisual = element is Visual or System.Windows.Media.Media3D.Visual3D;
+            var isVisual = element is Visual or Visual3D;
             if (isVisual)
             {
-                int childCount = VisualTreeHelper.GetChildrenCount(element);
-                for (int i = 0; i < childCount; i++)
-                {
-                    AppendVisibleText(VisualTreeHelper.GetChild(element, i), builder);
-                }
+                var childCount = VisualTreeHelper.GetChildrenCount(element);
+                for (var i = 0; i < childCount; i++) AppendVisibleText(VisualTreeHelper.GetChild(element, i), builder);
             }
         }
     }
@@ -175,23 +190,18 @@ public sealed class ElementDescriber
             case ContentControl cc when cc.Content is string s && !string.IsNullOrEmpty(s):
                 AppendSpaced(builder, s);
                 break;
-            default:
-                break;
         }
     }
 
     private static void AppendSpaced(StringBuilder builder, string fragment)
     {
-        if (builder.Length > 0)
-        {
-            builder.Append(' ');
-        }
+        if (builder.Length > 0) builder.Append(' ');
         builder.Append(fragment);
     }
 
     private static bool AnyBindingHasError(DependencyObject element)
     {
-        bool anyError = false;
+        var anyError = false;
         LocalValueEnumerator enumerator = element.GetLocalValueEnumerator();
         while (enumerator.MoveNext() && !anyError)
         {
@@ -199,16 +209,17 @@ public sealed class ElementDescriber
             BindingExpressionBase? expr = BindingOperations.GetBindingExpressionBase(element, entry.Property);
             if (expr is not null)
             {
-                bool errored = expr.HasError
-                    || expr.Status == BindingStatus.PathError
-                    || expr.Status == BindingStatus.UpdateSourceError
-                    || expr.Status == BindingStatus.UpdateTargetError;
-                if (errored)
-                {
-                    anyError = true;
-                }
+                var errored = expr.HasError
+                              || expr.Status == BindingStatus.PathError
+                              || expr.Status == BindingStatus.UpdateSourceError
+                              || expr.Status == BindingStatus.UpdateTargetError;
+                if (errored) anyError = true;
             }
         }
+
         return anyError;
     }
+
+    private const int VisibleTextCharCap = 200;
+    private const string EllipsisChar = "…";
 }

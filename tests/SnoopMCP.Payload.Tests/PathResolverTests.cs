@@ -1,17 +1,37 @@
 // PathResolverTests.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Payload.Tests;
+#region Usings
 
-using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using SnoopMCP.Payload;
 using SnoopMCP.Payload.Inspection;
 using SnoopMCP.Payload.PathStrings;
 using SnoopMCP.Protocol.Errors;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
+
+#endregion
+
+namespace SnoopMCP.Payload.Tests;
 
 public sealed class PathResolverTests
 {
@@ -27,13 +47,13 @@ public sealed class PathResolverTests
     public void Resolve_SingleStep_MatchingRoot_ReturnsRoot()
     {
         var registry = new ElementRegistry();
-        var resolver = CreateResolver(registry);
+        PathResolver resolver = CreateResolver(registry);
         var grid = new Grid();
 
         ResolvePathResponse response = resolver.Resolve(grid, "/Grid");
 
         Assert.NotNull(response.Element);
-        int gridId = registry.GetOrAssign(grid);
+        var gridId = registry.GetOrAssign(grid);
         Assert.Equal(gridId, response.Element!.Id);
     }
 
@@ -41,7 +61,7 @@ public sealed class PathResolverTests
     public void Resolve_RootTypeMismatch_ReturnsNull()
     {
         var registry = new ElementRegistry();
-        var resolver = CreateResolver(registry);
+        PathResolver resolver = CreateResolver(registry);
         var grid = new Grid();
 
         ResolvePathResponse response = resolver.Resolve(grid, "/Window");
@@ -53,7 +73,7 @@ public sealed class PathResolverTests
     public void Resolve_PathToChild_ByName_ReturnsChild()
     {
         var registry = new ElementRegistry();
-        var resolver = CreateResolver(registry);
+        PathResolver resolver = CreateResolver(registry);
         var grid = new Grid();
         var button = new Button { Name = "SaveBtn" };
         grid.Children.Add(button);
@@ -61,7 +81,7 @@ public sealed class PathResolverTests
         ResolvePathResponse response = resolver.Resolve(grid, "/Grid/Button[Name='SaveBtn']");
 
         Assert.NotNull(response.Element);
-        int buttonId = registry.GetOrAssign(button);
+        var buttonId = registry.GetOrAssign(button);
         Assert.Equal(buttonId, response.Element!.Id);
     }
 
@@ -69,7 +89,7 @@ public sealed class PathResolverTests
     public void Resolve_PathToChild_ByAutomationId_ReturnsChild()
     {
         var registry = new ElementRegistry();
-        var resolver = CreateResolver(registry);
+        PathResolver resolver = CreateResolver(registry);
         var grid = new Grid();
         var tagged = new Button();
         AutomationProperties.SetAutomationId(tagged, "ThemePicker");
@@ -79,7 +99,7 @@ public sealed class PathResolverTests
         ResolvePathResponse response = resolver.Resolve(grid, "/Grid/Button[AutomationId='ThemePicker']");
 
         Assert.NotNull(response.Element);
-        int taggedId = registry.GetOrAssign(tagged);
+        var taggedId = registry.GetOrAssign(tagged);
         Assert.Equal(taggedId, response.Element!.Id);
     }
 
@@ -87,7 +107,7 @@ public sealed class PathResolverTests
     public void Resolve_PathWithIndex_PicksNthSameTypeSibling()
     {
         var registry = new ElementRegistry();
-        var resolver = CreateResolver(registry);
+        PathResolver resolver = CreateResolver(registry);
         var stack = new StackPanel();
         var first = new Button();
         var second = new Button();
@@ -99,7 +119,7 @@ public sealed class PathResolverTests
         ResolvePathResponse response = resolver.Resolve(stack, "/StackPanel/Button[1]");
 
         Assert.NotNull(response.Element);
-        int secondId = registry.GetOrAssign(second);
+        var secondId = registry.GetOrAssign(second);
         Assert.Equal(secondId, response.Element!.Id);
     }
 
@@ -107,7 +127,7 @@ public sealed class PathResolverTests
     public void Resolve_DeepPath_TraversesMultipleLevels()
     {
         var registry = new ElementRegistry();
-        var resolver = CreateResolver(registry);
+        PathResolver resolver = CreateResolver(registry);
         var grid = new Grid();
         var stack = new StackPanel();
         var border = new Border();
@@ -121,7 +141,7 @@ public sealed class PathResolverTests
             "/Grid/StackPanel/Border/Button[Name='Deep']");
 
         Assert.NotNull(response.Element);
-        int buttonId = registry.GetOrAssign(button);
+        var buttonId = registry.GetOrAssign(button);
         Assert.Equal(buttonId, response.Element!.Id);
     }
 
@@ -129,17 +149,17 @@ public sealed class PathResolverTests
     public void Resolve_RoundTripWithEmitter_ReturnsOriginal()
     {
         var registry = new ElementRegistry();
-        var resolver = CreateResolver(registry);
+        PathResolver resolver = CreateResolver(registry);
         var emitter = new PathStringEmitter();
         var grid = new Grid();
         var button = new Button { Name = "Save" };
         grid.Children.Add(button);
 
-        string path = emitter.Emit(button);
+        var path = emitter.Emit(button);
         ResolvePathResponse response = resolver.Resolve(grid, path);
 
         Assert.NotNull(response.Element);
-        int buttonId = registry.GetOrAssign(button);
+        var buttonId = registry.GetOrAssign(button);
         Assert.Equal(buttonId, response.Element!.Id);
     }
 
@@ -147,7 +167,7 @@ public sealed class PathResolverTests
     public void Resolve_NoMatchingChild_ReturnsNull()
     {
         var registry = new ElementRegistry();
-        var resolver = CreateResolver(registry);
+        PathResolver resolver = CreateResolver(registry);
         var grid = new Grid();
         grid.Children.Add(new Button { Name = "Save" });
 
@@ -160,7 +180,7 @@ public sealed class PathResolverTests
     public void Resolve_IndexOutOfRange_ReturnsNull()
     {
         var registry = new ElementRegistry();
-        var resolver = CreateResolver(registry);
+        PathResolver resolver = CreateResolver(registry);
         var stack = new StackPanel();
         stack.Children.Add(new Button());
         stack.Children.Add(new Button());
@@ -174,11 +194,10 @@ public sealed class PathResolverTests
     public void Resolve_InvalidPath_ThrowsPathParseError()
     {
         var registry = new ElementRegistry();
-        var resolver = CreateResolver(registry);
+        PathResolver resolver = CreateResolver(registry);
         var grid = new Grid();
 
-        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(
-            () => resolver.Resolve(grid, "no-leading-slash"));
+        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(() => resolver.Resolve(grid, "no-leading-slash"));
         Assert.Equal(ErrorCode.PathParseError, ex.Code);
     }
 
@@ -186,7 +205,7 @@ public sealed class PathResolverTests
     public void Resolve_NullRoot_Throws()
     {
         var registry = new ElementRegistry();
-        var resolver = CreateResolver(registry);
+        PathResolver resolver = CreateResolver(registry);
 
         Assert.Throws<ArgumentNullException>(() => resolver.Resolve(null!, "/Grid"));
     }

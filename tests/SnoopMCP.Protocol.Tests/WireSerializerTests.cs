@@ -1,35 +1,51 @@
 // WireSerializerTests.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Protocol.Tests;
+#region Usings
 
-using System.IO;
 using System.Text.Json;
 using SnoopMCP.Protocol.Errors;
 using SnoopMCP.Protocol.Wire;
 using Xunit;
 
+#endregion
+
+namespace SnoopMCP.Protocol.Tests;
+
 /// <summary>
-/// Round-trip and edge-case tests for the length-prefixed <see cref="WireSerializer"/>.
+///     Round-trip and edge-case tests for the length-prefixed <see cref="WireSerializer" />.
 /// </summary>
 public sealed class WireSerializerTests
 {
     [Fact]
     public async Task RoundTrip_Request_PreservesIdToolAndArguments()
     {
-        var args = JsonDocument.Parse("{\"pid\":1234}").RootElement;
-        var original = new RpcRequest
-        {
-            Id = 42,
-            Tool = "attach",
-            Arguments = args
-        };
+        JsonElement args = JsonDocument.Parse("{\"pid\":1234}").RootElement;
+        var original = new RpcRequest { Id = 42, Tool = "attach", Arguments = args };
 
         using var stream = new MemoryStream();
         await WireSerializer.WriteFrameAsync(stream, original, CancellationToken.None);
         stream.Position = 0;
 
-        var roundTripped = await WireSerializer.ReadFrameAsync<RpcRequest>(stream, CancellationToken.None);
+        RpcRequest? roundTripped = await WireSerializer.ReadFrameAsync<RpcRequest>(stream, CancellationToken.None);
 
         Assert.NotNull(roundTripped);
         Assert.Equal(original.Id, roundTripped!.Id);
@@ -40,18 +56,14 @@ public sealed class WireSerializerTests
     [Fact]
     public async Task RoundTrip_Response_WithResult_PreservesPayload()
     {
-        var resultPayload = JsonDocument.Parse("{\"ok\":true,\"count\":3}").RootElement;
-        var original = new RpcResponse
-        {
-            Id = 7,
-            Result = resultPayload
-        };
+        JsonElement resultPayload = JsonDocument.Parse("{\"ok\":true,\"count\":3}").RootElement;
+        var original = new RpcResponse { Id = 7, Result = resultPayload };
 
         using var stream = new MemoryStream();
         await WireSerializer.WriteFrameAsync(stream, original, CancellationToken.None);
         stream.Position = 0;
 
-        var roundTripped = await WireSerializer.ReadFrameAsync<RpcResponse>(stream, CancellationToken.None);
+        RpcResponse? roundTripped = await WireSerializer.ReadFrameAsync<RpcResponse>(stream, CancellationToken.None);
 
         Assert.NotNull(roundTripped);
         Assert.Equal(7, roundTripped!.Id);
@@ -78,7 +90,7 @@ public sealed class WireSerializerTests
         await WireSerializer.WriteFrameAsync(stream, original, CancellationToken.None);
         stream.Position = 0;
 
-        var roundTripped = await WireSerializer.ReadFrameAsync<RpcResponse>(stream, CancellationToken.None);
+        RpcResponse? roundTripped = await WireSerializer.ReadFrameAsync<RpcResponse>(stream, CancellationToken.None);
 
         Assert.NotNull(roundTripped);
         Assert.False(roundTripped!.IsSuccess);
@@ -92,7 +104,7 @@ public sealed class WireSerializerTests
     public async Task ReadFrame_OnEofBeforeHeader_ReturnsDefault()
     {
         using var stream = new MemoryStream();
-        var result = await WireSerializer.ReadFrameAsync<RpcRequest>(stream, CancellationToken.None);
+        RpcRequest? result = await WireSerializer.ReadFrameAsync<RpcRequest>(stream, CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -104,7 +116,7 @@ public sealed class WireSerializerTests
         await stream.WriteAsync(header);
         stream.Position = 0;
 
-        var result = await WireSerializer.ReadFrameAsync<RpcRequest>(stream, CancellationToken.None);
+        RpcRequest? result = await WireSerializer.ReadFrameAsync<RpcRequest>(stream, CancellationToken.None);
         Assert.Null(result);
     }
 }

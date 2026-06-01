@@ -1,33 +1,45 @@
-namespace SnoopMCP.Host.Injection;
+// InjectorService.cs
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#region Usings
 
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using SnoopMCP.Protocol.Errors;
 
+#endregion
+
+namespace SnoopMCP.Host.Injection;
+
 public sealed class InjectorService : IInjectorService
 {
-    private const string LauncherRelativePath = @"injector\Snoop.InjectorLauncher.x64.exe";
-    private const string PayloadRelativePath = @"payload\SnoopMCP.Payload.dll";
-    private const string PayloadClassName = "SnoopMCP.Payload.PayloadEntryPoint";
-    private const string PayloadMethodName = "Inject";
-    private const int AccessDeniedExitCode = 5;
-
-    private const string ArgTargetPid = "--targetPID";
-    private const string ArgAssembly = "--assembly";
-    private const string ArgClassName = "--className";
-    private const string ArgMethodName = "--methodName";
-    private const string ArgSettingsFile = "--settingsFile";
-
-    private readonly ILogger<InjectorService> mLogger;
-
     public InjectorService(ILogger<InjectorService> logger)
     {
         ArgumentNullException.ThrowIfNull(logger);
         mLogger = logger;
     }
+
+    private readonly ILogger<InjectorService> mLogger;
 
     public Task<ProcessProbeResult> ProbeAsync(int processId, CancellationToken cancellationToken)
     {
@@ -39,8 +51,8 @@ public sealed class InjectorService : IInjectorService
     {
         ArgumentException.ThrowIfNullOrEmpty(pipeName);
 
-        string launcherPath = LocateLauncher();
-        string payloadPath = LocatePayload();
+        var launcherPath = LocateLauncher();
+        var payloadPath = LocatePayload();
 
         var startInfo = new ProcessStartInfo(launcherPath)
         {
@@ -62,7 +74,8 @@ public sealed class InjectorService : IInjectorService
         startInfo.ArgumentList.Add(pipeName);
 
         using Process launcher = Process.Start(startInfo)
-            ?? throw new SnoopMcpException(ErrorCode.AttachFailed, "Failed to start the injector launcher.");
+                                 ?? throw new SnoopMcpException(ErrorCode.AttachFailed,
+                                     "Failed to start the injector launcher.");
 
         var stdout = new StringBuilder();
         var stderr = new StringBuilder();
@@ -73,15 +86,15 @@ public sealed class InjectorService : IInjectorService
 
         await launcher.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
 
-        int exitCode = launcher.ExitCode;
-        bool succeeded = exitCode == 0;
+        var exitCode = launcher.ExitCode;
+        var succeeded = exitCode == 0;
         if (succeeded)
         {
             mLogger.LogInjectionSucceeded(processId, pipeName);
         }
         else
         {
-            string detail = $"launcher exit {exitCode}. stdout: {stdout}; stderr: {stderr}";
+            var detail = $"launcher exit {exitCode}. stdout: {stdout}; stderr: {stderr}";
             ErrorCode code = exitCode == AccessDeniedExitCode ? ErrorCode.AccessDenied : ErrorCode.PayloadLoadFailed;
             throw new SnoopMcpException(code, $"Injection into pid {processId} failed: {detail}");
         }
@@ -89,36 +102,41 @@ public sealed class InjectorService : IInjectorService
 
     private static void AppendLine(StringBuilder sink, string? line)
     {
-        bool hasContent = !string.IsNullOrEmpty(line);
-        if (hasContent)
-        {
-            sink.AppendLine(line);
-        }
+        var hasContent = !string.IsNullOrEmpty(line);
+        if (hasContent) sink.AppendLine(line);
     }
 
     private static string LocateLauncher()
     {
-        string candidate = Path.Combine(AppContext.BaseDirectory, LauncherRelativePath);
-        bool exists = File.Exists(candidate);
+        var candidate = Path.Combine(AppContext.BaseDirectory, LauncherRelativePath);
+        var exists = File.Exists(candidate);
         if (!exists)
-        {
             throw new SnoopMcpException(
                 ErrorCode.AttachFailed,
                 $"Injector launcher not found at {candidate}. Was SnoopMCP.Injection built and staged (Task 30)?");
-        }
         return candidate;
     }
 
     private static string LocatePayload()
     {
-        string candidate = Path.Combine(AppContext.BaseDirectory, PayloadRelativePath);
-        bool exists = File.Exists(candidate);
+        var candidate = Path.Combine(AppContext.BaseDirectory, PayloadRelativePath);
+        var exists = File.Exists(candidate);
         if (!exists)
-        {
             throw new SnoopMcpException(
                 ErrorCode.PayloadLoadFailed,
                 $"Payload not found at {candidate}. Verify CopyPayloadBinaries staged the payload closure.");
-        }
         return candidate;
     }
+
+    private const string LauncherRelativePath = @"injector\Snoop.InjectorLauncher.x64.exe";
+    private const string PayloadRelativePath = @"payload\SnoopMCP.Payload.dll";
+    private const string PayloadClassName = "SnoopMCP.Payload.PayloadEntryPoint";
+    private const string PayloadMethodName = "Inject";
+    private const int AccessDeniedExitCode = 5;
+
+    private const string ArgTargetPid = "--targetPID";
+    private const string ArgAssembly = "--assembly";
+    private const string ArgClassName = "--className";
+    private const string ArgMethodName = "--methodName";
+    private const string ArgSettingsFile = "--settingsFile";
 }

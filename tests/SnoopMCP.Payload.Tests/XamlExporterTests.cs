@@ -1,13 +1,35 @@
 // XamlExporterTests.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Payload.Tests;
+#region Usings
 
 using System.Windows.Controls;
 using System.Windows.Media;
 using SnoopMCP.Payload.Inspection;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
+
+#endregion
+
+namespace SnoopMCP.Payload.Tests;
 
 public sealed class XamlExporterTests
 {
@@ -42,11 +64,7 @@ public sealed class XamlExporterTests
     public void Export_TextBlockWithExplicitForeground_ReflectsLiveValue()
     {
         var exporter = new XamlExporter();
-        var text = new TextBlock
-        {
-            Text = "Hello",
-            Foreground = Brushes.Red
-        };
+        var text = new TextBlock { Text = "Hello", Foreground = Brushes.Red };
 
         ExportXamlResponse response = exporter.Export(text);
 
@@ -57,12 +75,10 @@ public sealed class XamlExporterTests
     [StaFact]
     public void Export_LargePayload_TruncatesAndWarns()
     {
-        var exporter = new XamlExporter(softCapBytes: 256);
+        var exporter = new XamlExporter(256);
         var stack = new StackPanel();
-        for (int i = 0; i < 200; i++)
-        {
+        for (var i = 0; i < 200; i++)
             stack.Children.Add(new TextBlock { Text = $"This is row number {i:D4} with extra padding text" });
-        }
 
         ExportXamlResponse response = exporter.Export(stack);
 

@@ -1,17 +1,35 @@
 // GeminiCliWriterTests.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#region Usings
+
+using System.Text.Json;
+using Xunit;
+
+#endregion
 
 namespace SnoopMCP.ClientIntegration.Tests;
 
-using System.Text.Json;
-using SnoopMCP.ClientIntegration;
-using Xunit;
-
 public sealed class GeminiCliWriterTests : IDisposable
 {
-    private readonly string mDir;
-    private readonly string mConfigPath;
-
     public GeminiCliWriterTests()
     {
         mDir = Path.Combine(Path.GetTempPath(), "snoopmcp-gemini-" + Guid.NewGuid().ToString("N"));
@@ -19,12 +37,12 @@ public sealed class GeminiCliWriterTests : IDisposable
         mConfigPath = Path.Combine(mDir, "settings.json");
     }
 
+    private readonly string mConfigPath;
+    private readonly string mDir;
+
     public void Dispose()
     {
-        if (Directory.Exists(mDir))
-        {
-            Directory.Delete(mDir, recursive: true);
-        }
+        if (Directory.Exists(mDir)) Directory.Delete(mDir, true);
         GC.SuppressFinalize(this);
     }
 
@@ -36,7 +54,7 @@ public sealed class GeminiCliWriterTests : IDisposable
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
         Assert.True(result.Success, result.Message);
-        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
+        using var doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
         JsonElement entry = doc.RootElement.GetProperty("mcpServers").GetProperty("snoopmcp");
         Assert.Equal("http://127.0.0.1:6300/mcp", entry.GetProperty("httpUrl").GetString());
         Assert.False(entry.TryGetProperty("type", out _));
@@ -51,7 +69,7 @@ public sealed class GeminiCliWriterTests : IDisposable
 
         writer.Register(McpEndpoint.Default);
 
-        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
+        using var doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
         Assert.Equal("dark", doc.RootElement.GetProperty("theme").GetString());
         JsonElement servers = doc.RootElement.GetProperty("mcpServers");
         Assert.True(servers.TryGetProperty("other", out _));

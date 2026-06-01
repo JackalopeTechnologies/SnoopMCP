@@ -1,16 +1,37 @@
 // RootEnumeratorTests.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Payload.Tests;
+#region Usings
 
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using SnoopMCP.Payload;
+using System.Windows.Media;
 using SnoopMCP.Payload.Inspection;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
+
+#endregion
+
+namespace SnoopMCP.Payload.Tests;
 
 public sealed class RootEnumeratorTests
 {
@@ -23,7 +44,7 @@ public sealed class RootEnumeratorTests
     public void Enumerate_VisibleWindow_AppearsAsWindowRoot()
     {
         var registry = new ElementRegistry();
-        var enumerator = CreateEnumerator(registry);
+        RootEnumerator enumerator = CreateEnumerator(registry);
 
         var window = new Window
         {
@@ -57,20 +78,10 @@ public sealed class RootEnumeratorTests
     public void Enumerate_OpenPopup_AppearsAsPopupRoot_WithOpenedBy()
     {
         var registry = new ElementRegistry();
-        var enumerator = CreateEnumerator(registry);
+        RootEnumerator enumerator = CreateEnumerator(registry);
 
-        var popupContent = new Border
-        {
-            Width = 50,
-            Height = 50,
-            Background = System.Windows.Media.Brushes.Yellow
-        };
-        var popup = new Popup
-        {
-            Child = popupContent,
-            IsOpen = false,
-            StaysOpen = true
-        };
+        var popupContent = new Border { Width = 50, Height = 50, Background = Brushes.Yellow };
+        var popup = new Popup { Child = popupContent, IsOpen = false, StaysOpen = true };
 
         var grid = new Grid();
         grid.Children.Add(popup);
@@ -99,7 +110,7 @@ public sealed class RootEnumeratorTests
             Assert.NotNull(popupRoot);
             Assert.NotNull(popupRoot!.OpenedBy);
 
-            int expectedOwnerId = registry.GetOrAssign(popup);
+            var expectedOwnerId = registry.GetOrAssign(popup);
             Assert.Equal(expectedOwnerId, popupRoot.OpenedBy);
         }
         finally
@@ -113,10 +124,10 @@ public sealed class RootEnumeratorTests
     public void Enumerate_MultipleWindows_AllReturned()
     {
         var registry = new ElementRegistry();
-        var enumerator = CreateEnumerator(registry);
+        RootEnumerator enumerator = CreateEnumerator(registry);
 
-        var a = NewHiddenWindow("Alpha");
-        var b = NewHiddenWindow("Beta");
+        Window a = NewHiddenWindow("Alpha");
+        Window b = NewHiddenWindow("Beta");
 
         try
         {
@@ -135,14 +146,17 @@ public sealed class RootEnumeratorTests
         }
     }
 
-    private static Window NewHiddenWindow(string title) => new()
+    private static Window NewHiddenWindow(string title)
     {
-        Title = title,
-        Width = 200,
-        Height = 100,
-        ShowInTaskbar = false,
-        WindowStyle = WindowStyle.None,
-        ShowActivated = false,
-        Visibility = Visibility.Hidden
-    };
+        return new Window
+        {
+            Title = title,
+            Width = 200,
+            Height = 100,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            ShowActivated = false,
+            Visibility = Visibility.Hidden
+        };
+    }
 }

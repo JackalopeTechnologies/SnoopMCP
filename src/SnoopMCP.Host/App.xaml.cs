@@ -1,15 +1,37 @@
 // App.xaml.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Host;
+#region Usings
 
 using System.Windows;
 using H.NotifyIcon;
 
+#endregion
+
+namespace SnoopMCP.Host;
+
 /// <summary>
-/// WPF application root for the SnoopMCP tray app. Enforces single-instance, starts the in-process
-/// MCP server, realises the tray icon (declared in App.xaml), and tears everything down on Exit or
-/// Windows session end.
+///     WPF application root for the SnoopMCP tray app. Enforces single-instance, starts the in-process
+///     MCP server, realises the tray icon (declared in App.xaml), and tears everything down on Exit or
+///     Windows session end.
 /// </summary>
 // CA1001 suppression: the disposable fields are released in the WPF OnExit override, which is the
 // correct teardown hook for the Application singleton. WPF never calls Dispose() on the Application,
@@ -18,22 +40,16 @@ using H.NotifyIcon;
 public partial class App : Application
 #pragma warning restore CA1001
 {
-    private const string SingleInstanceMutexName = @"Local\SnoopMCP.Host";
-    private const string TrayIconResourceKey = "TrayIcon";
-    private const string AppTitle = "SnoopMCP";
-    private const string AlreadyRunningMessage = "SnoopMCP is already running — check the system tray.";
-
-    private static readonly TimeSpan smExitDisposeTimeout = TimeSpan.FromSeconds(5);
+    private ServerController? mController;
 
     private Mutex? mInstanceMutex;
-    private ServerController? mController;
     private TaskbarIcon? mTrayIcon;
 
     /// <inheritdoc />
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        mInstanceMutex = new Mutex(initiallyOwned: false, SingleInstanceMutexName, out bool createdNew);
+        mInstanceMutex = new Mutex(false, SingleInstanceMutexName, out var createdNew);
         if (!createdNew)
         {
             // Without feedback a second launch just vanishes; tell the user where the running one is.
@@ -96,9 +112,7 @@ public partial class App : Application
         {
             mTrayIcon?.Dispose();
             if (mController is not null && !mController.DisposeAsync().AsTask().Wait(smExitDisposeTimeout))
-            {
                 HostLog.Warn("Server dispose timed out on exit.");
-            }
         }
         catch (Exception ex)
         {
@@ -110,4 +124,11 @@ public partial class App : Application
             base.OnExit(e);
         }
     }
+
+    private const string SingleInstanceMutexName = @"Local\SnoopMCP.Host";
+    private const string TrayIconResourceKey = "TrayIcon";
+    private const string AppTitle = "SnoopMCP";
+    private const string AlreadyRunningMessage = "SnoopMCP is already running — check the system tray.";
+
+    private static readonly TimeSpan smExitDisposeTimeout = TimeSpan.FromSeconds(5);
 }

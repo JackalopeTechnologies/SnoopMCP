@@ -1,23 +1,36 @@
 // CopilotCliWriterTests.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.ClientIntegration.Tests;
+#region Usings
 
 using System.Text.Json.Nodes;
 using Xunit;
 
-/// <summary>Unit tests for <see cref="CopilotCliWriter"/>.</summary>
+#endregion
+
+namespace SnoopMCP.ClientIntegration.Tests;
+
+/// <summary>Unit tests for <see cref="CopilotCliWriter" />.</summary>
 public sealed class CopilotCliWriterTests
 {
-    private const string EndpointName = "snoopmcp";
-    private const string ServersKey = "mcpServers";
-    private const string TypeKey = "type";
-    private const string UrlKey = "url";
-    private const string ToolsKey = "tools";
-    private const string HttpType = "http";
-    private const string OtherServerJson =
-        "{\"mcpServers\":{\"other\":{\"type\":\"http\",\"url\":\"http://localhost:9999/mcp\"}}}";
-
     private static string NewTempConfig()
     {
         return Path.Combine(Path.GetTempPath(), $"snoopmcp-copilot-{Guid.NewGuid():N}.json");
@@ -31,16 +44,16 @@ public sealed class CopilotCliWriterTests
     [Fact]
     public void Register_WritesHttpEntryWithToolsWildcard_WhenFileMissing()
     {
-        string path = NewTempConfig();
+        var path = NewTempConfig();
         try
         {
             CopilotCliWriter writer = NewWriter(path);
             RegisterResult result = writer.Register(McpEndpoint.Default);
             Assert.True(result.Success);
             JsonNode entry = JsonNode.Parse(File.ReadAllText(path))![ServersKey]![EndpointName]!;
-            Assert.Equal(HttpType, (string?) entry[TypeKey]);
-            Assert.Equal(McpEndpoint.Default.Url, (string?) entry[UrlKey]);
-            Assert.Equal("*", (string?) ((JsonArray) entry[ToolsKey]!)[0]);
+            Assert.Equal(HttpType, (string?)entry[TypeKey]);
+            Assert.Equal(McpEndpoint.Default.Url, (string?)entry[UrlKey]);
+            Assert.Equal("*", (string?)((JsonArray)entry[ToolsKey]!)[0]);
         }
         finally
         {
@@ -51,7 +64,7 @@ public sealed class CopilotCliWriterTests
     [Fact]
     public void Register_PreservesOtherServers_WhenPresent()
     {
-        string path = NewTempConfig();
+        var path = NewTempConfig();
         try
         {
             File.WriteAllText(path, OtherServerJson);
@@ -70,14 +83,14 @@ public sealed class CopilotCliWriterTests
     [Fact]
     public void Register_IsIdempotent_WhenCalledTwice()
     {
-        string path = NewTempConfig();
+        var path = NewTempConfig();
         try
         {
             CopilotCliWriter writer = NewWriter(path);
             writer.Register(McpEndpoint.Default);
             writer.Register(McpEndpoint.Default);
             JsonNode entry = JsonNode.Parse(File.ReadAllText(path))![ServersKey]![EndpointName]!;
-            Assert.Equal(McpEndpoint.Default.Url, (string?) entry[UrlKey]);
+            Assert.Equal(McpEndpoint.Default.Url, (string?)entry[UrlKey]);
         }
         finally
         {
@@ -88,7 +101,7 @@ public sealed class CopilotCliWriterTests
     [Fact]
     public void Unregister_RemovesOnlySnoopEntry_WhenOthersPresent()
     {
-        string path = NewTempConfig();
+        var path = NewTempConfig();
         try
         {
             CopilotCliWriter writer = NewWriter(path);
@@ -109,7 +122,7 @@ public sealed class CopilotCliWriterTests
     [Fact]
     public void Unregister_Succeeds_WhenFileMissing()
     {
-        string path = NewTempConfig();
+        var path = NewTempConfig();
         CopilotCliWriter writer = NewWriter(path);
         UnregisterResult result = writer.Unregister();
         Assert.True(result.Success);
@@ -118,7 +131,7 @@ public sealed class CopilotCliWriterTests
     [Fact]
     public void GetStatus_ReportsRegistered_AfterRegister()
     {
-        string path = NewTempConfig();
+        var path = NewTempConfig();
         try
         {
             CopilotCliWriter writer = NewWriter(path);
@@ -135,7 +148,7 @@ public sealed class CopilotCliWriterTests
     [Fact]
     public void GetStatus_ReportsNotRegistered_WhenFileMissing()
     {
-        string path = NewTempConfig();
+        var path = NewTempConfig();
         CopilotCliWriter writer = NewWriter(path);
         StatusResult status = writer.GetStatus();
         Assert.False(status.IsRegistered);
@@ -144,7 +157,7 @@ public sealed class CopilotCliWriterTests
     [Fact]
     public void Register_FailsSafely_WhenJsonMalformed()
     {
-        string path = NewTempConfig();
+        var path = NewTempConfig();
         try
         {
             File.WriteAllText(path, "{ this is not valid json ");
@@ -157,4 +170,14 @@ public sealed class CopilotCliWriterTests
             File.Delete(path);
         }
     }
+
+    private const string EndpointName = "snoopmcp";
+    private const string ServersKey = "mcpServers";
+    private const string TypeKey = "type";
+    private const string UrlKey = "url";
+    private const string ToolsKey = "tools";
+    private const string HttpType = "http";
+
+    private const string OtherServerJson =
+        "{\"mcpServers\":{\"other\":{\"type\":\"http\",\"url\":\"http://localhost:9999/mcp\"}}}";
 }

@@ -1,27 +1,42 @@
 // ServerController.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Host;
+#region Usings
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+
+#endregion
+
+namespace SnoopMCP.Host;
 
 /// <summary>
-/// Owns the in-process MCP <see cref="WebApplication"/> and its <see cref="ServerState"/>. Start
-/// builds and binds a fresh instance; Stop unbinds and disposes it so the port frees without the
-/// process exiting. A failed bind (for example, the port is taken) becomes <see cref="ServerState.Faulted"/>
-/// rather than throwing, so the tray stays alive.
+///     Owns the in-process MCP <see cref="WebApplication" /> and its <see cref="ServerState" />. Start
+///     builds and binds a fresh instance; Stop unbinds and disposes it so the port frees without the
+///     process exiting. A failed bind (for example, the port is taken) becomes <see cref="ServerState.Faulted" />
+///     rather than throwing, so the tray stays alive.
 /// </summary>
 public sealed class ServerController : IAsyncDisposable
 {
-    private readonly string[] mArgs;
-    private WebApplication? mApp;
-
-    /// <summary>Raised on the calling thread whenever <see cref="State"/> changes.</summary>
-    public event EventHandler? StateChanged;
-
-    /// <summary>Initialises a new <see cref="ServerController"/>.</summary>
+    /// <summary>Initialises a new <see cref="ServerController" />.</summary>
     /// <param name="args">Process arguments forwarded to each built server instance.</param>
     public ServerController(string[] args)
     {
@@ -35,6 +50,25 @@ public sealed class ServerController : IAsyncDisposable
     /// <summary>Gets a value indicating whether a WPF target is currently attached.</summary>
     public bool IsAttached => mApp?.Services.GetService<SessionManager>()?.IsAttached == true;
 
+    private readonly string[] mArgs;
+    private WebApplication? mApp;
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (mApp is not null)
+        {
+            WebApplication app = mApp;
+            mApp = null;
+            // ConfigureAwait(false) is required: App.OnExit blocks on this via GetAwaiter().GetResult()
+            // on the dispatcher thread, so resuming on that captured context would deadlock.
+            await app.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Raised on the calling thread whenever <see cref="State" /> changes.</summary>
+    public event EventHandler? StateChanged;
+
     /// <summary>Builds and starts a fresh server instance when one is not already running.</summary>
     public async Task StartAsync()
     {
@@ -46,7 +80,7 @@ public sealed class ServerController : IAsyncDisposable
                 WebApplication app = ServerHost.Build(mArgs);
                 // ConfigureAwait(true) is required: the post-await SetState must run on the UI thread,
                 // where StateChanged updates the tray view model (INotifyPropertyChanged / ICommand).
-                bool started = await TryStartAsync(app).ConfigureAwait(true);
+                var started = await TryStartAsync(app).ConfigureAwait(true);
                 if (started)
                 {
                     mApp = app;
@@ -95,22 +129,9 @@ public sealed class ServerController : IAsyncDisposable
         }
     }
 
-    /// <inheritdoc />
-    public async ValueTask DisposeAsync()
-    {
-        if (mApp is not null)
-        {
-            WebApplication app = mApp;
-            mApp = null;
-            // ConfigureAwait(false) is required: App.OnExit blocks on this via GetAwaiter().GetResult()
-            // on the dispatcher thread, so resuming on that captured context would deadlock.
-            await app.DisposeAsync().ConfigureAwait(false);
-        }
-    }
-
     private static async Task<bool> TryStartAsync(WebApplication app)
     {
-        bool ok = true;
+        var ok = true;
         try
         {
             await app.StartAsync().ConfigureAwait(true);
@@ -122,6 +143,7 @@ public sealed class ServerController : IAsyncDisposable
             HostLog.Error("MCP server failed to start.", ex);
             ok = false;
         }
+
         return ok;
     }
 

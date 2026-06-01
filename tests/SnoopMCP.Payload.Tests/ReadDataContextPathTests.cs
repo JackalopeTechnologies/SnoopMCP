@@ -1,16 +1,49 @@
 // ReadDataContextPathTests.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Payload.Tests;
+#region Usings
 
-using System.Windows;
 using System.Windows.Controls;
 using SnoopMCP.Payload.Inspection;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 
+#endregion
+
+namespace SnoopMCP.Payload.Tests;
+
 public sealed class ReadDataContextPathTests
 {
+    private sealed class Model
+    {
+        public string Name { get; set; } = string.Empty;
+        public int Age { get; set; }
+        public Inner? Inner { get; set; }
+    }
+
+    private sealed class Inner
+    {
+        public string Label { get; set; } = string.Empty;
+    }
+
     [StaFact]
     public void ReadPath_NullDataContext_PathReachableFalse()
     {
@@ -40,13 +73,7 @@ public sealed class ReadDataContextPathTests
     public void ReadPath_DottedPath_WalksChain()
     {
         var inspector = new DataContextInspector();
-        var grid = new Grid
-        {
-            DataContext = new Model
-            {
-                Inner = new Inner { Label = "Deep" }
-            }
-        };
+        var grid = new Grid { DataContext = new Model { Inner = new Inner { Label = "Deep" } } };
 
         ReadDataContextPathResponse response = inspector.ReadPath(grid, "Inner.Label");
 
@@ -127,17 +154,5 @@ public sealed class ReadDataContextPathTests
     {
         var inspector = new DataContextInspector();
         Assert.Throws<ArgumentNullException>(() => inspector.ReadPath(null!, "X"));
-    }
-
-    private sealed class Model
-    {
-        public string Name { get; set; } = string.Empty;
-        public int Age { get; set; }
-        public Inner? Inner { get; set; }
-    }
-
-    private sealed class Inner
-    {
-        public string Label { get; set; } = string.Empty;
     }
 }

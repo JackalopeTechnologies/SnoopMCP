@@ -1,24 +1,45 @@
 // PipeClientTests.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Host.Tests;
+#region Usings
 
 using System.IO.Pipes;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
-using SnoopMCP.Host;
 using SnoopMCP.Protocol.Errors;
 using SnoopMCP.Protocol.Wire;
 using Xunit;
+
+#endregion
+
+namespace SnoopMCP.Host.Tests;
 
 public sealed class PipeClientTests
 {
     [Fact]
     public async Task SendAsync_ReturnsResultJson()
     {
-        string pipeName = $"snoopmcp-test-{Guid.NewGuid():N}";
+        var pipeName = $"snoopmcp-test-{Guid.NewGuid():N}";
 
-        Task serverTask = Task.Run(async () =>
+        var serverTask = Task.Run(async () =>
         {
             await using var server = new NamedPipeServerStream(
                 pipeName,
@@ -48,9 +69,9 @@ public sealed class PipeClientTests
     [Fact]
     public async Task SendAsync_ErrorResponse_ThrowsSnoopMcpException()
     {
-        string pipeName = $"snoopmcp-test-{Guid.NewGuid():N}";
+        var pipeName = $"snoopmcp-test-{Guid.NewGuid():N}";
 
-        Task serverTask = Task.Run(async () =>
+        var serverTask = Task.Run(async () =>
         {
             await using var server = new NamedPipeServerStream(
                 pipeName,
@@ -63,8 +84,7 @@ public sealed class PipeClientTests
             RpcRequest? request = await WireSerializer.ReadFrameAsync<RpcRequest>(server, default);
             var response = new RpcResponse
             {
-                Id = request!.Id,
-                Error = new RpcError { Code = ErrorCode.ElementExpired, Message = "gone" }
+                Id = request!.Id, Error = new RpcError { Code = ErrorCode.ElementExpired, Message = "gone" }
             };
             await WireSerializer.WriteFrameAsync(server, response, default);
         });
@@ -72,8 +92,8 @@ public sealed class PipeClientTests
         await using var client = new PipeClient(pipeName, NullLogger<PipeClient>.Instance);
         await client.ConnectAsync(default);
 
-        SnoopMcpException ex = await Assert.ThrowsAsync<SnoopMcpException>(
-            () => client.SendAsync("anything", new { }, default));
+        SnoopMcpException ex =
+            await Assert.ThrowsAsync<SnoopMcpException>(() => client.SendAsync("anything", new { }, default));
         Assert.Equal(ErrorCode.ElementExpired, ex.Code);
         await serverTask;
     }

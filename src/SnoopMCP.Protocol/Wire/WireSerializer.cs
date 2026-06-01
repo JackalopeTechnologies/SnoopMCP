@@ -1,34 +1,51 @@
 // WireSerializer.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#region Usings
+
+using System.Buffers.Binary;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+#endregion
 
 namespace SnoopMCP.Protocol.Wire;
 
-using System.Buffers.Binary;
-using System.IO;
-using System.Text.Json;
-
 /// <summary>
-/// Length-prefixed JSON framing for SnoopMCP wire payloads.
-/// Frame layout: 4-byte little-endian uint32 payload length, then UTF-8 JSON body.
+///     Length-prefixed JSON framing for SnoopMCP wire payloads.
+///     Frame layout: 4-byte little-endian uint32 payload length, then UTF-8 JSON body.
 /// </summary>
 public static class WireSerializer
 {
-    private const int FrameLengthBytes = 4;
-    private const int MaxFrameSizeBytes = 16 * 1024 * 1024;
-
-    private static readonly JsonSerializerOptions smJsonOptions = new()
+    /// <summary>Gets the shared <see cref="JsonSerializerOptions" /> instance used by the framing layer.</summary>
+    public static JsonSerializerOptions JsonOptions { get; } = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         WriteIndented = false
     };
 
-    /// <summary>Gets the shared <see cref="JsonSerializerOptions"/> instance used by the framing layer.</summary>
-    public static JsonSerializerOptions JsonOptions => smJsonOptions;
-
     /// <summary>
-    /// Serialises <paramref name="payload"/> as UTF-8 JSON and writes it to <paramref name="destination"/>
-    /// prefixed by a 4-byte little-endian length header.
+    ///     Serialises <paramref name="payload" /> as UTF-8 JSON and writes it to <paramref name="destination" />
+    ///     prefixed by a 4-byte little-endian length header.
     /// </summary>
     /// <typeparam name="T">The payload type.</typeparam>
     /// <param name="destination">The stream to write into.</param>
@@ -39,14 +56,12 @@ public static class WireSerializer
         ArgumentNullException.ThrowIfNull(destination);
         ArgumentNullException.ThrowIfNull(payload);
 
-        byte[] body = JsonSerializer.SerializeToUtf8Bytes(payload, smJsonOptions);
+        var body = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions);
         if (body.Length > MaxFrameSizeBytes)
-        {
             throw new InvalidOperationException($"Frame exceeds {MaxFrameSizeBytes} bytes ({body.Length}).");
-        }
 
-        byte[] header = new byte[FrameLengthBytes];
-        BinaryPrimitives.WriteUInt32LittleEndian(header, (uint) body.Length);
+        var header = new byte[FrameLengthBytes];
+        BinaryPrimitives.WriteUInt32LittleEndian(header, (uint)body.Length);
 
         await destination.WriteAsync(header.AsMemory(), cancellationToken).ConfigureAwait(false);
         await destination.WriteAsync(body.AsMemory(), cancellationToken).ConfigureAwait(false);
@@ -54,8 +69,9 @@ public static class WireSerializer
     }
 
     /// <summary>
-    /// Reads a single length-prefixed frame from <paramref name="source"/> and deserialises it as <typeparamref name="T"/>.
-    /// Returns <c>default</c> when the stream is exhausted before a complete frame is available.
+    ///     Reads a single length-prefixed frame from <paramref name="source" /> and deserialises it as
+    ///     <typeparamref name="T" />.
+    ///     Returns <c>default</c> when the stream is exhausted before a complete frame is available.
     /// </summary>
     /// <typeparam name="T">The payload type to deserialise.</typeparam>
     /// <param name="source">The stream to read from.</param>
@@ -65,39 +81,35 @@ public static class WireSerializer
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        byte[] header = new byte[FrameLengthBytes];
-        int headerRead = await ReadExactAsync(source, header, cancellationToken).ConfigureAwait(false);
+        var header = new byte[FrameLengthBytes];
+        var headerRead = await ReadExactAsync(source, header, cancellationToken).ConfigureAwait(false);
         T? result = default;
 
-        bool gotFullHeader = headerRead == FrameLengthBytes;
+        var gotFullHeader = headerRead == FrameLengthBytes;
         if (gotFullHeader)
         {
-            uint length = BinaryPrimitives.ReadUInt32LittleEndian(header);
+            var length = BinaryPrimitives.ReadUInt32LittleEndian(header);
             if (length > MaxFrameSizeBytes)
-            {
                 throw new InvalidDataException($"Incoming frame {length} bytes exceeds {MaxFrameSizeBytes}.");
-            }
 
-            byte[] body = new byte[length];
-            int bodyRead = await ReadExactAsync(source, body, cancellationToken).ConfigureAwait(false);
-            bool gotFullBody = bodyRead == (int) length;
-            if (gotFullBody)
-            {
-                result = JsonSerializer.Deserialize<T>(body, smJsonOptions);
-            }
+            var body = new byte[length];
+            var bodyRead = await ReadExactAsync(source, body, cancellationToken).ConfigureAwait(false);
+            var gotFullBody = bodyRead == (int)length;
+            if (gotFullBody) result = JsonSerializer.Deserialize<T>(body, JsonOptions);
         }
 
         return result;
     }
 
-    private static async Task<int> ReadExactAsync(Stream source, Memory<byte> buffer, CancellationToken cancellationToken)
+    private static async Task<int> ReadExactAsync(Stream source, Memory<byte> buffer,
+        CancellationToken cancellationToken)
     {
-        int total = 0;
-        bool keepReading = buffer.Length > 0;
+        var total = 0;
+        var keepReading = buffer.Length > 0;
         while (keepReading)
         {
-            int chunk = await source.ReadAsync(buffer.Slice(total), cancellationToken).ConfigureAwait(false);
-            bool eof = chunk == 0;
+            var chunk = await source.ReadAsync(buffer.Slice(total), cancellationToken).ConfigureAwait(false);
+            var eof = chunk == 0;
             if (eof)
             {
                 keepReading = false;
@@ -108,6 +120,10 @@ public static class WireSerializer
                 keepReading = total < buffer.Length;
             }
         }
+
         return total;
     }
+
+    private const int FrameLengthBytes = 4;
+    private const int MaxFrameSizeBytes = 16 * 1024 * 1024;
 }

@@ -1,31 +1,50 @@
 // TemplateResolver.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Payload.Inspection;
+#region Usings
 
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
-using SnoopMCP.Payload;
 using SnoopMCP.Protocol.Tools;
 
+#endregion
+
+namespace SnoopMCP.Payload.Inspection;
+
 /// <summary>
-/// Resolves the <see cref="ControlTemplate"/> applied to a <see cref="Control"/> into a wire
-/// response: the template's type and key, the runtime template tree (the template's visual-tree
-/// expansion, each node carrying a stable id), and the named parts reachable in that expansion.
+///     Resolves the <see cref="ControlTemplate" /> applied to a <see cref="Control" /> into a wire
+///     response: the template's type and key, the runtime template tree (the template's visual-tree
+///     expansion, each node carrying a stable id), and the named parts reachable in that expansion.
 /// </summary>
 public sealed class TemplateResolver
 {
-    private readonly ElementRegistry mRegistry;
-
     /// <summary>
-    /// Initialises a new <see cref="TemplateResolver"/>.
+    ///     Initialises a new <see cref="TemplateResolver" />.
     /// </summary>
     /// <param name="registry">Element registry used to assign stable ids to template-tree nodes.</param>
     /// <param name="describer">
-    /// The element describer. Reserved for richer per-node descriptions in a follow-up phase;
-    /// validated here so the dependency contract is enforced at construction.
+    ///     The element describer. Reserved for richer per-node descriptions in a follow-up phase;
+    ///     validated here so the dependency contract is enforced at construction.
     /// </param>
     public TemplateResolver(ElementRegistry registry, ElementDescriber describer)
     {
@@ -34,10 +53,12 @@ public sealed class TemplateResolver
         mRegistry = registry;
     }
 
+    private readonly ElementRegistry mRegistry;
+
     /// <summary>
-    /// Resolves the control template applied to <paramref name="element"/>. When the element is not a
-    /// <see cref="Control"/> or has no template, the type, key, source, and tree are <c>null</c> and
-    /// the named parts are empty.
+    ///     Resolves the control template applied to <paramref name="element" />. When the element is not a
+    ///     <see cref="Control" /> or has no template, the type, key, source, and tree are <c>null</c> and
+    ///     the named parts are empty.
     /// </summary>
     /// <param name="element">The element to inspect.</param>
     /// <returns>The template type, key, source, runtime tree, and named parts.</returns>
@@ -47,18 +68,14 @@ public sealed class TemplateResolver
 
         ResolveTemplateResponse response;
         if (element is not Control control || control.Template is null)
-        {
             response = new ResolveTemplateResponse(
-                TemplateType: null,
-                TemplateKey: null,
-                TemplateSource: null,
-                TemplateTree: null,
-                NamedParts: Array.Empty<NamedPartDto>());
-        }
+                null,
+                null,
+                null,
+                null,
+                Array.Empty<NamedPartDto>());
         else
-        {
             response = BuildResponse(control);
-        }
 
         return response;
     }
@@ -66,43 +83,40 @@ public sealed class TemplateResolver
     private ResolveTemplateResponse BuildResponse(Control control)
     {
         ControlTemplate template = control.Template;
-        string templateType = template.GetType().FullName ?? template.GetType().Name;
-        string? templateKey = template.TargetType?.Name;
+        var templateType = template.GetType().FullName ?? template.GetType().Name;
+        var templateKey = template.TargetType?.Name;
 
         TemplateNodeDto? tree = BuildTree(control);
         List<NamedPartDto> parts = CollectNamedParts(control, template);
 
         return new ResolveTemplateResponse(
-            TemplateType: templateType,
-            TemplateKey: templateKey,
-            TemplateSource: null,
-            TemplateTree: tree,
-            NamedParts: parts);
+            templateType,
+            templateKey,
+            null,
+            tree,
+            parts);
     }
 
     private TemplateNodeDto? BuildTree(DependencyObject root)
     {
         TemplateNodeDto? node = null;
-        bool isVisual = root is Visual or Visual3D;
+        var isVisual = root is Visual or Visual3D;
         if (isVisual)
         {
-            int count = VisualTreeHelper.GetChildrenCount(root);
+            var count = VisualTreeHelper.GetChildrenCount(root);
             var children = new List<TemplateNodeDto>(count);
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 DependencyObject child = VisualTreeHelper.GetChild(root, i);
                 TemplateNodeDto? childNode = BuildTree(child);
-                if (childNode is not null)
-                {
-                    children.Add(childNode);
-                }
+                if (childNode is not null) children.Add(childNode);
             }
 
             node = new TemplateNodeDto(
-                ElementId: mRegistry.GetOrAssign(root),
-                Type: root.GetType().Name,
-                Name: (root as FrameworkElement)?.Name,
-                Children: children);
+                mRegistry.GetOrAssign(root),
+                root.GetType().Name,
+                (root as FrameworkElement)?.Name,
+                children);
         }
 
         return node;
@@ -125,10 +139,7 @@ public sealed class TemplateResolver
         FrameworkElementFactory? current = factory;
         while (current is not null)
         {
-            if (current.Name is { Length: > 0 } name)
-            {
-                sink.Add(name);
-            }
+            if (current.Name is { Length: > 0 } name) sink.Add(name);
 
             CollectFactoryNames(current.FirstChild, sink);
             current = current.NextSibling;
@@ -137,17 +148,14 @@ public sealed class TemplateResolver
 
     private static void CollectVisualTreeNames(DependencyObject node, HashSet<string> sink)
     {
-        bool isVisual = node is Visual or Visual3D;
+        var isVisual = node is Visual or Visual3D;
         if (isVisual)
         {
-            int count = VisualTreeHelper.GetChildrenCount(node);
-            for (int i = 0; i < count; i++)
+            var count = VisualTreeHelper.GetChildrenCount(node);
+            for (var i = 0; i < count; i++)
             {
                 DependencyObject child = VisualTreeHelper.GetChild(node, i);
-                if (child is FrameworkElement { Name: { Length: > 0 } name })
-                {
-                    sink.Add(name);
-                }
+                if (child is FrameworkElement { Name: { Length: > 0 } name }) sink.Add(name);
 
                 CollectVisualTreeNames(child, sink);
             }
@@ -160,15 +168,11 @@ public sealed class TemplateResolver
         HashSet<string> names,
         List<NamedPartDto> sink)
     {
-        foreach (string name in names)
-        {
+        foreach (var name in names)
             if (template.FindName(name, control) is DependencyObject part)
-            {
                 sink.Add(new NamedPartDto(
-                    PartName: name,
-                    PartType: part.GetType().FullName ?? part.GetType().Name,
-                    ElementId: mRegistry.GetOrAssign(part)));
-            }
-        }
+                    name,
+                    part.GetType().FullName ?? part.GetType().Name,
+                    mRegistry.GetOrAssign(part)));
     }
 }

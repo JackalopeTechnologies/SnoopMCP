@@ -1,7 +1,25 @@
 // WalkthroughCaptureTests.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.IntegrationTests;
+#region Usings
 
 using System.Diagnostics;
 using System.Text.Json;
@@ -12,36 +30,34 @@ using SnoopMCP.Host.Tools;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 
+#endregion
+
+namespace SnoopMCP.IntegrationTests;
+
 /// <summary>
-/// Skip-by-default capture run that drives every v1.1 tool against a live SampleWpfApp in document
-/// order and writes walkthrough-transcript.json. NOT a regression gate — it generates the doc's
-/// source-of-truth transcript.
-///
-/// To refresh the transcript: remove the Skip below, then run
-///   dotnet test tests/SnoopMCP.IntegrationTests/SnoopMCP.IntegrationTests.csproj \
-///       --filter FullyQualifiedName~CaptureWalkthroughTranscript
-/// inspect the regenerated walkthrough-transcript.json, restore the Skip, and commit the JSON.
+///     Skip-by-default capture run that drives every v1.1 tool against a live SampleWpfApp in document
+///     order and writes walkthrough-transcript.json. NOT a regression gate — it generates the doc's
+///     source-of-truth transcript.
+///     To refresh the transcript: remove the Skip below, then run
+///     dotnet test tests/SnoopMCP.IntegrationTests/SnoopMCP.IntegrationTests.csproj \
+///     --filter FullyQualifiedName~CaptureWalkthroughTranscript
+///     inspect the regenerated walkthrough-transcript.json, restore the Skip, and commit the JSON.
 /// </summary>
 public sealed class WalkthroughCaptureTests : IAsyncLifetime
 {
-    private const int WindowInitDelaySeconds = 5;
-    private const string ThemeComboAutomationId = "ThemePicker";
+    private readonly WalkthroughTranscript mTranscript = new();
 
     private Process? mSampleProcess;
     private SessionManager? mSession;
     private McpTools? mTools;
-    private readonly WalkthroughTranscript mTranscript = new();
 
     public async ValueTask InitializeAsync()
     {
-        string samplePath = Path.Combine(AppContext.BaseDirectory, "SampleWpfApp.exe");
+        var samplePath = Path.Combine(AppContext.BaseDirectory, "SampleWpfApp.exe");
         Assert.True(File.Exists(samplePath), $"SampleWpfApp.exe not found at {samplePath}.");
 
-        mSampleProcess = Process.Start(new ProcessStartInfo
-        {
-            FileName = samplePath,
-            UseShellExecute = false
-        }) ?? throw new InvalidOperationException("Failed to start SampleWpfApp.");
+        mSampleProcess = Process.Start(new ProcessStartInfo { FileName = samplePath, UseShellExecute = false }) ??
+                         throw new InvalidOperationException("Failed to start SampleWpfApp.");
 
         await Task.Delay(TimeSpan.FromSeconds(WindowInitDelaySeconds));
 
@@ -54,14 +70,12 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
     {
         if (mSampleProcess is not null && !mSampleProcess.HasExited)
         {
-            mSampleProcess.Kill(entireProcessTree: true);
+            mSampleProcess.Kill(true);
             mSampleProcess.WaitForExit(5000);
             mSampleProcess.Dispose();
         }
-        if (mSession is not null)
-        {
-            await mSession.DisposeAsync();
-        }
+
+        if (mSession is not null) await mSession.DisposeAsync();
     }
 
     private async Task<int> FindFirstIdAsync(int rootId, ElementPredicateDto predicate, CancellationToken ct)
@@ -77,12 +91,10 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
         JsonElement result = default;
         foreach (JsonElement root in listVisualRootsResponse.GetProperty("roots").EnumerateArray())
         {
-            bool isKind = string.Equals(root.GetProperty("kind").GetString(), kind, StringComparison.Ordinal);
-            if (isKind && result.ValueKind != JsonValueKind.Object)
-            {
-                result = root.Clone();
-            }
+            var isKind = string.Equals(root.GetProperty("kind").GetString(), kind, StringComparison.Ordinal);
+            if (isKind && result.ValueKind != JsonValueKind.Object) result = root.Clone();
         }
+
         return result;
     }
 
@@ -104,13 +116,13 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
         // --- Orientation ---
         JsonElement roots = await mTools.ListVisualRoots(ct);
         mTranscript.Add("Orientation", "listVisualRoots", new { }, roots);
-        int rootId = roots.GetProperty("roots")[0].GetProperty("rootElementId").GetInt32();
+        var rootId = roots.GetProperty("roots")[0].GetProperty("rootElementId").GetInt32();
 
         JsonElement desc = await mTools.DescribeElement(rootId, ct);
         mTranscript.Add("Orientation", "describeElement", new { id = rootId }, desc);
 
         // --- Tree navigation ---
-        int detailPaneId = await FindFirstIdAsync(rootId, new ElementPredicateDto { Name = "DetailPane" }, ct);
+        var detailPaneId = await FindFirstIdAsync(rootId, new ElementPredicateDto { Name = "DetailPane" }, ct);
 
         JsonElement kidsVisual = await mTools.GetChildren(detailPaneId, "visual", ct);
         mTranscript.Add("Navigation", "getChildren", new { id = detailPaneId, tree = "visual" }, kidsVisual);
@@ -118,13 +130,13 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
         JsonElement kidsLogical = await mTools.GetChildren(detailPaneId, "logical", ct);
         mTranscript.Add("Navigation", "getChildren", new { id = detailPaneId, tree = "logical" }, kidsLogical);
 
-        int firstVisualChild = kidsVisual.GetProperty("children")[0].GetProperty("id").GetInt32();
+        var firstVisualChild = kidsVisual.GetProperty("children")[0].GetProperty("id").GetInt32();
         JsonElement parent = await mTools.GetParent(firstVisualChild, "visual", ct);
         mTranscript.Add("Navigation", "getParent", new { id = firstVisualChild, tree = "visual" }, parent);
 
-        int saveButtonId = await FindFirstIdAsync(rootId, new ElementPredicateDto { Name = "SaveButton" }, ct);
+        var saveButtonId = await FindFirstIdAsync(rootId, new ElementPredicateDto { Name = "SaveButton" }, ct);
         JsonElement saveKids = await mTools.GetChildren(saveButtonId, "visual", ct);
-        int templatedChild = saveKids.GetProperty("children")[0].GetProperty("id").GetInt32();
+        var templatedChild = saveKids.GetProperty("children")[0].GetProperty("id").GetInt32();
         JsonElement templatedParent = await mTools.GetTemplatedParent(templatedChild, ct);
         mTranscript.Add("Navigation", "getTemplatedParent", new { id = templatedChild }, templatedParent);
 
@@ -140,12 +152,12 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
         JsonElement hit = await mTools.HitTest(rootId, 50, 50, ct);
         mTranscript.Add("Search", "hitTest", new { rootId, x = 50, y = 50 }, hit);
 
-        string rootPath = desc.GetProperty("path").GetString() ?? "/Window";
+        var rootPath = desc.GetProperty("path").GetString() ?? "/Window";
         JsonElement resolved = await mTools.ResolvePath(rootId, rootPath, ct);
         mTranscript.Add("Search", "resolvePath", new { rootId, pathString = rootPath }, resolved);
 
         // --- DataContext ---
-        int brokenBindingId = await FindFirstIdAsync(rootId, new ElementPredicateDto { Name = "BrokenBinding" }, ct);
+        var brokenBindingId = await FindFirstIdAsync(rootId, new ElementPredicateDto { Name = "BrokenBinding" }, ct);
 
         JsonElement dcShape = await mTools.DescribeDataContext(brokenBindingId, ct);
         mTranscript.Add("DataContext", "describeDataContext", new { id = brokenBindingId }, dcShape);
@@ -160,7 +172,7 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
             new { id = brokenBindingId, path = "Address.Country.Name" }, dcBroken);
 
         // --- Dependency properties ---
-        int deleteButtonId = await FindFirstIdAsync(rootId, new ElementPredicateDto { Name = "DeleteButton" }, ct);
+        var deleteButtonId = await FindFirstIdAsync(rootId, new ElementPredicateDto { Name = "DeleteButton" }, ct);
 
         JsonElement dps = await mTools.ListDependencyProperties(saveButtonId, ct);
         mTranscript.Add("DependencyProperties", "listDependencyProperties", new { id = saveButtonId }, dps);
@@ -189,7 +201,7 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
         mTranscript.Add("Snapshot", "exportXaml", new { id = detailPaneId }, xaml);
 
         // --- Popup (UIA opens the dropdown; the only non-MCP step) ---
-        bool opened = ComboBoxAutomation.TrySetDropDownOpen(ThemeComboAutomationId, open: true);
+        var opened = ComboBoxAutomation.TrySetDropDownOpen(ThemeComboAutomationId, true);
         if (opened)
         {
             await Task.Delay(500);
@@ -199,12 +211,12 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
             JsonElement popupRoot = FirstRootOfKind(rootsWithPopup, "Popup");
             if (popupRoot.ValueKind == JsonValueKind.Object)
             {
-                int popupRootId = popupRoot.GetProperty("rootElementId").GetInt32();
+                var popupRootId = popupRoot.GetProperty("rootElementId").GetInt32();
                 JsonElement popupKids = await mTools.GetChildren(popupRootId, "visual", ct);
                 mTranscript.Add("Popup", "getChildren", new { id = popupRootId, tree = "visual" }, popupKids);
             }
 
-            ComboBoxAutomation.TrySetDropDownOpen(ThemeComboAutomationId, open: false);
+            ComboBoxAutomation.TrySetDropDownOpen(ThemeComboAutomationId, false);
         }
 
         // --- Wrap-up ---
@@ -213,4 +225,7 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
 
         await mTranscript.WriteAsync();
     }
+
+    private const int WindowInitDelaySeconds = 5;
+    private const string ThemeComboAutomationId = "ThemePicker";
 }

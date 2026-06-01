@@ -1,7 +1,25 @@
 // PipeClient.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Host;
+#region Usings
 
 using System.IO.Pipes;
 using System.Text.Json;
@@ -9,25 +27,20 @@ using Microsoft.Extensions.Logging;
 using SnoopMCP.Protocol.Errors;
 using SnoopMCP.Protocol.Wire;
 
+#endregion
+
+namespace SnoopMCP.Host;
+
 /// <summary>
-/// Host-side counterpart to the payload's <c>PipeServer</c>. Connects to a named pipe, writes
-/// length-prefixed <see cref="RpcRequest"/> frames, reads <see cref="RpcResponse"/> frames, and
-/// surfaces <see cref="RpcError"/> payloads as <see cref="SnoopMcpException"/>. A single lock
-/// serialises calls so request/response framing stays paired on the one-client pipe.
+///     Host-side counterpart to the payload's <c>PipeServer</c>. Connects to a named pipe, writes
+///     length-prefixed <see cref="RpcRequest" /> frames, reads <see cref="RpcResponse" /> frames, and
+///     surfaces <see cref="RpcError" /> payloads as <see cref="SnoopMcpException" />. A single lock
+///     serialises calls so request/response framing stays paired on the one-client pipe.
 /// </summary>
 public sealed partial class PipeClient : IAsyncDisposable
 {
-    private const int ConnectTimeoutMs = 5000;
-    private const string NullJsonLiteral = "null";
-
-    private readonly string mPipeName;
-    private readonly ILogger<PipeClient> mLogger;
-    private readonly SemaphoreSlim mLock = new(1, 1);
-    private NamedPipeClientStream? mStream;
-    private long mNextRequestId;
-
     /// <summary>
-    /// Initialises a new <see cref="PipeClient"/> bound to the supplied named pipe.
+    ///     Initialises a new <see cref="PipeClient" /> bound to the supplied named pipe.
     /// </summary>
     /// <param name="pipeName">The named-pipe instance to connect to.</param>
     /// <param name="logger">The logger to record diagnostics into.</param>
@@ -42,8 +55,34 @@ public sealed partial class PipeClient : IAsyncDisposable
     /// <summary>Gets a value indicating whether the underlying pipe stream is connected.</summary>
     public bool IsConnected => mStream is { IsConnected: true };
 
+    private readonly SemaphoreSlim mLock = new(1, 1);
+    private readonly ILogger<PipeClient> mLogger;
+
+    private readonly string mPipeName;
+    private long mNextRequestId;
+    private NamedPipeClientStream? mStream;
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        await mLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (mStream is not null)
+            {
+                await mStream.DisposeAsync().ConfigureAwait(false);
+                mStream = null;
+            }
+        }
+        finally
+        {
+            mLock.Release();
+            mLock.Dispose();
+        }
+    }
+
     /// <summary>
-    /// Connects to the named pipe. Throws if already connected.
+    ///     Connects to the named pipe. Throws if already connected.
     /// </summary>
     /// <param name="cancellationToken">A token to observe while connecting.</param>
     public async Task ConnectAsync(CancellationToken cancellationToken)
@@ -51,10 +90,7 @@ public sealed partial class PipeClient : IAsyncDisposable
         await mLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (mStream is not null)
-            {
-                throw new InvalidOperationException("Pipe client already connected.");
-            }
+            if (mStream is not null) throw new InvalidOperationException("Pipe client already connected.");
 
             var stream = new NamedPipeClientStream(
                 ".",
@@ -72,8 +108,8 @@ public sealed partial class PipeClient : IAsyncDisposable
     }
 
     /// <summary>
-    /// Sends a tool request and returns the result JSON. Throws <see cref="SnoopMcpException"/>
-    /// when the payload returns an error or the pipe closes before a response arrives.
+    ///     Sends a tool request and returns the result JSON. Throws <see cref="SnoopMcpException" />
+    ///     when the payload returns an error or the pipe closes before a response arrives.
     /// </summary>
     /// <param name="toolName">The wire tool name to dispatch.</param>
     /// <param name="arguments">The tool-specific argument object; serialised to the request body.</param>
@@ -92,9 +128,9 @@ public sealed partial class PipeClient : IAsyncDisposable
         try
         {
             NamedPipeClientStream stream = mStream
-                ?? throw new InvalidOperationException("Pipe client not connected.");
+                                           ?? throw new InvalidOperationException("Pipe client not connected.");
 
-            long id = Interlocked.Increment(ref mNextRequestId);
+            var id = Interlocked.Increment(ref mNextRequestId);
             JsonElement argsElement = ToJsonElement(arguments);
             var request = new RpcRequest { Id = id, Tool = toolName, Arguments = argsElement };
 
@@ -116,14 +152,9 @@ public sealed partial class PipeClient : IAsyncDisposable
     private static JsonElement ExtractResult(RpcResponse? response)
     {
         if (response is null)
-        {
             throw new SnoopMcpException(ErrorCode.SessionLost, "Pipe closed before response arrived.");
-        }
 
-        if (response.Error is not null)
-        {
-            throw new SnoopMcpException(response.Error.Code, response.Error.Message);
-        }
+        if (response.Error is not null) throw new SnoopMcpException(response.Error.Code, response.Error.Message);
 
         JsonElement result = response.Result ?? JsonDocument.Parse(NullJsonLiteral).RootElement.Clone();
         return result;
@@ -131,30 +162,14 @@ public sealed partial class PipeClient : IAsyncDisposable
 
     private static JsonElement ToJsonElement(object arguments)
     {
-        string json = JsonSerializer.Serialize(arguments, WireSerializer.JsonOptions);
+        var json = JsonSerializer.Serialize(arguments, WireSerializer.JsonOptions);
         using var doc = JsonDocument.Parse(json);
         return doc.RootElement.Clone();
     }
 
-    /// <inheritdoc />
-    public async ValueTask DisposeAsync()
-    {
-        await mLock.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            if (mStream is not null)
-            {
-                await mStream.DisposeAsync().ConfigureAwait(false);
-                mStream = null;
-            }
-        }
-        finally
-        {
-            mLock.Release();
-            mLock.Dispose();
-        }
-    }
-
     [LoggerMessage(EventId = 1, Level = LogLevel.Information, Message = "Connected to pipe {PipeName}.")]
     private partial void LogConnected(string pipeName);
+
+    private const int ConnectTimeoutMs = 5000;
+    private const string NullJsonLiteral = "null";
 }

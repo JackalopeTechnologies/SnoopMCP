@@ -1,7 +1,25 @@
 // PipeServer.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-namespace SnoopMCP.Payload;
+#region Usings
 
 using System.IO;
 using System.IO.Pipes;
@@ -11,22 +29,18 @@ using SnoopMCP.Payload.Tools;
 using SnoopMCP.Protocol.Errors;
 using SnoopMCP.Protocol.Wire;
 
+#endregion
+
+namespace SnoopMCP.Payload;
+
 /// <summary>
-/// Named-pipe server that accepts one client at a time and dispatches incoming
-/// <see cref="RpcRequest"/> frames to a <see cref="ToolRegistry"/>.
+///     Named-pipe server that accepts one client at a time and dispatches incoming
+///     <see cref="RpcRequest" /> frames to a <see cref="ToolRegistry" />.
 /// </summary>
 public sealed partial class PipeServer : IAsyncDisposable
 {
-    private const int PipeBufferSize = 64 * 1024;
-
-    private readonly string mPipeName;
-    private readonly ToolRegistry mRegistry;
-    private readonly ILogger<PipeServer> mLogger;
-    private readonly CancellationTokenSource mShutdown = new();
-    private Task? mAcceptLoop;
-
     /// <summary>
-    /// Initialises a new <see cref="PipeServer"/> bound to the supplied named pipe.
+    ///     Initialises a new <see cref="PipeServer" /> bound to the supplied named pipe.
     /// </summary>
     /// <param name="pipeName">The named-pipe instance to create.</param>
     /// <param name="registry">The tool registry to dispatch into.</param>
@@ -41,20 +55,18 @@ public sealed partial class PipeServer : IAsyncDisposable
         mLogger = logger;
     }
 
-    /// <summary>
-    /// Starts the accept loop on a background task. Returns immediately.
-    /// </summary>
-    public void Start()
-    {
-        mAcceptLoop = Task.Run(() => AcceptLoopAsync(mShutdown.Token));
-    }
+    private readonly ILogger<PipeServer> mLogger;
+
+    private readonly string mPipeName;
+    private readonly ToolRegistry mRegistry;
+    private readonly CancellationTokenSource mShutdown = new();
+    private Task? mAcceptLoop;
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         await mShutdown.CancelAsync().ConfigureAwait(false);
         if (mAcceptLoop is not null)
-        {
             try
             {
                 await mAcceptLoop.ConfigureAwait(false);
@@ -62,8 +74,16 @@ public sealed partial class PipeServer : IAsyncDisposable
             catch (OperationCanceledException)
             {
             }
-        }
+
         mShutdown.Dispose();
+    }
+
+    /// <summary>
+    ///     Starts the accept loop on a background task. Returns immediately.
+    /// </summary>
+    public void Start()
+    {
+        mAcceptLoop = Task.Run(() => AcceptLoopAsync(mShutdown.Token));
     }
 
     [LoggerMessage(EventId = 1, Level = LogLevel.Warning, Message = "Pipe IO exception in accept loop; will retry.")]
@@ -74,9 +94,8 @@ public sealed partial class PipeServer : IAsyncDisposable
 
     private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
-        bool keepRunning = true;
+        var keepRunning = true;
         while (keepRunning && !cancellationToken.IsCancellationRequested)
-        {
             try
             {
                 await using var pipe = new NamedPipeServerStream(
@@ -99,12 +118,11 @@ public sealed partial class PipeServer : IAsyncDisposable
             {
                 LogPipeIoException(ex);
             }
-        }
     }
 
     private async Task ServeClientAsync(NamedPipeServerStream pipe, CancellationToken cancellationToken)
     {
-        bool clientConnected = true;
+        var clientConnected = true;
         while (clientConnected && !cancellationToken.IsCancellationRequested)
         {
             RpcRequest? request = await WireSerializer
@@ -128,19 +146,15 @@ public sealed partial class PipeServer : IAsyncDisposable
         RpcResponse response;
         IToolHandler? handler = mRegistry.Find(request.Tool);
         if (handler is null)
-        {
             response = new RpcResponse
             {
                 Id = request.Id,
                 Error = new RpcError
                 {
-                    Code = ErrorCode.ToolNotFound,
-                    Message = $"No handler registered for tool '{request.Tool}'."
+                    Code = ErrorCode.ToolNotFound, Message = $"No handler registered for tool '{request.Tool}'."
                 }
             };
-        }
         else
-        {
             try
             {
                 JsonElement result = await handler
@@ -152,8 +166,7 @@ public sealed partial class PipeServer : IAsyncDisposable
             {
                 response = new RpcResponse
                 {
-                    Id = request.Id,
-                    Error = new RpcError { Code = ex.Code, Message = ex.Message }
+                    Id = request.Id, Error = new RpcError { Code = ex.Code, Message = ex.Message }
                 };
             }
             catch (Exception ex)
@@ -164,13 +177,13 @@ public sealed partial class PipeServer : IAsyncDisposable
                     Id = request.Id,
                     Error = new RpcError
                     {
-                        Code = ErrorCode.Unknown,
-                        Message = ex.Message,
-                        Details = ex.GetType().FullName
+                        Code = ErrorCode.Unknown, Message = ex.Message, Details = ex.GetType().FullName
                     }
                 };
             }
-        }
+
         return response;
     }
+
+    private const int PipeBufferSize = 64 * 1024;
 }

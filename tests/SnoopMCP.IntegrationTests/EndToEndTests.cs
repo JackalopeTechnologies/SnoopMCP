@@ -1,4 +1,25 @@
-namespace SnoopMCP.IntegrationTests;
+// EndToEndTests.cs
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#region Usings
 
 using System.Diagnostics;
 using System.Text.Json;
@@ -6,32 +27,32 @@ using Microsoft.Extensions.Logging.Abstractions;
 using SnoopMCP.Host;
 using SnoopMCP.Host.Injection;
 using SnoopMCP.Host.Tools;
+using SnoopMCP.Protocol.Tools;
 using Xunit;
 
+#endregion
+
+namespace SnoopMCP.IntegrationTests;
+
 /// <summary>
-/// End-to-end gate: spawns the real SampleWpfApp, attaches via the host's injector + session, and
-/// drives every read-only MCP tool against the live process. Asserts response shape (not per-tool
-/// semantics, which the payload unit tests cover). This is the only test that exercises the full
-/// inject -> pipe -> dispatcher -> tool path against a real .NET 10 WPF target.
+///     End-to-end gate: spawns the real SampleWpfApp, attaches via the host's injector + session, and
+///     drives every read-only MCP tool against the live process. Asserts response shape (not per-tool
+///     semantics, which the payload unit tests cover). This is the only test that exercises the full
+///     inject -> pipe -> dispatcher -> tool path against a real .NET 10 WPF target.
 /// </summary>
 public sealed class EndToEndTests : IAsyncLifetime
 {
-    private const int WindowInitDelaySeconds = 5;
-
     private Process? mSampleProcess;
     private SessionManager? mSession;
     private McpTools? mTools;
 
     public async ValueTask InitializeAsync()
     {
-        string samplePath = Path.Combine(AppContext.BaseDirectory, "SampleWpfApp.exe");
+        var samplePath = Path.Combine(AppContext.BaseDirectory, "SampleWpfApp.exe");
         Assert.True(File.Exists(samplePath), $"SampleWpfApp.exe not found at {samplePath}.");
 
-        mSampleProcess = Process.Start(new ProcessStartInfo
-        {
-            FileName = samplePath,
-            UseShellExecute = false
-        }) ?? throw new InvalidOperationException("Failed to start SampleWpfApp.");
+        mSampleProcess = Process.Start(new ProcessStartInfo { FileName = samplePath, UseShellExecute = false }) ??
+                         throw new InvalidOperationException("Failed to start SampleWpfApp.");
 
         await Task.Delay(TimeSpan.FromSeconds(WindowInitDelaySeconds));
 
@@ -45,7 +66,6 @@ public sealed class EndToEndTests : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         if (mTools is not null)
-        {
             try
             {
                 await mTools.Detach(CancellationToken.None);
@@ -53,17 +73,15 @@ public sealed class EndToEndTests : IAsyncLifetime
             catch (Exception)
             {
             }
-        }
+
         if (mSampleProcess is not null && !mSampleProcess.HasExited)
         {
-            mSampleProcess.Kill(entireProcessTree: true);
+            mSampleProcess.Kill(true);
             mSampleProcess.WaitForExit(5000);
             mSampleProcess.Dispose();
         }
-        if (mSession is not null)
-        {
-            await mSession.DisposeAsync();
-        }
+
+        if (mSession is not null) await mSession.DisposeAsync();
     }
 
     [Fact]
@@ -75,7 +93,7 @@ public sealed class EndToEndTests : IAsyncLifetime
         JsonElement roots = await mTools!.ListVisualRoots(ct);
         JsonElement rootArr = roots.GetProperty("roots");
         Assert.True(rootArr.GetArrayLength() > 0);
-        int rootElementId = rootArr[0].GetProperty("rootElementId").GetInt32();
+        var rootElementId = rootArr[0].GetProperty("rootElementId").GetInt32();
 
         JsonElement desc = await mTools.DescribeElement(rootElementId, ct);
         Assert.True(desc.TryGetProperty("type", out _));
@@ -85,7 +103,7 @@ public sealed class EndToEndTests : IAsyncLifetime
         JsonElement kids = await mTools.GetChildren(rootElementId, "visual", ct);
         JsonElement children = kids.GetProperty("children");
         Assert.True(children.GetArrayLength() > 0);
-        int childId = children[0].GetProperty("id").GetInt32();
+        var childId = children[0].GetProperty("id").GetInt32();
 
         // getParent on a child returns a non-null parent (the root is omitted from JSON when null
         // because the wire serializer drops null properties — so test against a child, not the root).
@@ -99,7 +117,7 @@ public sealed class EndToEndTests : IAsyncLifetime
 
         JsonElement found = await mTools.FindElements(
             rootElementId,
-            new SnoopMCP.Protocol.Tools.ElementPredicateDto { Type = "Button" },
+            new ElementPredicateDto { Type = "Button" },
             ct);
         Assert.True(found.TryGetProperty("matches", out _));
 
@@ -151,12 +169,12 @@ public sealed class EndToEndTests : IAsyncLifetime
         JsonElement processes = result.GetProperty("processes");
         Assert.Equal(JsonValueKind.Array, processes.ValueKind);
 
-        bool found = false;
-        bool attachable = false;
+        var found = false;
+        var attachable = false;
         foreach (JsonElement proc in processes.EnumerateArray())
         {
-            string name = proc.GetProperty("processName").GetString() ?? string.Empty;
-            bool isSample = string.Equals(name, "SampleWpfApp", StringComparison.Ordinal);
+            var name = proc.GetProperty("processName").GetString() ?? string.Empty;
+            var isSample = string.Equals(name, "SampleWpfApp", StringComparison.Ordinal);
             if (isSample)
             {
                 found = true;
@@ -167,4 +185,6 @@ public sealed class EndToEndTests : IAsyncLifetime
         Assert.True(found, "SampleWpfApp not found in listWpfProcesses output.");
         Assert.True(attachable, "SampleWpfApp was discovered but reported as non-attachable.");
     }
+
+    private const int WindowInitDelaySeconds = 5;
 }
