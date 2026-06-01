@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:tb="http://www.hardcodet.net/taskbar"
+             xmlns:ci="clr-namespace:SnoopMCP.ClientIntegration;assembly=SnoopMCP.ClientIntegration"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
 
@@ -11,12 +12,63 @@
             <MenuItem Header="Start MCP" Command="{Binding StartCommand}" />
             <MenuItem Header="Stop MCP" Command="{Binding StopCommand}" />
             <Separator />
+
+            <MenuItem Header="Install into">
+                <MenuItem Header="All detected agents" Command="{Binding InstallCommand}" />
+                <Separator />
+                <MenuItem Header="Claude Code" Command="{Binding InstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.ClaudeCode}" />
+                <MenuItem Header="Claude Desktop" Command="{Binding InstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.ClaudeDesktop}" />
+                <MenuItem Header="VS Code" Command="{Binding InstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.VsCode}" />
+                <MenuItem Header="Codex" Command="{Binding InstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.Codex}" />
+                <MenuItem Header="Copilot CLI" Command="{Binding InstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.CopilotCli}" />
+                <MenuItem Header="Cursor" Command="{Binding InstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.Cursor}" />
+                <MenuItem Header="Gemini CLI" Command="{Binding InstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.GeminiCli}" />
+                <MenuItem Header="Windsurf" Command="{Binding InstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.Windsurf}" />
+                <MenuItem Header="Visual Studio 2022" Command="{Binding InstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.VisualStudio2022}" />
+            </MenuItem>
+
+            <MenuItem Header="Uninstall from">
+                <MenuItem Header="All detected agents" Command="{Binding UninstallCommand}" />
+                <Separator />
+                <MenuItem Header="Claude Code" Command="{Binding UninstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.ClaudeCode}" />
+                <MenuItem Header="Claude Desktop" Command="{Binding UninstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.ClaudeDesktop}" />
+                <MenuItem Header="VS Code" Command="{Binding UninstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.VsCode}" />
+                <MenuItem Header="Codex" Command="{Binding UninstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.Codex}" />
+                <MenuItem Header="Copilot CLI" Command="{Binding UninstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.CopilotCli}" />
+                <MenuItem Header="Cursor" Command="{Binding UninstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.Cursor}" />
+                <MenuItem Header="Gemini CLI" Command="{Binding UninstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.GeminiCli}" />
+                <MenuItem Header="Windsurf" Command="{Binding UninstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.Windsurf}" />
+                <MenuItem Header="Visual Studio 2022" Command="{Binding UninstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.VisualStudio2022}" />
+            </MenuItem>
+
+            <MenuItem Header="Status" Command="{Binding StatusCommand}" />
+            <Separator />
             <MenuItem Header="Exit" Command="{Binding ExitCommand}" />
         </ContextMenu>
 
-        <!-- Instantiated from App.OnStartup via FindResource + ForceCreate; DataContext is a TrayViewModel. -->
+        <!-- Instantiated from App.OnStartup via FindResource + ForceCreate; DataContext is a TrayViewModel.
+             IconSource is bound to the view model so the logo carries a colored status dot that tracks the
+             server state live (the VM hands out a frozen pack:// BitmapImage, the H.NotifyIcon-safe path). -->
         <tb:TaskbarIcon x:Key="TrayIcon"
-                        IconSource="/Images/icon.ico"
+                        IconSource="{Binding IconSource}"
                         ToolTipText="{Binding ToolTipText}"
                         ContextMenu="{StaticResource TrayMenu}"
                         MenuActivation="LeftOrRightClick"

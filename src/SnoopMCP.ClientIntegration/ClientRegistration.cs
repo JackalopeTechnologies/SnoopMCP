@@ -1,5 +1,23 @@
 // ClientRegistration.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 namespace SnoopMCP.ClientIntegration;
 
@@ -24,6 +42,10 @@ public static class ClientRegistration
             McpClient.VsCode => VsCodeMcpWriter.ForCurrentUser(),
             McpClient.Codex => CodexWriter.ForCurrentUser(),
             McpClient.CopilotCli => CopilotCliWriter.ForCurrentUser(),
+            McpClient.Cursor => CursorWriter.ForCurrentUser(),
+            McpClient.GeminiCli => GeminiCliWriter.ForCurrentUser(),
+            McpClient.Windsurf => WindsurfWriter.ForCurrentUser(),
+            McpClient.VisualStudio2022 => VisualStudio2022Writer.ForCurrentUser(),
             _ => throw new ArgumentOutOfRangeException(nameof(client), client, "Unknown client.")
         };
     }
@@ -33,6 +55,12 @@ public static class ClientRegistration
     {
         ArgumentNullException.ThrowIfNull(clients);
         return clients.Select(CreateWriter).ToArray();
+    }
+
+    /// <summary>The writers for every client whose agent is detected as installed on this machine.</summary>
+    public static IReadOnlyList<IClientWriter> DetectedWriters()
+    {
+        return AllClients.Select(CreateWriter).Where(w => w.IsDetected()).ToArray();
     }
 
     /// <summary>Registers the endpoint with every supplied writer.</summary>

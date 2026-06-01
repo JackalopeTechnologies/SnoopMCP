@@ -1,5 +1,23 @@
 // App.xaml.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 namespace SnoopMCP.Host;
 
@@ -45,7 +63,9 @@ public partial class App : Application
         {
             mController = new ServerController(e.Args);
             mTrayIcon = (TaskbarIcon)FindResource(TrayIconResourceKey);
-            mTrayIcon.DataContext = new TrayViewModel(mController, Shutdown);
+            mTrayIcon.DataContext = new TrayViewModel(mController, Shutdown,
+                (title, message) => mTrayIcon.ShowNotification(title, message),
+                ShowOwnedDialog);
             mTrayIcon.ForceCreate();
             SessionEnding += OnSessionEnding;
             _ = mController.StartAsync();
@@ -56,6 +76,33 @@ public partial class App : Application
     private void OnSessionEnding(object sender, SessionEndingCancelEventArgs e)
     {
         Shutdown();
+    }
+
+    // A tray app has no main window, so an ownerless MessageBox opens unactivated and the closing
+    // context menu's input dismisses it before the user can read it. Give it a tiny, off-screen,
+    // topmost owner that is activated first, so the dialog stays modal and on top until OK is clicked.
+    private static void ShowOwnedDialog(string title, string message)
+    {
+        var owner = new Window
+        {
+            Width = 1,
+            Height = 1,
+            Left = -10000,
+            Top = -10000,
+            ShowInTaskbar = false,
+            WindowStyle = WindowStyle.None,
+            Topmost = true,
+            ShowActivated = true
+        };
+        try
+        {
+            owner.Show();
+            MessageBox.Show(owner, message, title, MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        finally
+        {
+            owner.Close();
+        }
     }
 
     /// <inheritdoc />

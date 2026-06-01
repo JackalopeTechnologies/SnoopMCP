@@ -1,5 +1,23 @@
 // CodexWriterTests.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 namespace SnoopMCP.ClientIntegration.Tests;
 
@@ -38,7 +56,7 @@ public sealed class CodexWriterTests : IDisposable
     [Fact]
     public void Register_OnMissingFile_CreatesConfigWithUrlEntry()
     {
-        var writer = new CodexWriter(mConfigPath);
+        var writer = new CodexWriter(mConfigPath, mDir);
 
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
@@ -47,10 +65,22 @@ public sealed class CodexWriterTests : IDisposable
     }
 
     [Fact]
+    public void Register_EnablesRmcpFeatureFlag()
+    {
+        var writer = new CodexWriter(mConfigPath, mDir);
+
+        writer.Register(McpEndpoint.Default);
+
+        TomlTable root = ReadConfig();
+        var features = (TomlTable)root["features"];
+        Assert.True((bool)features["experimental_use_rmcp_client"]);
+    }
+
+    [Fact]
     public void Register_PreservesOtherTablesAndTopLevelKeys()
     {
         File.WriteAllText(mConfigPath, "model = \"gpt-5\"\n\n[mcp_servers.other]\nurl = \"http://x\"\n");
-        var writer = new CodexWriter(mConfigPath);
+        var writer = new CodexWriter(mConfigPath, mDir);
 
         writer.Register(McpEndpoint.Default);
 
@@ -64,7 +94,7 @@ public sealed class CodexWriterTests : IDisposable
     public void Register_OnFileWithNoServersSection_AddsTheSection()
     {
         File.WriteAllText(mConfigPath, "model = \"gpt-5\"\n");
-        var writer = new CodexWriter(mConfigPath);
+        var writer = new CodexWriter(mConfigPath, mDir);
 
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
@@ -77,7 +107,7 @@ public sealed class CodexWriterTests : IDisposable
     [Fact]
     public void Register_WhenAlreadyPresent_IsIdempotent()
     {
-        var writer = new CodexWriter(mConfigPath);
+        var writer = new CodexWriter(mConfigPath, mDir);
         writer.Register(McpEndpoint.Default);
 
         RegisterResult second = writer.Register(McpEndpoint.Default);
@@ -90,7 +120,7 @@ public sealed class CodexWriterTests : IDisposable
     public void Register_OnMalformedToml_FailsWithoutThrowing()
     {
         File.WriteAllText(mConfigPath, "this is not = valid = toml =");
-        var writer = new CodexWriter(mConfigPath);
+        var writer = new CodexWriter(mConfigPath, mDir);
 
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
@@ -102,7 +132,7 @@ public sealed class CodexWriterTests : IDisposable
     {
         File.WriteAllText(mConfigPath,
             "[mcp_servers.snoopmcp]\nurl = \"http://127.0.0.1:6300/mcp\"\n\n[mcp_servers.other]\nurl = \"http://x\"\n");
-        var writer = new CodexWriter(mConfigPath);
+        var writer = new CodexWriter(mConfigPath, mDir);
 
         UnregisterResult result = writer.Unregister();
 
@@ -115,7 +145,7 @@ public sealed class CodexWriterTests : IDisposable
     [Fact]
     public void Unregister_OnMissingFile_IsSuccessfulNoOp()
     {
-        var writer = new CodexWriter(mConfigPath);
+        var writer = new CodexWriter(mConfigPath, mDir);
 
         UnregisterResult result = writer.Unregister();
 
@@ -126,7 +156,7 @@ public sealed class CodexWriterTests : IDisposable
     [Fact]
     public void GetStatus_ReflectsRegistration()
     {
-        var writer = new CodexWriter(mConfigPath);
+        var writer = new CodexWriter(mConfigPath, mDir);
         Assert.False(writer.GetStatus().IsRegistered);
 
         writer.Register(McpEndpoint.Default);
@@ -138,7 +168,7 @@ public sealed class CodexWriterTests : IDisposable
     public void Register_WhenUrlChanged_OverwritesExistingEntry()
     {
         File.WriteAllText(mConfigPath, "[mcp_servers.snoopmcp]\nurl = \"http://old:1/mcp\"\n");
-        var writer = new CodexWriter(mConfigPath);
+        var writer = new CodexWriter(mConfigPath, mDir);
 
         writer.Register(McpEndpoint.Default);
 
@@ -149,7 +179,7 @@ public sealed class CodexWriterTests : IDisposable
     public void Unregister_WhenEntryAbsentButFileExists_IsSuccessfulNoOp()
     {
         File.WriteAllText(mConfigPath, "[mcp_servers.other]\nurl = \"http://x\"\n");
-        var writer = new CodexWriter(mConfigPath);
+        var writer = new CodexWriter(mConfigPath, mDir);
 
         UnregisterResult result = writer.Unregister();
 
@@ -162,7 +192,7 @@ public sealed class CodexWriterTests : IDisposable
     {
         File.WriteAllText(mConfigPath,
             "[mcp_servers]\nsnoopmcp = \"not-a-table\"\n\n[mcp_servers.snoopmcp]\nurl = \"http://y\"\n");
-        var writer = new CodexWriter(mConfigPath);
+        var writer = new CodexWriter(mConfigPath, mDir);
 
         RegisterResult result = writer.Register(McpEndpoint.Default);
 

@@ -10,4 +10,7 @@
     <ItemGroup>
         <ProjectReference Include="..\SnoopMCP.ClientIntegration\SnoopMCP.ClientIntegration.csproj" />
     </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="SnoopMCP.Cli.Tests" />
+    </ItemGroup>
 </Project>

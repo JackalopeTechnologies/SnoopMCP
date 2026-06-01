@@ -1,5 +1,23 @@
 // Program.cs
-// Copyright (c) 2026 Jackalope Technologies
+// Copyright © 2012–Present Jackalope Technologies, Inc. and Doug Gerard.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 namespace SnoopMCP.Cli;
 
@@ -27,6 +45,11 @@ public static class Program
     private const string FlagClaudeDesktop = "--claude-desktop";
     private const string FlagCodex = "--codex";
     private const string FlagCopilotCli = "--copilot-cli";
+    private const string FlagCursor = "--cursor";
+    private const string FlagGemini = "--gemini-cli";
+    private const string FlagWindsurf = "--windsurf";
+    private const string FlagVisualStudio = "--visual-studio";
+    private const string FlagDetectedOnly = "--detected-only";
     private const string MsgAutostartCreated = "Autostart task created.";
     private const string MsgAutostartCreateFailed = "Failed to create autostart task.";
     private const string MsgAutostartRemoved = "Autostart task removed.";
@@ -89,7 +112,8 @@ public static class Program
         Console.Error.WriteLine(
             "Usage: SnoopMCP.Cli <register-clients|unregister-clients|install-autostart|"
             + "uninstall-autostart|status|start|stop> [--claude-code] [--claude-desktop] "
-            + "[--vscode] [--codex] [--copilot-cli]");
+            + "[--vscode] [--codex] [--copilot-cli] [--cursor] [--gemini-cli] [--windsurf] "
+            + "[--visual-studio] [--detected-only]");
         return ExitUsage;
     }
 
@@ -107,39 +131,40 @@ public static class Program
         return ok ? ExitOk : ExitFailure;
     }
 
-    private static List<IClientWriter> SelectWriters(string[] args)
+    private static readonly (string Flag, McpClient Client)[] smClientFlags =
     {
-        bool wantClaude = HasFlag(args, FlagClaudeCode);
-        bool wantClaudeDesktop = HasFlag(args, FlagClaudeDesktop);
-        bool wantVsCode = HasFlag(args, FlagVsCode);
-        bool wantCodex = HasFlag(args, FlagCodex);
-        bool wantCopilot = HasFlag(args, FlagCopilotCli);
-        bool all = !wantClaude && !wantClaudeDesktop && !wantVsCode && !wantCodex && !wantCopilot;
-        var writers = new List<IClientWriter>();
-        if (wantClaude || all)
-        {
-            writers.Add(ClaudeCodeWriter.ForCurrentUser());
-        }
-        if (wantClaudeDesktop || all)
-        {
-            writers.Add(ClaudeDesktopWriter.ForCurrentUser());
-        }
-        if (wantVsCode || all)
-        {
-            writers.Add(VsCodeMcpWriter.ForCurrentUser());
-        }
-        if (wantCodex || all)
-        {
-            writers.Add(CodexWriter.ForCurrentUser());
-        }
-        if (wantCopilot || all)
-        {
-            writers.Add(CopilotCliWriter.ForCurrentUser());
-        }
-        return writers;
+        (FlagClaudeCode, McpClient.ClaudeCode),
+        (FlagClaudeDesktop, McpClient.ClaudeDesktop),
+        (FlagVsCode, McpClient.VsCode),
+        (FlagCodex, McpClient.Codex),
+        (FlagCopilotCli, McpClient.CopilotCli),
+        (FlagCursor, McpClient.Cursor),
+        (FlagGemini, McpClient.GeminiCli),
+        (FlagWindsurf, McpClient.Windsurf),
+        (FlagVisualStudio, McpClient.VisualStudio2022)
+    };
+
+    internal static IReadOnlyList<McpClient> SelectClients(string[] args)
+    {
+        List<McpClient> selected = smClientFlags
+            .Where(m => HasFlag(args, m.Flag))
+            .Select(m => m.Client)
+            .ToList();
+        return selected.Count > 0 ? selected : SnoopMCP.ClientIntegration.ClientRegistration.AllClients;
     }
 
-    private static bool HasFlag(string[] args, string flag)
+    private static List<IClientWriter> SelectWriters(string[] args)
+    {
+        IEnumerable<IClientWriter> writers = SelectClients(args)
+            .Select(SnoopMCP.ClientIntegration.ClientRegistration.CreateWriter);
+        if (HasFlag(args, FlagDetectedOnly))
+        {
+            writers = writers.Where(w => w.IsDetected());
+        }
+        return writers.ToList();
+    }
+
+    internal static bool HasFlag(string[] args, string flag)
     {
         return Array.Exists(args, a => string.Equals(a, flag, StringComparison.Ordinal));
     }
