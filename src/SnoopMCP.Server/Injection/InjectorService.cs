@@ -10,7 +10,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using Microsoft.Extensions.Logging;
-using SnoopMCP.Protocol.Errors;
+using Protocol.Errors;
 
 public sealed class InjectorService : IInjectorService
 {

@@ -3,12 +3,15 @@
 // SPDX-License-Identifier: MIT
 // Licensed under the MIT License. See LICENSE in the repository root.
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace SnoopMCP.Cli.Tests;
 
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 using Xunit;
-using ClientRegistration = SnoopMCP.Cli.ClientRegistration;
+using ClientRegistration = ClientRegistration;
 
+[SuppressMessage("ReSharper", "GCSuppressFinalizeForTypeWithoutDestructor")]
 public sealed class ClientRegistrationTests : IDisposable
 {
     private readonly string mDir;

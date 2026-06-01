@@ -45,7 +45,7 @@ public sealed class HitTester
         Point point = new(x, y);
         HitTestResult? result = VisualTreeHelper.HitTest(visualRoot, point);
         DescribeElementResponse? described = null;
-        if (result?.VisualHit is DependencyObject hit)
+        if (result?.VisualHit is { } hit)
         {
             described = mDescriber.Describe(hit);
         }

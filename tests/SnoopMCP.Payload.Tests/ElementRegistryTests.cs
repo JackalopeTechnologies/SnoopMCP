@@ -6,7 +6,7 @@
 namespace SnoopMCP.Payload.Tests;
 
 using System.Windows.Controls;
-using SnoopMCP.Payload;
+using Payload;
 using Xunit;
 
 public sealed class ElementRegistryTests
@@ -64,9 +64,9 @@ public sealed class ElementRegistryTests
     public void TryResolve_UnknownId_ReturnsFalse()
     {
         var registry = new ElementRegistry();
-        const int unknownId = 99999;
+        const int UnknownId = 99999;
 
-        bool resolved = registry.TryResolve(unknownId, out System.Windows.DependencyObject? element);
+        bool resolved = registry.TryResolve(UnknownId, out System.Windows.DependencyObject? element);
 
         Assert.False(resolved);
         Assert.Null(element);

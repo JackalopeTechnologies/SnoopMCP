@@ -8,9 +8,9 @@ namespace SnoopMCP.IntegrationTests;
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
-using SnoopMCP.Host;
-using SnoopMCP.Host.Injection;
-using SnoopMCP.Host.Tools;
+using Host;
+using Host.Injection;
+using Host.Tools;
 using Xunit;
 
 /// <summary>
@@ -104,7 +104,7 @@ public sealed class EndToEndTests : IAsyncLifetime
 
         JsonElement found = await mTools.FindElements(
             rootElementId,
-            new SnoopMCP.Protocol.Tools.ElementPredicateDto { Type = "Button" },
+            new Protocol.Tools.ElementPredicateDto { Type = "Button" },
             ct);
         Assert.True(found.TryGetProperty("matches", out _));
 

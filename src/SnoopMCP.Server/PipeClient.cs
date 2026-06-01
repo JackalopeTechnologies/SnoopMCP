@@ -8,8 +8,8 @@ namespace SnoopMCP.Host;
 using System.IO.Pipes;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using SnoopMCP.Protocol.Errors;
-using SnoopMCP.Protocol.Wire;
+using Protocol.Errors;
+using Protocol.Wire;
 
 /// <summary>
 /// Host-side counterpart to the payload's <c>PipeServer</c>. Connects to a named pipe, writes

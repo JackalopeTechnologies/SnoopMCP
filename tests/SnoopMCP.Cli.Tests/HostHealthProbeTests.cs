@@ -6,7 +6,7 @@
 namespace SnoopMCP.Cli.Tests;
 
 using System.Net;
-using SnoopMCP.Cli;
+using Cli;
 using Xunit;
 
 public sealed class HostHealthProbeTests

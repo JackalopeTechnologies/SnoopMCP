@@ -16,7 +16,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel()
     {
-        Customers = new ObservableCollection<Customer>();
+        Customers = [];
         SeedCustomers();
         SelectedCustomer = Customers[0];
     }
@@ -39,8 +39,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void SeedCustomers()
     {
-        const int seedCount = 1000;
-        for (int i = 0; i < seedCount; i++)
+        const int SeedCount = 1000;
+        for (int i = 0; i < SeedCount; i++)
         {
             Customers.Add(new Customer
             {

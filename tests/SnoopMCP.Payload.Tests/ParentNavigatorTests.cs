@@ -7,9 +7,9 @@ namespace SnoopMCP.Payload.Tests;
 
 using System.Windows;
 using System.Windows.Controls;
-using SnoopMCP.Payload;
-using SnoopMCP.Payload.Inspection;
-using SnoopMCP.Payload.PathStrings;
+using Payload;
+using Inspection;
+using PathStrings;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 
@@ -43,7 +43,8 @@ public sealed class ParentNavigatorTests
         var registry = new ElementRegistry();
         var nav = CreateNavigator(registry);
         var inner = new TextBlock { Text = "x" };
-        var host = new ContentControl { Content = inner };
+        // Assigning inner as Content sets its logical parent to the ContentControl.
+        _ = new ContentControl { Content = inner };
 
         GetParentResponse response = nav.GetParent(inner, "logical");
 
@@ -87,7 +88,7 @@ public sealed class ParentNavigatorTests
         DependencyObject? insideTemplate = FindFirstTemplateChild(button);
         Assert.NotNull(insideTemplate);
 
-        GetTemplatedParentResponse response = nav.GetTemplatedParent(insideTemplate!);
+        GetTemplatedParentResponse response = nav.GetTemplatedParent(insideTemplate);
 
         Assert.NotNull(response.TemplatedParent);
         Assert.Equal("Button", response.TemplatedParent!.Type);
@@ -110,7 +111,7 @@ public sealed class ParentNavigatorTests
         for (int i = 0; i < count && result is null; i++)
         {
             DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
-            FrameworkElement? fe = child as FrameworkElement;
+            var fe = child as FrameworkElement;
             bool isFromTemplate = fe?.TemplatedParent is not null;
             result = isFromTemplate ? child : FindFirstTemplateChild(child);
         }

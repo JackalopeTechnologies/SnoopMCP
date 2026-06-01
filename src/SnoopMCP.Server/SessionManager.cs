@@ -7,7 +7,7 @@ namespace SnoopMCP.Host;
 
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using SnoopMCP.Protocol.Errors;
+using Protocol.Errors;
 
 /// <summary>
 /// Owns the lifecycle of a single attached target. Allocates the pipe name, holds the

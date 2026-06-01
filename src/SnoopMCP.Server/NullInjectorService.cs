@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.Host;
 
-using SnoopMCP.Protocol.Errors;
+using Protocol.Errors;
 
 /// <summary>
 /// Default <see cref="IInjectorService"/> registered until Task 31 swaps in the real Snoop-based

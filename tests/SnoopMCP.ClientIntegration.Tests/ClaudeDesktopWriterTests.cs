@@ -38,10 +38,10 @@ public sealed class ClaudeDesktopWriterTests
             ClaudeDesktopWriter writer = NewWriter(path);
             RegisterResult result = writer.Register(McpEndpoint.Default);
             Assert.True(result.Success);
-            JsonNode root = JsonNode.Parse(File.ReadAllText(path))!;
+            var root = JsonNode.Parse(File.ReadAllText(path))!;
             JsonNode entry = root[ServersKey]![EndpointName]!;
             Assert.Equal(NpxCommand, (string?) entry[CommandKey]);
-            JsonArray args = (JsonArray) entry[ArgsKey]!;
+            var args = (JsonArray) entry[ArgsKey]!;
             Assert.Contains(McpEndpoint.Default.Url, args.Select(a => (string?) a));
         }
         finally

@@ -8,10 +8,10 @@ namespace SnoopMCP.IntegrationTests;
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
-using SnoopMCP.Host;
-using SnoopMCP.Host.Injection;
-using SnoopMCP.Host.Tools;
-using SnoopMCP.Protocol.Tools;
+using Host;
+using Host.Injection;
+using Host.Tools;
+using Protocol.Tools;
 using Xunit;
 
 /// <summary>

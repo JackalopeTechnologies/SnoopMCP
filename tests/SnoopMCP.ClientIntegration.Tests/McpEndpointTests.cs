@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.ClientIntegration.Tests;
 
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 using Xunit;
 
 public sealed class McpEndpointTests

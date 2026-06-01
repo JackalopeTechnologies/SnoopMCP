@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.ClientIntegration.Tests;
 
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 using Xunit;
 
 /// <summary>Tests for <see cref="SnoopSkill"/> installing/removing the snoopmcp-first skill.</summary>

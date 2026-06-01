@@ -9,7 +9,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using SnoopMCP.Payload.Inspection;
+using Inspection;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 
@@ -33,7 +33,7 @@ public sealed class StyleResolverTests
     {
         var resolver = new StyleResolver();
         var style = new Style(typeof(Button));
-        style.Setters.Add(new Setter(Button.BackgroundProperty, Brushes.Crimson));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Crimson));
         var button = new Button { Style = style };
 
         ResolveStyleResponse response = resolver.Resolve(button);
@@ -75,7 +75,7 @@ public sealed class StyleResolverTests
         var resolver = new StyleResolver();
         var style = new Style(typeof(Button));
         var trigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
-        trigger.Setters.Add(new Setter(Button.BackgroundProperty, Brushes.Blue));
+        trigger.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Blue));
         style.Triggers.Add(trigger);
         var button = new Button { Style = style };
 

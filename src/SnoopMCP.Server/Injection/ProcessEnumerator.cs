@@ -87,7 +87,7 @@ public static class ProcessEnumerator
         string runtime = UnknownVersion;
         foreach (ProcessModule module in process.Modules.Cast<ProcessModule>())
         {
-            string name = module.ModuleName ?? string.Empty;
+            string name = module.ModuleName;
             bool isWpfModule = string.Equals(name, WpfModule, StringComparison.OrdinalIgnoreCase);
             if (isWpfModule)
             {

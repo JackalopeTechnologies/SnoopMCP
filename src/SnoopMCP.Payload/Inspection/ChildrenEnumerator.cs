@@ -56,7 +56,7 @@ public sealed class ChildrenEnumerator
                 nameof(tree))
         };
 
-        List<DescribeElementResponse> described = kids.Select(k => mDescriber.Describe(k)).ToList();
+        var described = kids.Select(k => mDescriber.Describe(k)).ToList();
         VirtualizationDto? virtualization = ComputeVirtualization(parent, described.Count);
 
         return new GetChildrenResponse(described, virtualization);
@@ -97,7 +97,7 @@ public sealed class ChildrenEnumerator
         if (parent is ItemsControl ic)
         {
             bool isVirtualizing = VirtualizingPanel.GetIsVirtualizing(ic);
-            int? total = ic.Items?.Count;
+            int? total = ic.Items.Count;
             virtualization = new VirtualizationDto(
                 IsVirtualizing: isVirtualizing,
                 RealizedItems: realizedCount,

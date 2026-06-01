@@ -7,8 +7,8 @@ namespace SnoopMCP.Payload.Tests;
 
 using System.Threading;
 using System.Windows.Threading;
-using SnoopMCP.Payload;
-using SnoopMCP.Protocol.Errors;
+using Payload;
+using Protocol.Errors;
 using Xunit;
 
 public sealed class DispatcherMarshalTests

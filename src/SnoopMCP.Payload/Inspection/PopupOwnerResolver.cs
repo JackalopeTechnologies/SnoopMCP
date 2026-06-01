@@ -49,7 +49,7 @@ public sealed class PopupOwnerResolver
 
         Popup? match = null;
         IEnumerator<Popup> openPopups = candidates
-            .Where(p => p.IsOpen && p.Child is not null)
+            .Where(p => p is { IsOpen: true, Child: not null })
             .GetEnumerator();
         while (match is null && openPopups.MoveNext())
         {
@@ -88,7 +88,7 @@ public sealed class PopupOwnerResolver
 
     private static Visual? ResolveChildVisualRoot(UIElement child)
     {
-        PresentationSource? source = PresentationSource.FromVisual(child);
+        var source = PresentationSource.FromVisual(child);
         Visual? root = source?.RootVisual;
         return root;
     }

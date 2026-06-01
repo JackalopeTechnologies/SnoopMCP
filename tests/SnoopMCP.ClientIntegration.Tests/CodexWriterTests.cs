@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.ClientIntegration.Tests;
 
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 using Tomlyn;
 using Tomlyn.Model;
 using Xunit;

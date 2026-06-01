@@ -17,7 +17,7 @@ using H.NotifyIcon;
 // correct teardown hook for the Application singleton. WPF never calls Dispose() on the Application,
 // so implementing IDisposable here would be dead code and would not run on shutdown.
 #pragma warning disable CA1001
-public partial class App : Application
+public partial class App
 #pragma warning restore CA1001
 {
     private const string SingleInstanceMutexName = @"Local\SnoopMCP.Host";
@@ -46,7 +46,7 @@ public partial class App : Application
         else
         {
             mController = new ServerController(e.Args);
-            mTrayIcon = (TaskbarIcon)FindResource(TrayIconResourceKey);
+            mTrayIcon = (TaskbarIcon?) FindResource(TrayIconResourceKey) ?? throw new InvalidOperationException("Tray icon resource not found.");
             mTrayIcon.DataContext = new TrayViewModel(mController, Shutdown,
                 (title, message) => mTrayIcon.ShowNotification(title, message),
                 ShowOwnedDialog);

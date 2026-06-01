@@ -7,7 +7,6 @@ namespace SnoopMCP.Host;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 /// <summary>
 /// Owns the in-process MCP <see cref="WebApplication"/> and its <see cref="ServerState"/>. Start

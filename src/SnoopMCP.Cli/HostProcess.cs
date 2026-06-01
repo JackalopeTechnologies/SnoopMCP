@@ -33,7 +33,7 @@ public static class HostProcess
             UseShellExecute = false
         };
         // Dispose only the handle, not the process: the host keeps running after this returns.
-        using Process? process = Process.Start(psi);
+        using var process = Process.Start(psi);
         return process is not null;
     }
 

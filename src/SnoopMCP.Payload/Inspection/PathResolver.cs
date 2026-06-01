@@ -8,7 +8,7 @@ namespace SnoopMCP.Payload.Inspection;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Media;
-using SnoopMCP.Payload.PathStrings;
+using PathStrings;
 using SnoopMCP.Protocol.Tools;
 
 /// <summary>

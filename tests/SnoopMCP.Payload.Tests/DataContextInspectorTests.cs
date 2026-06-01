@@ -10,7 +10,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
-using SnoopMCP.Payload.Inspection;
+using Inspection;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 

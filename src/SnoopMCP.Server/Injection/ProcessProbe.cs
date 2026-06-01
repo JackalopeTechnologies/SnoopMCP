@@ -7,7 +7,7 @@ namespace SnoopMCP.Host.Injection;
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using SnoopMCP.Protocol.Errors;
+using Protocol.Errors;
 
 public static class ProcessProbe
 {
@@ -69,7 +69,7 @@ public static class ProcessProbe
         string framework = UnknownVersion;
         foreach (ProcessModule module in process.Modules)
         {
-            string name = module.ModuleName ?? string.Empty;
+            string name = module.ModuleName;
             bool isHostFxr = string.Equals(name, HostFxrModule, StringComparison.OrdinalIgnoreCase);
             if (isHostFxr)
             {

@@ -6,9 +6,9 @@
 namespace SnoopMCP.Payload.Tools;
 
 using System.Text.Json;
-using SnoopMCP.Payload.Inspection;
+using Inspection;
 using SnoopMCP.Protocol.Tools;
-using SnoopMCP.Protocol.Wire;
+using Protocol.Wire;
 
 /// <summary>
 /// Wire handler for the <c>listVisualRoots</c> tool. Marshals
@@ -46,7 +46,7 @@ public sealed class ListVisualRootsToolHandler : IToolHandler
             cancellationToken);
 
         string json = JsonSerializer.Serialize(response, WireSerializer.JsonOptions);
-        using JsonDocument doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
         JsonElement result = doc.RootElement.Clone();
         return Task.FromResult(result);
     }

@@ -8,9 +8,9 @@ namespace SnoopMCP.Host.Tests;
 using System.IO.Pipes;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
-using SnoopMCP.Host;
-using SnoopMCP.Protocol.Errors;
-using SnoopMCP.Protocol.Wire;
+using Host;
+using Protocol.Errors;
+using Protocol.Wire;
 using Xunit;
 
 public sealed class SessionManagerTests
@@ -23,7 +23,7 @@ public sealed class SessionManagerTests
     [Fact]
     public void AllocatePipeName_ReturnsUnique()
     {
-        var manager = CreateManager();
+        CreateManager();
         string a = SessionManager.AllocatePipeName();
         string b = SessionManager.AllocatePipeName();
         Assert.NotEqual(a, b);
@@ -45,7 +45,7 @@ public sealed class SessionManagerTests
         await using var manager = CreateManager();
         string pipeName = SessionManager.AllocatePipeName();
 
-        Task serverTask = Task.Run(async () =>
+        var serverTask = Task.Run(async () =>
         {
             await using var server = new NamedPipeServerStream(
                 pipeName,
@@ -79,7 +79,7 @@ public sealed class SessionManagerTests
         await using var manager = CreateManager();
         string pipeName = SessionManager.AllocatePipeName();
 
-        Task serverTask = Task.Run(async () =>
+        var serverTask = Task.Run(async () =>
         {
             await using var server = new NamedPipeServerStream(
                 pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);

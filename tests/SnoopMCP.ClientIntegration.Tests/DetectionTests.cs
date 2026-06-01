@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.ClientIntegration.Tests;
 
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 using Xunit;
 
 /// <summary>Tests <see cref="IClientWriter.IsDetected"/> for present/absent agent directories.</summary>

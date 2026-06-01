@@ -9,9 +9,9 @@ using System.IO;
 using System.IO.Pipes;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using SnoopMCP.Payload.Tools;
-using SnoopMCP.Protocol.Errors;
-using SnoopMCP.Protocol.Wire;
+using Tools;
+using Protocol.Errors;
+using Protocol.Wire;
 
 /// <summary>
 /// Named-pipe server that accepts one client at a time and dispatches incoming

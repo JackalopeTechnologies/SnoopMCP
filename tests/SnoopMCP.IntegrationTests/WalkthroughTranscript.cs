@@ -7,7 +7,7 @@ namespace SnoopMCP.IntegrationTests;
 
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using SnoopMCP.Protocol.Wire;
+using Protocol.Wire;
 
 /// <summary>
 /// Buffers <see cref="WalkthroughRecord"/> entries during a capture run and writes them to
@@ -20,7 +20,7 @@ public sealed class WalkthroughTranscript
 
     private static readonly string smSourceDirectory = ResolveSourceDirectory();
 
-    private readonly List<WalkthroughRecord> mRecords = new();
+    private readonly List<WalkthroughRecord> mRecords = [];
 
     public void Add(string scene, string tool, object request, JsonElement response)
     {

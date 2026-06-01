@@ -9,8 +9,8 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using SnoopMCP.Payload;
-using SnoopMCP.Payload.Inspection;
+using Payload;
+using Inspection;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 
@@ -45,7 +45,7 @@ public sealed class RootEnumeratorTests
 
             VisualRootDto? match = response.Roots.FirstOrDefault(r => r.Title == "Test Window");
             Assert.NotNull(match);
-            Assert.Equal("Window", match!.Kind);
+            Assert.Equal("Window", match.Kind);
             Assert.Null(match.OpenedBy);
             Assert.NotEqual(0, match.Hwnd);
         }
@@ -99,7 +99,7 @@ public sealed class RootEnumeratorTests
 
             VisualRootDto? popupRoot = response.Roots.FirstOrDefault(r => r.Kind == "Popup");
             Assert.NotNull(popupRoot);
-            Assert.NotNull(popupRoot!.OpenedBy);
+            Assert.NotNull(popupRoot.OpenedBy);
 
             int expectedOwnerId = registry.GetOrAssign(popup);
             Assert.Equal(expectedOwnerId, popupRoot.OpenedBy);

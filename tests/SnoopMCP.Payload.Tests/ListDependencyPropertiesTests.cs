@@ -6,9 +6,8 @@
 namespace SnoopMCP.Payload.Tests;
 
 using System.Linq;
-using System.Windows;
 using System.Windows.Controls;
-using SnoopMCP.Payload.Inspection;
+using Inspection;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 
@@ -68,7 +67,7 @@ public sealed class ListDependencyPropertiesTests
         DependencyPropertyDto? rowEntry = response.Properties
             .FirstOrDefault(p => p.Name == "Row" && p.OwnerType.EndsWith(".Grid", StringComparison.Ordinal));
         Assert.NotNull(rowEntry);
-        Assert.True(rowEntry!.IsAttached);
+        Assert.True(rowEntry.IsAttached);
     }
 
     [StaFact]
@@ -81,7 +80,7 @@ public sealed class ListDependencyPropertiesTests
 
         DependencyPropertyDto? isEnabled = response.Properties.FirstOrDefault(p => p.Name == "IsEnabled");
         Assert.NotNull(isEnabled);
-        Assert.Contains('.', isEnabled!.OwnerType);
+        Assert.Contains('.', isEnabled.OwnerType);
     }
 
     [StaFact]

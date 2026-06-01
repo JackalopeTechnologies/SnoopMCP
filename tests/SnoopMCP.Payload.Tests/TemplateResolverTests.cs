@@ -6,9 +6,9 @@
 namespace SnoopMCP.Payload.Tests;
 
 using System.Windows.Controls;
-using SnoopMCP.Payload;
-using SnoopMCP.Payload.Inspection;
-using SnoopMCP.Payload.PathStrings;
+using Payload;
+using Inspection;
+using PathStrings;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 
@@ -66,7 +66,7 @@ public sealed class TemplateResolverTests
     {
         var registry = new ElementRegistry();
         var resolver = CreateResolver(registry);
-        var template = new System.Windows.Controls.ControlTemplate(typeof(Button));
+        var template = new ControlTemplate(typeof(Button));
         var border = new System.Windows.FrameworkElementFactory(typeof(Border), "PART_Border");
         template.VisualTree = border;
         var button = new Button { Template = template, Content = "x" };

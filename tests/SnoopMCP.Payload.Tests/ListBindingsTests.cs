@@ -3,14 +3,16 @@
 // SPDX-License-Identifier: MIT
 // Licensed under the MIT License. See LICENSE in the repository root.
 
+using System.Windows;
+// ReSharper disable UnusedAutoPropertyAccessor.Local
+
 namespace SnoopMCP.Payload.Tests;
 
 using System.ComponentModel;
-using System.Linq;
 using System.Windows.Controls;
 using System.Windows.Data;
-using SnoopMCP.Payload;
-using SnoopMCP.Payload.Inspection;
+using Payload;
+using Inspection;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 
@@ -57,7 +59,7 @@ public sealed class ListBindingsTests
         var source = new Source { Value = "x" };
         var text = new TextBlock();
         BindingOperations.SetBinding(text, TextBlock.TextProperty, new Binding("Value") { Source = source });
-        BindingOperations.SetBinding(text, TextBlock.ToolTipProperty, new Binding("Value") { Source = source });
+        BindingOperations.SetBinding(text, FrameworkElement.ToolTipProperty, new Binding("Value") { Source = source });
 
         ListBindingsResponse response = inspector.ListBindings(text, includeDescendants: false);
 

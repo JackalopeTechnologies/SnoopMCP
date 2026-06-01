@@ -43,9 +43,9 @@ public sealed class StyleResolver
             response = new ResolveStyleResponse(
                 AppliedStyleKey: null,
                 AppliedStyleSource: null,
-                BasedOnChain: Array.Empty<BasedOnEntryDto>(),
-                Setters: Array.Empty<StyleSetterDto>(),
-                Triggers: Array.Empty<TriggerSummaryDto>());
+                BasedOnChain: [],
+                Setters: [],
+                Triggers: []);
         }
         else
         {

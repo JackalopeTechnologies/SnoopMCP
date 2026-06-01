@@ -9,8 +9,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Hosting;
-using SnoopMCP.Host;
+using Host;
 using Xunit;
 
 /// <summary>

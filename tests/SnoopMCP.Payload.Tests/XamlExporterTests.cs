@@ -7,7 +7,7 @@ namespace SnoopMCP.Payload.Tests;
 
 using System.Windows.Controls;
 using System.Windows.Media;
-using SnoopMCP.Payload.Inspection;
+using Inspection;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 
