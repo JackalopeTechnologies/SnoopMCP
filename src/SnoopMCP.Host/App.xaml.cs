@@ -46,7 +46,7 @@ public partial class App
         else
         {
             mController = new ServerController(e.Args);
-            mTrayIcon = (TaskbarIcon?) FindResource(TrayIconResourceKey) ?? throw new NullReferenceException("Tray icon resource not found.");
+            mTrayIcon = (TaskbarIcon?) FindResource(TrayIconResourceKey) ?? throw new InvalidOperationException("Tray icon resource not found.");
             mTrayIcon.DataContext = new TrayViewModel(mController, Shutdown,
                 (title, message) => mTrayIcon.ShowNotification(title, message),
                 ShowOwnedDialog);
