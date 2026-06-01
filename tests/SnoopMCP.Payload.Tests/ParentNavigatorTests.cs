@@ -43,6 +43,8 @@ public sealed class ParentNavigatorTests
         var registry = new ElementRegistry();
         var nav = CreateNavigator(registry);
         var inner = new TextBlock { Text = "x" };
+        // Assigning inner as Content sets its logical parent to the ContentControl.
+        _ = new ContentControl { Content = inner };
 
         GetParentResponse response = nav.GetParent(inner, "logical");
 
