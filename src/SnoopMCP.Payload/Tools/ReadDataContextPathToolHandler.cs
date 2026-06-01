@@ -7,10 +7,10 @@ namespace SnoopMCP.Payload.Tools;
 
 using System.Text.Json;
 using System.Windows;
-using SnoopMCP.Payload.Inspection;
-using SnoopMCP.Protocol.Errors;
+using Inspection;
+using Protocol.Errors;
 using SnoopMCP.Protocol.Tools;
-using SnoopMCP.Protocol.Wire;
+using Protocol.Wire;
 
 /// <summary>
 /// Wire handler for the <c>readDataContextPath</c> tool. Resolves the element id and marshals
@@ -66,7 +66,7 @@ public sealed class ReadDataContextPathToolHandler : IToolHandler
             cancellationToken);
 
         string json = JsonSerializer.Serialize(response, WireSerializer.JsonOptions);
-        using JsonDocument doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
         JsonElement result = doc.RootElement.Clone();
         return Task.FromResult(result);
     }

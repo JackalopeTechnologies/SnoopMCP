@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.Cli;
 
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 
 /// <summary>
 /// Management CLI for SnoopMCP: registers the MCP server in LLM clients, manages the per-user logon
@@ -116,7 +116,7 @@ public static class Program
     }
 
     private static readonly (string Flag, McpClient Client)[] smClientFlags =
-    {
+    [
         (FlagClaudeCode, McpClient.ClaudeCode),
         (FlagClaudeDesktop, McpClient.ClaudeDesktop),
         (FlagVsCode, McpClient.VsCode),
@@ -126,11 +126,11 @@ public static class Program
         (FlagGemini, McpClient.GeminiCli),
         (FlagWindsurf, McpClient.Windsurf),
         (FlagVisualStudio, McpClient.VisualStudio2022)
-    };
+    ];
 
     internal static IReadOnlyList<McpClient> SelectClients(string[] args)
     {
-        List<McpClient> selected = smClientFlags
+        var selected = smClientFlags
             .Where(m => HasFlag(args, m.Flag))
             .Select(m => m.Client)
             .ToList();

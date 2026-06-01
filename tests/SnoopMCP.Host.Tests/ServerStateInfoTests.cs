@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.Host.Tests;
 
-using SnoopMCP.Host;
+using Host;
 using Xunit;
 
 public class ServerStateInfoTests

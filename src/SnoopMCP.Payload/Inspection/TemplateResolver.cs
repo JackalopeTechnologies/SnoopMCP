@@ -9,7 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
-using SnoopMCP.Payload;
+using Payload;
 using SnoopMCP.Protocol.Tools;
 
 /// <summary>
@@ -55,7 +55,7 @@ public sealed class TemplateResolver
                 TemplateKey: null,
                 TemplateSource: null,
                 TemplateTree: null,
-                NamedParts: Array.Empty<NamedPartDto>());
+                NamedParts: []);
         }
         else
         {

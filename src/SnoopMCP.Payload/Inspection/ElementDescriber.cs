@@ -12,7 +12,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
-using SnoopMCP.Payload.PathStrings;
+using PathStrings;
 using SnoopMCP.Protocol.Tools;
 
 /// <summary>
@@ -103,7 +103,7 @@ public sealed class ElementDescriber
     private static BoundsDto ComputeBounds(DependencyObject element)
     {
         BoundsDto bounds = new(0, 0, 0, 0);
-        if (element is UIElement ui && ui.IsArrangeValid)
+        if (element is UIElement { IsArrangeValid: true } ui)
         {
             try
             {
@@ -125,7 +125,7 @@ public sealed class ElementDescriber
     private static Visual? FindRootVisual(Visual start)
     {
         DependencyObject? current = start;
-        DependencyObject? lastVisual = start;
+        DependencyObject lastVisual = start;
         while (current is not null)
         {
             lastVisual = current;
@@ -174,10 +174,8 @@ public sealed class ElementDescriber
             case TextBox tx when !string.IsNullOrEmpty(tx.Text):
                 AppendSpaced(builder, tx.Text);
                 break;
-            case ContentControl cc when cc.Content is string s && !string.IsNullOrEmpty(s):
+            case ContentControl { Content: string s } when !string.IsNullOrEmpty(s):
                 AppendSpaced(builder, s);
-                break;
-            default:
                 break;
         }
     }

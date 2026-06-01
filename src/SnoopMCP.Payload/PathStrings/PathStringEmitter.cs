@@ -5,7 +5,6 @@
 
 namespace SnoopMCP.Payload.PathStrings;
 
-using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Automation;
@@ -84,7 +83,7 @@ public sealed class PathStringEmitter
         {
             builder.Append('[').Append(string.Join(AttributeSeparator, attrs)).Append(']');
         }
-        if (siblingIndex is int idx && attrs.Count == 0)
+        if (siblingIndex is { } idx && attrs.Count == 0)
         {
             builder.Append('[').Append(idx).Append(']');
         }

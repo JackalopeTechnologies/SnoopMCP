@@ -9,8 +9,8 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using SnoopMCP.Payload.Inspection;
-using SnoopMCP.Protocol.Errors;
+using Inspection;
+using Protocol.Errors;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 
@@ -57,7 +57,7 @@ public sealed class GetDependencyPropertyTests
     {
         var inspector = new DependencyPropertyInspector();
         var style = new Style(typeof(Button));
-        style.Setters.Add(new Setter(Button.BackgroundProperty, Brushes.Crimson));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Crimson));
         var button = new Button { Style = style };
 
         GetDependencyPropertyResponse response = inspector.GetProperty(button, "Background");
@@ -70,7 +70,7 @@ public sealed class GetDependencyPropertyTests
     {
         var inspector = new DependencyPropertyInspector();
         var style = new Style(typeof(Button));
-        style.Setters.Add(new Setter(Button.BackgroundProperty, Brushes.Crimson));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Crimson));
         var button = new Button
         {
             Style = style,
@@ -89,9 +89,9 @@ public sealed class GetDependencyPropertyTests
     {
         var inspector = new DependencyPropertyInspector();
         var baseStyle = new Style(typeof(Button));
-        baseStyle.Setters.Add(new Setter(Button.BackgroundProperty, Brushes.Gray));
+        baseStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Gray));
         var derivedStyle = new Style(typeof(Button)) { BasedOn = baseStyle };
-        derivedStyle.Setters.Add(new Setter(Button.BackgroundProperty, Brushes.Blue));
+        derivedStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Blue));
         var button = new Button { Style = derivedStyle };
 
         GetDependencyPropertyResponse response = inspector.GetProperty(button, "Background");

@@ -7,9 +7,9 @@ namespace SnoopMCP.Payload.Tests;
 
 using System.Windows.Controls;
 using System.Windows.Data;
-using SnoopMCP.Payload;
-using SnoopMCP.Payload.Inspection;
-using SnoopMCP.Protocol.Errors;
+using Payload;
+using Inspection;
+using Protocol.Errors;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 

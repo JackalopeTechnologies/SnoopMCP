@@ -7,8 +7,8 @@ namespace SnoopMCP.Protocol.Tests;
 
 using System.IO;
 using System.Text.Json;
-using SnoopMCP.Protocol.Errors;
-using SnoopMCP.Protocol.Wire;
+using Errors;
+using Wire;
 using Xunit;
 
 /// <summary>
@@ -34,7 +34,7 @@ public sealed class WireSerializerTests
         var roundTripped = await WireSerializer.ReadFrameAsync<RpcRequest>(stream, CancellationToken.None);
 
         Assert.NotNull(roundTripped);
-        Assert.Equal(original.Id, roundTripped!.Id);
+        Assert.Equal(original.Id, roundTripped.Id);
         Assert.Equal(original.Tool, roundTripped.Tool);
         Assert.Equal(1234, roundTripped.Arguments.GetProperty("pid").GetInt32());
     }
@@ -56,7 +56,7 @@ public sealed class WireSerializerTests
         var roundTripped = await WireSerializer.ReadFrameAsync<RpcResponse>(stream, CancellationToken.None);
 
         Assert.NotNull(roundTripped);
-        Assert.Equal(7, roundTripped!.Id);
+        Assert.Equal(7, roundTripped.Id);
         Assert.True(roundTripped.IsSuccess);
         Assert.NotNull(roundTripped.Result);
         Assert.Equal(3, roundTripped.Result!.Value.GetProperty("count").GetInt32());
@@ -83,7 +83,7 @@ public sealed class WireSerializerTests
         var roundTripped = await WireSerializer.ReadFrameAsync<RpcResponse>(stream, CancellationToken.None);
 
         Assert.NotNull(roundTripped);
-        Assert.False(roundTripped!.IsSuccess);
+        Assert.False(roundTripped.IsSuccess);
         Assert.NotNull(roundTripped.Error);
         Assert.Equal(ErrorCode.ElementExpired, roundTripped.Error!.Code);
         Assert.Equal("Element id 42 has been garbage collected.", roundTripped.Error.Message);
@@ -102,7 +102,7 @@ public sealed class WireSerializerTests
     public async Task ReadFrame_OnTruncatedBody_ReturnsDefault()
     {
         using var stream = new MemoryStream();
-        byte[] header = { 0xFF, 0x00, 0x00, 0x00 };
+        byte[] header = [0xFF, 0x00, 0x00, 0x00];
         await stream.WriteAsync(header);
         stream.Position = 0;
 

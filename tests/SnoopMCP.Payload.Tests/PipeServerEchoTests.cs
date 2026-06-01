@@ -8,9 +8,9 @@ namespace SnoopMCP.Payload.Tests;
 using System.IO.Pipes;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
-using SnoopMCP.Payload;
-using SnoopMCP.Payload.Tools;
-using SnoopMCP.Protocol.Wire;
+using Payload;
+using Tools;
+using Protocol.Wire;
 using Xunit;
 
 public sealed class PipeServerEchoTests
@@ -18,7 +18,7 @@ public sealed class PipeServerEchoTests
     [Fact]
     public async Task Echo_ViaPipe_RoundTrips()
     {
-        const int connectTimeoutMs = 5000;
+        const int ConnectTimeoutMs = 5000;
         string pipeName = $"snoopmcp-echo-{Guid.NewGuid():N}";
         var registry = new ToolRegistry();
         registry.Register(new EchoToolHandler());
@@ -31,7 +31,7 @@ public sealed class PipeServerEchoTests
             pipeName,
             PipeDirection.InOut,
             PipeOptions.Asynchronous);
-        await client.ConnectAsync(connectTimeoutMs);
+        await client.ConnectAsync(ConnectTimeoutMs);
 
         using var argsDoc = JsonDocument.Parse("{\"hello\":\"world\"}");
         var request = new RpcRequest
@@ -45,7 +45,7 @@ public sealed class PipeServerEchoTests
         var response = await WireSerializer.ReadFrameAsync<RpcResponse>(client, CancellationToken.None);
 
         Assert.NotNull(response);
-        Assert.Equal(1, response!.Id);
+        Assert.Equal(1, response.Id);
         Assert.True(response.IsSuccess);
         Assert.NotNull(response.Result);
 

@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.Payload.PathStrings;
 
-using SnoopMCP.Protocol.Errors;
+using Protocol.Errors;
 
 /// <summary>
 /// Parses canonical path strings of the form <c>/TypeName[Name='X', AutomationId='Y'][n]/...</c>
@@ -35,7 +35,7 @@ public sealed class PathStringParser
         }
 
         string remaining = path[1..];
-        string[] rawSteps = remaining.Split('/', StringSplitOptions.None);
+        string[] rawSteps = remaining.Split('/');
         var steps = new List<PathStep>(rawSteps.Length);
         foreach (string raw in rawSteps.Where(s => s.Length > 0))
         {
@@ -110,7 +110,7 @@ public sealed class PathStringParser
             }
             string key = pair[..equals].Trim();
             string valuePart = pair[(equals + 1)..].Trim();
-            bool isQuoted = valuePart.Length >= 2 && valuePart[0] == '\'' && valuePart[^1] == '\'';
+            bool isQuoted = valuePart is ['\'', _, ..] && valuePart[^1] == '\'';
             if (!isQuoted)
             {
                 throw new SnoopMcpException(

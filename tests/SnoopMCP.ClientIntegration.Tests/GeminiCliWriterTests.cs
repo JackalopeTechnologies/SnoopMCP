@@ -6,7 +6,7 @@
 namespace SnoopMCP.ClientIntegration.Tests;
 
 using System.Text.Json;
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 using Xunit;
 
 public sealed class GeminiCliWriterTests : IDisposable
@@ -38,7 +38,7 @@ public sealed class GeminiCliWriterTests : IDisposable
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
         Assert.True(result.Success, result.Message);
-        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
+        using var doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
         JsonElement entry = doc.RootElement.GetProperty("mcpServers").GetProperty("snoopmcp");
         Assert.Equal("http://127.0.0.1:6300/mcp", entry.GetProperty("httpUrl").GetString());
         Assert.False(entry.TryGetProperty("type", out _));
@@ -53,7 +53,7 @@ public sealed class GeminiCliWriterTests : IDisposable
 
         writer.Register(McpEndpoint.Default);
 
-        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
+        using var doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
         Assert.Equal("dark", doc.RootElement.GetProperty("theme").GetString());
         JsonElement servers = doc.RootElement.GetProperty("mcpServers");
         Assert.True(servers.TryGetProperty("other", out _));

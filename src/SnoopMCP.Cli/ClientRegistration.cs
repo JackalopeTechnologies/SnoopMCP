@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.Cli;
 
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 
 /// <summary>
 /// Drives a set of <see cref="IClientWriter"/> over register / unregister / status, logging each

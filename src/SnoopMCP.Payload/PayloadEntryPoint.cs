@@ -10,9 +10,9 @@ using System.Reflection;
 using System.Windows;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using SnoopMCP.Payload.Inspection;
-using SnoopMCP.Payload.PathStrings;
-using SnoopMCP.Payload.Tools;
+using Inspection;
+using PathStrings;
+using Tools;
 
 /// <summary>
 /// Static entry point invoked by Snoop's <c>ManagedInjector</c> after the payload assembly is loaded
@@ -131,8 +131,8 @@ public static class PayloadEntryPoint
         }
         catch (Exception)
         {
-            const int injectionFailedExitCode = 1;
-            exitCode = injectionFailedExitCode;
+            const int InjectionFailedExitCode = 1;
+            exitCode = InjectionFailedExitCode;
         }
         return exitCode;
     }

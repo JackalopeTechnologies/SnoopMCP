@@ -5,8 +5,8 @@
 
 namespace SnoopMCP.Cli.Tests;
 
-using SnoopMCP.ClientIntegration;
-using SnoopMCP.Cli;
+using ClientIntegration;
+using Cli;
 using Xunit;
 
 /// <summary>Argument-parsing checks for the CLI verb dispatcher's client selection.</summary>

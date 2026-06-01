@@ -9,7 +9,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
-using SnoopMCP.Protocol.Errors;
+using Protocol.Errors;
 using SnoopMCP.Protocol.Tools;
 
 /// <summary>
@@ -130,7 +130,7 @@ public sealed class DependencyPropertyInspector
             trace.Add(new PrecedenceEntryDto(
                 Source: LocalSource,
                 Value: Stringify(localValue),
-                ValueType: localValue?.GetType().FullName,
+                ValueType: localValue.GetType().FullName,
                 SourceDescription: LocalDescription));
         }
     }

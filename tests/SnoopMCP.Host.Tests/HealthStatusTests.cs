@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.Host.Tests;
 
-using SnoopMCP.Host;
+using Host;
 using Xunit;
 
 public sealed class HealthStatusTests
@@ -13,7 +13,7 @@ public sealed class HealthStatusTests
     [Fact]
     public void Create_SetsOkStatus_AndPassesThroughVersionAndAttached()
     {
-        HealthStatus health = HealthStatus.Create("1.2.3", attached: true);
+        var health = HealthStatus.Create("1.2.3", attached: true);
 
         Assert.Equal("ok", health.Status);
         Assert.Equal("1.2.3", health.Version);

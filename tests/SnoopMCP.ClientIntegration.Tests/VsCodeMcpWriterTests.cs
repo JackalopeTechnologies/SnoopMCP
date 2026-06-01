@@ -7,7 +7,7 @@ namespace SnoopMCP.ClientIntegration.Tests;
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 using Xunit;
 
 public sealed class VsCodeMcpWriterTests : IDisposable

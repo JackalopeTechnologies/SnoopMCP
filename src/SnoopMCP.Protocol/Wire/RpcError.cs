@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.Protocol.Wire;
 
-using SnoopMCP.Protocol.Errors;
+using Errors;
 
 /// <summary>
 /// Error payload returned alongside an <see cref="RpcResponse"/> when a tool invocation fails.

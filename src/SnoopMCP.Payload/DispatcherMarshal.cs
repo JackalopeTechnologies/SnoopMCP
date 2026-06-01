@@ -6,7 +6,7 @@
 namespace SnoopMCP.Payload;
 
 using System.Windows.Threading;
-using SnoopMCP.Protocol.Errors;
+using Protocol.Errors;
 
 /// <summary>
 /// Marshals work onto a WPF <see cref="Dispatcher"/> with a per-call timeout.

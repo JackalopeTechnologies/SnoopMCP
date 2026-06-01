@@ -5,8 +5,8 @@
 
 namespace SnoopMCP.Payload.Tests;
 
-using SnoopMCP.Payload.PathStrings;
-using SnoopMCP.Protocol.Errors;
+using PathStrings;
+using Protocol.Errors;
 using Xunit;
 
 public sealed class PathStringParserTests

@@ -7,7 +7,7 @@ namespace SnoopMCP.ClientIntegration.Tests;
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 using Xunit;
 
 public sealed class ClaudeCodeWriterTests : IDisposable
@@ -32,6 +32,7 @@ public sealed class ClaudeCodeWriterTests : IDisposable
         {
             Directory.Delete(mDir, recursive: true);
         }
+        // ReSharper disable once GCSuppressFinalizeForTypeWithoutDestructor
         GC.SuppressFinalize(this);
     }
 

@@ -49,10 +49,11 @@ public sealed class RootEnumerator
     {
         IEnumerable sources = PresentationSource.CurrentSources;
         var roots = new List<VisualRootDto>();
-        List<Window> windowRoots = CollectWindowRoots(sources);
+        IEnumerable enumerable = sources.Cast<object>().ToList();
+        List<Window> windowRoots = CollectWindowRoots(enumerable);
 
         int nextRootId = 0;
-        foreach (PresentationSource source in sources.OfType<PresentationSource>())
+        foreach (PresentationSource source in enumerable.OfType<PresentationSource>())
         {
             Visual? rootVisual = source.RootVisual;
             if (rootVisual is not null)

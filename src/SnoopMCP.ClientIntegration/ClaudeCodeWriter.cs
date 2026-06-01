@@ -118,7 +118,7 @@ public sealed class ClaudeCodeWriter : JsonMcpServerWriter
         {
             JsonObject root = LoadJsonObjectOrEmpty(mSettingsPath);
             JsonObject permissions = GetOrAddObject(root, PermissionsKey);
-            JsonArray allow = permissions[AllowKey] as JsonArray ?? new JsonArray();
+            JsonArray allow = permissions[AllowKey] as JsonArray ?? [];
             permissions[AllowKey] = allow;
             bool present = allow.Any(n => string.Equals((string?) n, WholeServerPermission, StringComparison.Ordinal));
             if (!present)

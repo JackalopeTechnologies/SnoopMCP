@@ -28,39 +28,64 @@ csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
 csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
 csharp_prefer_switch_expression = true:warning
 
-# Field naming (m, ps, sm, pm prefixes per CLAUDE.md)
-dotnet_naming_rule.private_instance_fields.severity = warning
-dotnet_naming_rule.private_instance_fields.symbols = private_instance_field
-dotnet_naming_rule.private_instance_fields.style = m_prefix_camel_case
+# Field naming (m, ps, sm, pm prefixes per CLAUDE.md; constants PascalCase)
+# Rule order is significant: the first matching rule wins. Constants are
+# implicitly static, so the const rule must precede the static rules.
 
-dotnet_naming_symbols.private_instance_field.applicable_kinds = field
-dotnet_naming_symbols.private_instance_field.applicable_accessibilities = private
-dotnet_naming_symbols.private_instance_field.required_modifiers =
+# Constants: PascalCase at any accessibility / level
+dotnet_naming_rule.constant_fields.severity = warning
+dotnet_naming_rule.constant_fields.symbols = constant_field
+dotnet_naming_rule.constant_fields.style = pascal_case
 
-dotnet_naming_style.m_prefix_camel_case.required_prefix = m
-dotnet_naming_style.m_prefix_camel_case.capitalization = camel_case
+dotnet_naming_symbols.constant_field.applicable_kinds = field
+dotnet_naming_symbols.constant_field.applicable_accessibilities = *
+dotnet_naming_symbols.constant_field.required_modifiers = const
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
 
 dotnet_naming_rule.private_static_readonly_fields.severity = warning
 dotnet_naming_rule.private_static_readonly_fields.symbols = private_static_readonly_field
-dotnet_naming_rule.private_static_readonly_fields.style = sm_prefix_camel_case
+dotnet_naming_rule.private_static_readonly_fields.style = sm_prefix_pascal_case
 
 dotnet_naming_symbols.private_static_readonly_field.applicable_kinds = field
 dotnet_naming_symbols.private_static_readonly_field.applicable_accessibilities = private
 dotnet_naming_symbols.private_static_readonly_field.required_modifiers = static,readonly
 
-dotnet_naming_style.sm_prefix_camel_case.required_prefix = sm
-dotnet_naming_style.sm_prefix_camel_case.capitalization = camel_case
+dotnet_naming_style.sm_prefix_pascal_case.required_prefix = sm
+dotnet_naming_style.sm_prefix_pascal_case.capitalization = pascal_case
 
 dotnet_naming_rule.private_static_fields.severity = warning
 dotnet_naming_rule.private_static_fields.symbols = private_static_field
-dotnet_naming_rule.private_static_fields.style = ps_prefix_camel_case
+dotnet_naming_rule.private_static_fields.style = ps_prefix_pascal_case
 
 dotnet_naming_symbols.private_static_field.applicable_kinds = field
 dotnet_naming_symbols.private_static_field.applicable_accessibilities = private
 dotnet_naming_symbols.private_static_field.required_modifiers = static
 
-dotnet_naming_style.ps_prefix_camel_case.required_prefix = ps
-dotnet_naming_style.ps_prefix_camel_case.capitalization = camel_case
+dotnet_naming_style.ps_prefix_pascal_case.required_prefix = ps
+dotnet_naming_style.ps_prefix_pascal_case.capitalization = pascal_case
+
+dotnet_naming_rule.public_instance_fields.severity = warning
+dotnet_naming_rule.public_instance_fields.symbols = public_instance_field
+dotnet_naming_rule.public_instance_fields.style = pm_prefix_pascal_case
+
+dotnet_naming_symbols.public_instance_field.applicable_kinds = field
+dotnet_naming_symbols.public_instance_field.applicable_accessibilities = public
+dotnet_naming_symbols.public_instance_field.required_modifiers =
+
+dotnet_naming_style.pm_prefix_pascal_case.required_prefix = pm
+dotnet_naming_style.pm_prefix_pascal_case.capitalization = pascal_case
+
+dotnet_naming_rule.private_instance_fields.severity = warning
+dotnet_naming_rule.private_instance_fields.symbols = private_instance_field
+dotnet_naming_rule.private_instance_fields.style = m_prefix_pascal_case
+
+dotnet_naming_symbols.private_instance_field.applicable_kinds = field
+dotnet_naming_symbols.private_instance_field.applicable_accessibilities = private
+dotnet_naming_symbols.private_instance_field.required_modifiers =
+
+dotnet_naming_style.m_prefix_pascal_case.required_prefix = m
+dotnet_naming_style.m_prefix_pascal_case.capitalization = pascal_case
 
 [*.xaml]
 indent_size = 4

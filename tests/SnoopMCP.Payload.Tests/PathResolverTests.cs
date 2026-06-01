@@ -5,13 +5,12 @@
 
 namespace SnoopMCP.Payload.Tests;
 
-using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using SnoopMCP.Payload;
-using SnoopMCP.Payload.Inspection;
-using SnoopMCP.Payload.PathStrings;
-using SnoopMCP.Protocol.Errors;
+using Payload;
+using Inspection;
+using PathStrings;
+using Protocol.Errors;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 

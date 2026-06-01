@@ -8,10 +8,10 @@ namespace SnoopMCP.Host.Tools;
 using System.ComponentModel;
 using System.Text.Json;
 using ModelContextProtocol.Server;
-using SnoopMCP.Host.Injection;
-using SnoopMCP.Protocol;
+using Injection;
+using Protocol;
 using SnoopMCP.Protocol.Tools;
-using SnoopMCP.Protocol.Wire;
+using Protocol.Wire;
 
 /// <summary>
 /// The MCP tool surface exposed to the LLM client: one tool per inspection operation plus

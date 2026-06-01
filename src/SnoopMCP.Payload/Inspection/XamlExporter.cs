@@ -88,7 +88,7 @@ public sealed class XamlExporter
             Indent = true,
             OmitXmlDeclaration = true
         };
-        using (XmlWriter writer = XmlWriter.Create(builder, settings))
+        using (var writer = XmlWriter.Create(builder, settings))
         {
             XamlWriter.Save(element, writer);
         }

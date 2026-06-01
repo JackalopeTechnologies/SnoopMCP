@@ -87,7 +87,7 @@ public static class AutostartTask
             psi.ArgumentList.Add(arg);
         }
         int exit;
-        using (Process? process = Process.Start(psi))
+        using (var process = Process.Start(psi))
         {
             if (process is null)
             {

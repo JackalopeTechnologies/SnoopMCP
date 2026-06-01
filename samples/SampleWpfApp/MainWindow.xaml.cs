@@ -5,9 +5,7 @@
 
 namespace SampleWpfApp;
 
-using System.Windows;
-
-public partial class MainWindow : Window
+public partial class MainWindow
 {
     public MainWindow()
     {

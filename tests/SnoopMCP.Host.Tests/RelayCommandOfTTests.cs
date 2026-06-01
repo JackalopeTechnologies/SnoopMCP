@@ -5,8 +5,8 @@
 
 namespace SnoopMCP.Host.Tests;
 
-using SnoopMCP.ClientIntegration;
-using SnoopMCP.Host;
+using ClientIntegration;
+using Host;
 using Xunit;
 
 /// <summary>

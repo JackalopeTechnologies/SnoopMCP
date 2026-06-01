@@ -3,10 +3,11 @@
 // SPDX-License-Identifier: MIT
 // Licensed under the MIT License. See LICENSE in the repository root.
 
+// ReSharper disable GCSuppressFinalizeForTypeWithoutDestructor
 namespace SnoopMCP.ClientIntegration.Tests;
 
 using System.Text.Json;
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 using Xunit;
 
 public sealed class WindsurfWriterTests : IDisposable
@@ -38,7 +39,7 @@ public sealed class WindsurfWriterTests : IDisposable
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
         Assert.True(result.Success, result.Message);
-        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
+        using var doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
         JsonElement entry = doc.RootElement.GetProperty("mcpServers").GetProperty("snoopmcp");
         Assert.Equal("http://127.0.0.1:6300/mcp", entry.GetProperty("serverUrl").GetString());
         Assert.False(entry.TryGetProperty("type", out _));

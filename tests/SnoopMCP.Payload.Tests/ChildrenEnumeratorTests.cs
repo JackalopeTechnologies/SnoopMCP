@@ -8,9 +8,9 @@ namespace SnoopMCP.Payload.Tests;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using SnoopMCP.Payload;
-using SnoopMCP.Payload.Inspection;
-using SnoopMCP.Payload.PathStrings;
+using Payload;
+using Inspection;
+using PathStrings;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 

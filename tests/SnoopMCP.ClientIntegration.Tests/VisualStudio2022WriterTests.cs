@@ -6,7 +6,7 @@
 namespace SnoopMCP.ClientIntegration.Tests;
 
 using System.Text.Json;
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 using Xunit;
 
 public sealed class VisualStudio2022WriterTests : IDisposable
@@ -38,7 +38,7 @@ public sealed class VisualStudio2022WriterTests : IDisposable
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
         Assert.True(result.Success, result.Message);
-        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
+        using var doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
         JsonElement entry = doc.RootElement.GetProperty("servers").GetProperty("snoopmcp");
         Assert.Equal("http://127.0.0.1:6300/mcp", entry.GetProperty("url").GetString());
         Assert.False(entry.TryGetProperty("type", out _));

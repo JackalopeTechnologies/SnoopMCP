@@ -171,7 +171,7 @@ public sealed class ClaudeDesktopWriter : IClientWriter
     private static bool IsNpxOnPath()
     {
         string path = Environment.GetEnvironmentVariable(PathEnvVar) ?? string.Empty;
-        string[] candidates = { NpxCmd, NpxExe, NpxCommand };
+        string[] candidates = [NpxCmd, NpxExe, NpxCommand];
         return path.Split(Path.PathSeparator)
             .Where(dir => !string.IsNullOrWhiteSpace(dir))
             .SelectMany(dir => candidates.Select(name => Path.Combine(dir, name)))

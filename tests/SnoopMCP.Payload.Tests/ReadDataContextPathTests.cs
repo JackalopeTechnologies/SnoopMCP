@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: MIT
 // Licensed under the MIT License. See LICENSE in the repository root.
 
+// ReSharper disable UnusedAutoPropertyAccessor.Local
 namespace SnoopMCP.Payload.Tests;
 
-using System.Windows;
 using System.Windows.Controls;
-using SnoopMCP.Payload.Inspection;
+using Inspection;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 

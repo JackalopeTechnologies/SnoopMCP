@@ -7,9 +7,8 @@ namespace SnoopMCP.Host;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using ModelContextProtocol.Protocol;
-using SnoopMCP.Host.Tools;
+using Tools;
 
 /// <summary>
 /// Builds the SnoopMCP MCP server as a configured-but-not-started <see cref="WebApplication"/>

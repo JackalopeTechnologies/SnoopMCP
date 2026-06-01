@@ -6,7 +6,7 @@
 namespace SnoopMCP.ClientIntegration.Tests;
 
 using System.Text.Json;
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 using Xunit;
 
 public sealed class CursorWriterTests : IDisposable
@@ -38,7 +38,7 @@ public sealed class CursorWriterTests : IDisposable
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
         Assert.True(result.Success, result.Message);
-        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
+        using var doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
         JsonElement entry = doc.RootElement.GetProperty("mcpServers").GetProperty("snoopmcp");
         Assert.Equal("http://127.0.0.1:6300/mcp", entry.GetProperty("url").GetString());
         Assert.False(entry.TryGetProperty("type", out _));
@@ -52,7 +52,7 @@ public sealed class CursorWriterTests : IDisposable
 
         writer.Register(McpEndpoint.Default);
 
-        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
+        using var doc = JsonDocument.Parse(File.ReadAllText(mConfigPath));
         JsonElement servers = doc.RootElement.GetProperty("mcpServers");
         Assert.Equal("http://x", servers.GetProperty("other").GetProperty("url").GetString());
         Assert.True(servers.TryGetProperty("snoopmcp", out _));

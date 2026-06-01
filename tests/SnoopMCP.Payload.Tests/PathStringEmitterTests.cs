@@ -7,7 +7,7 @@ namespace SnoopMCP.Payload.Tests;
 
 using System.Windows;
 using System.Windows.Controls;
-using SnoopMCP.Payload.PathStrings;
+using PathStrings;
 using Xunit;
 
 public sealed class PathStringEmitterTests

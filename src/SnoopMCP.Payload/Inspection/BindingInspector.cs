@@ -12,8 +12,8 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
-using SnoopMCP.Payload;
-using SnoopMCP.Protocol.Errors;
+using Payload;
+using Protocol.Errors;
 using SnoopMCP.Protocol.Tools;
 
 /// <summary>
@@ -88,7 +88,7 @@ public sealed class BindingInspector
                 ResolvedSourceHashCode: null,
                 CurrentValue: null,
                 State: StateNoBinding,
-                RecentTraceLines: Array.Empty<BindingTraceLineDto>());
+                RecentTraceLines: []);
         }
         else
         {
@@ -151,7 +151,7 @@ public sealed class BindingInspector
         int elementId,
         string elementType)
     {
-        BindingExpression? typed = expression as BindingExpression;
+        var typed = expression as BindingExpression;
         Binding? binding = typed?.ParentBinding;
         object? currentValue = element.GetValue(dp);
 
@@ -172,7 +172,7 @@ public sealed class BindingInspector
         DependencyProperty dp,
         BindingExpressionBase expression)
     {
-        BindingExpression? typed = expression as BindingExpression;
+        var typed = expression as BindingExpression;
         Binding? binding = typed?.ParentBinding;
         string state = MapState(expression);
         object? currentValue = element.GetValue(dp);
@@ -186,7 +186,7 @@ public sealed class BindingInspector
                 : RuntimeHelpers.GetHashCode(typed.ResolvedSource),
             CurrentValue: Convert.ToString(currentValue, CultureInfo.InvariantCulture),
             State: state,
-            RecentTraceLines: Array.Empty<BindingTraceLineDto>());
+            RecentTraceLines: []);
     }
 
     private static string MapState(BindingExpressionBase expression)

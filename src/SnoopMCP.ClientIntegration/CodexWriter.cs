@@ -94,7 +94,7 @@ public sealed class CodexWriter : IClientWriter
         {
             if (TryLoadModel(out TomlTable root, out string? error))
             {
-                bool removed = root.TryGetValue(ServersTableKey, out object? value)
+                bool removed = root.TryGetValue(ServersTableKey, out object value)
                     && value is TomlTable servers
                     && servers.Remove(McpEndpoint.Default.Name);
                 if (removed)
@@ -119,11 +119,11 @@ public sealed class CodexWriter : IClientWriter
     {
         bool present = File.Exists(mConfigPath)
             && TryLoadModel(out TomlTable root, out _)
-            && root.TryGetValue(ServersTableKey, out object? serversValue)
+            && root.TryGetValue(ServersTableKey, out object serversValue)
             && serversValue is TomlTable servers
-            && servers.TryGetValue(McpEndpoint.Default.Name, out object? entryValue)
+            && servers.TryGetValue(McpEndpoint.Default.Name, out object entryValue)
             && entryValue is TomlTable entry
-            && entry.TryGetValue(UrlKey, out object? url)
+            && entry.TryGetValue(UrlKey, out object url)
             && string.Equals(url as string, McpEndpoint.Default.Url, StringComparison.Ordinal);
         return new StatusResult(present, present
             ? $"{ClientName}: SnoopMCP is registered."
@@ -172,7 +172,7 @@ public sealed class CodexWriter : IClientWriter
     private static TomlTable GetOrAddTable(TomlTable parent, string key)
     {
         TomlTable child;
-        if (parent.TryGetValue(key, out object? existing) && existing is TomlTable table)
+        if (parent.TryGetValue(key, out object existing) && existing is TomlTable table)
         {
             child = table;
         }

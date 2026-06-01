@@ -8,9 +8,9 @@ namespace SnoopMCP.Host.Tests;
 using System.IO.Pipes;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
-using SnoopMCP.Host;
-using SnoopMCP.Protocol.Errors;
-using SnoopMCP.Protocol.Wire;
+using Host;
+using Protocol.Errors;
+using Protocol.Wire;
 using Xunit;
 
 public sealed class PipeClientTests
@@ -20,7 +20,7 @@ public sealed class PipeClientTests
     {
         string pipeName = $"snoopmcp-test-{Guid.NewGuid():N}";
 
-        Task serverTask = Task.Run(async () =>
+        var serverTask = Task.Run(async () =>
         {
             await using var server = new NamedPipeServerStream(
                 pipeName,
@@ -32,7 +32,7 @@ public sealed class PipeClientTests
 
             RpcRequest? request = await WireSerializer.ReadFrameAsync<RpcRequest>(server, default);
             Assert.NotNull(request);
-            Assert.Equal("echo", request!.Tool);
+            Assert.Equal("echo", request.Tool);
 
             JsonElement result = JsonDocument.Parse("{\"echoed\":\"ok\"}").RootElement.Clone();
             var response = new RpcResponse { Id = request.Id, Result = result };
@@ -52,7 +52,7 @@ public sealed class PipeClientTests
     {
         string pipeName = $"snoopmcp-test-{Guid.NewGuid():N}";
 
-        Task serverTask = Task.Run(async () =>
+        var serverTask = Task.Run(async () =>
         {
             await using var server = new NamedPipeServerStream(
                 pipeName,

@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.Cli.Tests;
 
-using SnoopMCP.Cli;
+using Cli;
 using Xunit;
 
 public sealed class UsageTests

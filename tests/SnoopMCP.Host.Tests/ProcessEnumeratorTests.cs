@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.Host.Tests;
 
-using SnoopMCP.Host.Injection;
+using Injection;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
 

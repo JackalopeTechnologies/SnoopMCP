@@ -8,7 +8,7 @@ namespace SnoopMCP.Host;
 using System.ComponentModel;
 using System.Windows.Input;
 using System.Windows.Media;
-using SnoopMCP.ClientIntegration;
+using ClientIntegration;
 
 /// <summary>
 /// DataContext for the tray <c>TaskbarIcon</c> declared in App.xaml. Surfaces the status-dot icon and
@@ -127,8 +127,8 @@ public sealed class TrayViewModel : INotifyPropertyChanged
 
     private static IReadOnlyList<IClientWriter> WritersFor(McpClient? client)
     {
-        return client is McpClient chosen
-            ? new[] { ClientRegistration.CreateWriter(chosen) }
+        return client is { } chosen
+            ? [ClientRegistration.CreateWriter(chosen)]
             : ClientRegistration.DetectedWriters();
     }
 

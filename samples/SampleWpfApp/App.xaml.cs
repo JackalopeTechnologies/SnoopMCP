@@ -5,8 +5,6 @@
 
 namespace SampleWpfApp;
 
-using System.Windows;
-
-public partial class App : Application
+public partial class App
 {
 }
