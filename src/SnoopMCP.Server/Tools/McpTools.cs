@@ -7,22 +7,30 @@ namespace SnoopMCP.Host.Tools;
 
 using System.ComponentModel;
 using System.Text.Json;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using Injection;
 using Protocol;
+using Protocol.Errors;
 using SnoopMCP.Protocol.Tools;
 using Protocol.Wire;
 
 /// <summary>
 /// The MCP tool surface exposed to the LLM client: one tool per inspection operation plus
 /// <c>attach</c> / <c>detach</c>. Every inspection tool forwards its typed arguments through
-/// <see cref="SessionManager.SendAsync"/> and returns the payload's result element unchanged so the
-/// MCP SDK serialises it to the client as-is. Wire tool names come from <see cref="ToolNames"/> so
-/// the host holds no magic strings.
+/// <see cref="Dispatch"/> and returns the payload's result element unchanged so the MCP SDK
+/// serialises it to the client as-is. Wire tool names come from <see cref="ToolNames"/> so the host
+/// holds no magic strings. This class is also the one boundary where SnoopMCP's own
+/// <see cref="SnoopMcpException"/> is promoted to <see cref="McpException"/> (see <see cref="Promote"/>)
+/// so the curated code + message reach the model instead of the SDK's sanitised fallback text.
 /// </summary>
 [McpServerToolType]
 public sealed class McpTools
 {
+    private const string RootsProperty = "roots";
+    private const string ElementExpiredHint =
+        " Element ids are per-session and reset on attach; call list_visual_roots to get current root ids.";
+
     private readonly SessionManager mSession;
     private readonly IInjectorService mInjector;
 
@@ -63,20 +71,36 @@ public sealed class McpTools
         "Attach to a running WPF process by PID. Generates a pipe, injects the payload, opens the session.")]
     public async Task<JsonElement> Attach(int pid, CancellationToken cancellationToken)
     {
-        string pipeName = SessionManager.AllocatePipeName();
-        ProcessProbeResult probe = await mInjector.ProbeAsync(pid, cancellationToken).ConfigureAwait(false);
-        await mInjector.InjectAsync(pid, pipeName, cancellationToken).ConfigureAwait(false);
-        await mSession.OpenAsync(pipeName, cancellationToken).ConfigureAwait(false);
-
-        var payload = new
+        JsonElement result;
+        try
         {
-            sessionId = pipeName,
-            processName = probe.ProcessName,
-            runtimeVersion = probe.RuntimeVersion,
-            frameworkVersion = probe.FrameworkVersion,
-            bitness = probe.Bitness
-        };
-        return SerializeResult(payload);
+            string pipeName = SessionManager.AllocatePipeName();
+            ProcessProbeResult probe = await mInjector.ProbeAsync(pid, cancellationToken).ConfigureAwait(false);
+            await mInjector.InjectAsync(pid, pipeName, cancellationToken).ConfigureAwait(false);
+            await mSession.OpenAsync(pipeName, cancellationToken).ConfigureAwait(false);
+
+            // Seed the payload's element registry with the live visual roots and hand them back, so a
+            // freshly attached caller has valid root element ids immediately - element ids are
+            // per-session and a previous session's ids are dead after re-attach. This spares the common
+            // stale-id trap of reusing an old root id before calling list_visual_roots.
+            JsonElement? visualRoots = await TrySeedVisualRootsAsync(cancellationToken).ConfigureAwait(false);
+
+            var payload = new
+            {
+                sessionId = pipeName,
+                processName = probe.ProcessName,
+                runtimeVersion = probe.RuntimeVersion,
+                frameworkVersion = probe.FrameworkVersion,
+                bitness = probe.Bitness,
+                visualRoots
+            };
+            result = SerializeResult(payload);
+        }
+        catch (SnoopMcpException ex)
+        {
+            throw Promote(ex);
+        }
+        return result;
     }
 
     /// <summary>Detaches from the current session.</summary>
@@ -94,7 +118,7 @@ public sealed class McpTools
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description("Enumerate every active visual root (window, popup, etc.).")]
     public Task<JsonElement> ListVisualRoots(CancellationToken cancellationToken) =>
-        mSession.SendAsync(ToolNames.ListVisualRoots, new ListVisualRootsRequest(), cancellationToken);
+        Dispatch(ToolNames.ListVisualRoots, new ListVisualRootsRequest(), cancellationToken);
 
     /// <summary>Describes an element by id.</summary>
     /// <param name="id">The element id.</param>
@@ -102,7 +126,7 @@ public sealed class McpTools
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description("Describe an element by id.")]
     public Task<JsonElement> DescribeElement(int id, CancellationToken cancellationToken) =>
-        mSession.SendAsync(ToolNames.DescribeElement, new DescribeElementRequest(id), cancellationToken);
+        Dispatch(ToolNames.DescribeElement, new DescribeElementRequest(id), cancellationToken);
 
     /// <summary>Enumerates the visual or logical children of an element.</summary>
     /// <param name="id">The parent element id.</param>
@@ -113,7 +137,7 @@ public sealed class McpTools
     public Task<JsonElement> GetChildren(int id, string tree, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(tree);
-        return mSession.SendAsync(ToolNames.GetChildren, new GetChildrenRequest(id, tree), cancellationToken);
+        return Dispatch(ToolNames.GetChildren, new GetChildrenRequest(id, tree), cancellationToken);
     }
 
     /// <summary>Gets the visual or logical parent of an element.</summary>
@@ -125,7 +149,7 @@ public sealed class McpTools
     public Task<JsonElement> GetParent(int id, string tree, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(tree);
-        return mSession.SendAsync(ToolNames.GetParent, new GetParentRequest(id, tree), cancellationToken);
+        return Dispatch(ToolNames.GetParent, new GetParentRequest(id, tree), cancellationToken);
     }
 
     /// <summary>Gets the templated parent of an element, if any.</summary>
@@ -134,7 +158,7 @@ public sealed class McpTools
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description("Get the TemplatedParent if any.")]
     public Task<JsonElement> GetTemplatedParent(int id, CancellationToken cancellationToken) =>
-        mSession.SendAsync(ToolNames.GetTemplatedParent, new GetTemplatedParentRequest(id), cancellationToken);
+        Dispatch(ToolNames.GetTemplatedParent, new GetTemplatedParentRequest(id), cancellationToken);
 
     /// <summary>Finds elements under a root matching an AND-combined predicate.</summary>
     /// <param name="rootId">The root element id whose subtree is searched.</param>
@@ -148,7 +172,7 @@ public sealed class McpTools
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(predicate);
-        return mSession.SendAsync(
+        return Dispatch(
             ToolNames.FindElements,
             new FindElementsRequest(rootId, predicate),
             cancellationToken);
@@ -166,7 +190,7 @@ public sealed class McpTools
         double x,
         double y,
         CancellationToken cancellationToken) =>
-        mSession.SendAsync(ToolNames.HitTest, new HitTestRequest(rootId, x, y), cancellationToken);
+        Dispatch(ToolNames.HitTest, new HitTestRequest(rootId, x, y), cancellationToken);
 
     /// <summary>Resolves a canonical path string under a root.</summary>
     /// <param name="rootId">The root element id whose subtree is walked.</param>
@@ -180,7 +204,7 @@ public sealed class McpTools
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(pathString);
-        return mSession.SendAsync(
+        return Dispatch(
             ToolNames.ResolvePath,
             new ResolvePathRequest(rootId, pathString),
             cancellationToken);
@@ -192,7 +216,7 @@ public sealed class McpTools
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description("Describe the CLR type shape of the DataContext.")]
     public Task<JsonElement> DescribeDataContext(int id, CancellationToken cancellationToken) =>
-        mSession.SendAsync(ToolNames.DescribeDataContext, new DescribeDataContextRequest(id), cancellationToken);
+        Dispatch(ToolNames.DescribeDataContext, new DescribeDataContextRequest(id), cancellationToken);
 
     /// <summary>Reads a dotted property path off an element's DataContext.</summary>
     /// <param name="id">The element id whose DataContext roots the walk.</param>
@@ -203,7 +227,7 @@ public sealed class McpTools
     public Task<JsonElement> ReadDataContextPath(int id, string path, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-        return mSession.SendAsync(
+        return Dispatch(
             ToolNames.ReadDataContextPath,
             new ReadDataContextPathRequest(id, path),
             cancellationToken);
@@ -215,7 +239,7 @@ public sealed class McpTools
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description("List dependency properties on an element.")]
     public Task<JsonElement> ListDependencyProperties(int id, CancellationToken cancellationToken) =>
-        mSession.SendAsync(
+        Dispatch(
             ToolNames.ListDependencyProperties,
             new ListDependencyPropertiesRequest(id),
             cancellationToken);
@@ -232,7 +256,7 @@ public sealed class McpTools
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(propertyName);
-        return mSession.SendAsync(
+        return Dispatch(
             ToolNames.GetDependencyProperty,
             new GetDependencyPropertyRequest(id, propertyName),
             cancellationToken);
@@ -244,7 +268,7 @@ public sealed class McpTools
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description("Resolve the applied Style and its BasedOn chain.")]
     public Task<JsonElement> ResolveStyle(int id, CancellationToken cancellationToken) =>
-        mSession.SendAsync(ToolNames.ResolveStyle, new ResolveStyleRequest(id), cancellationToken);
+        Dispatch(ToolNames.ResolveStyle, new ResolveStyleRequest(id), cancellationToken);
 
     /// <summary>Resolves the applied ControlTemplate.</summary>
     /// <param name="id">The element id.</param>
@@ -252,7 +276,7 @@ public sealed class McpTools
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description("Resolve the applied ControlTemplate.")]
     public Task<JsonElement> ResolveTemplate(int id, CancellationToken cancellationToken) =>
-        mSession.SendAsync(ToolNames.ResolveTemplate, new ResolveTemplateRequest(id), cancellationToken);
+        Dispatch(ToolNames.ResolveTemplate, new ResolveTemplateRequest(id), cancellationToken);
 
     /// <summary>Inspects the BindingExpression on a property.</summary>
     /// <param name="id">The element id.</param>
@@ -266,7 +290,7 @@ public sealed class McpTools
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(propertyName);
-        return mSession.SendAsync(
+        return Dispatch(
             ToolNames.InspectBinding,
             new InspectBindingRequest(id, propertyName),
             cancellationToken);
@@ -282,7 +306,7 @@ public sealed class McpTools
         int id,
         bool includeDescendants,
         CancellationToken cancellationToken) =>
-        mSession.SendAsync(
+        Dispatch(
             ToolNames.ListBindings,
             new ListBindingsRequest(id, includeDescendants),
             cancellationToken);
@@ -293,7 +317,58 @@ public sealed class McpTools
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description("Serialize an element to XAML reflecting its current live state.")]
     public Task<JsonElement> ExportXaml(int id, CancellationToken cancellationToken) =>
-        mSession.SendAsync(ToolNames.ExportXaml, new ExportXamlRequest(id), cancellationToken);
+        Dispatch(ToolNames.ExportXaml, new ExportXamlRequest(id), cancellationToken);
+
+    /// <summary>
+    /// Dispatches a tool call through the open session and, on failure, promotes SnoopMCP's curated
+    /// <see cref="SnoopMcpException"/> to <see cref="McpException"/> so the SDK propagates its code +
+    /// message to the client rather than sanitising it to "An error occurred invoking '…'".
+    /// </summary>
+    private async Task<JsonElement> Dispatch(string toolName, object arguments, CancellationToken cancellationToken)
+    {
+        JsonElement result;
+        try
+        {
+            result = await mSession.SendAsync(toolName, arguments, cancellationToken).ConfigureAwait(false);
+        }
+        catch (SnoopMcpException ex)
+        {
+            throw Promote(ex);
+        }
+        return result;
+    }
+
+    private async Task<JsonElement?> TrySeedVisualRootsAsync(CancellationToken cancellationToken)
+    {
+        JsonElement? roots = null;
+        try
+        {
+            JsonElement response = await mSession
+                .SendAsync(ToolNames.ListVisualRoots, new ListVisualRootsRequest(), cancellationToken)
+                .ConfigureAwait(false);
+            if (response.TryGetProperty(RootsProperty, out JsonElement array))
+            {
+                roots = array.Clone();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Seeding the visual roots is a best-effort convenience: the session is already open and
+            // valid without them, and the caller can fall back to list_visual_roots. Never fail attach.
+            roots = null;
+        }
+        return roots;
+    }
+
+    private static McpException Promote(SnoopMcpException ex)
+    {
+        string hint = ex.Code == ErrorCode.ElementExpired ? ElementExpiredHint : string.Empty;
+        return new McpException($"[{ex.Code}] {ex.Message}{hint}", ex);
+    }
 
     private static JsonElement SerializeResult(object payload)
     {

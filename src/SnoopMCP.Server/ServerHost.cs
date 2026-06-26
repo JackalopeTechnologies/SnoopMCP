@@ -7,7 +7,9 @@ namespace SnoopMCP.Host;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
+using Logging;
 using Tools;
 
 /// <summary>
@@ -22,17 +24,28 @@ public static class ServerHost
     private const string RootPath = "/";
     private const string ServerName = "SnoopMCP — WPF live-inspection MCP server";
     private const int ListenPort = 6300;
+    private const string AspNetCoreLogCategory = "Microsoft.AspNetCore";
 
     /// <summary>Builds the MCP Streamable-HTTP host on localhost without starting it.</summary>
     /// <param name="args">Process command-line arguments.</param>
     /// <param name="port">Loopback port to listen on; defaults to <see cref="ListenPort"/>. Pass 0 to bind a free port (used by tests).</param>
+    /// <param name="logPath">Absolute path for the server log file; defaults to
+    /// <see cref="FileLoggerProvider.DefaultLogPath"/> under %LOCALAPPDATA%. Tests pass a temp path so they never touch the real log.</param>
     /// <returns>The configured, not-yet-started web application.</returns>
-    public static WebApplication Build(string[] args, int port = ListenPort)
+    public static WebApplication Build(string[] args, int port = ListenPort, string? logPath = null)
     {
         ArgumentNullException.ThrowIfNull(args);
 
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
         builder.WebHost.ConfigureKestrel(kestrel => kestrel.ListenLocalhost(port));
+
+        // The tray host is windowless, so the default Console logger has nowhere to surface errors.
+        // Persist the MCP server's ILogger output - crucially the SDK's full exception detail when a
+        // tool handler throws, which it logs before returning a sanitised message to the client - to
+        // a file beside the host log. ASP.NET's per-request chatter is dropped to keep the rolling
+        // file focused on warnings, errors, and lifecycle.
+        builder.Logging.AddProvider(new FileLoggerProvider(logPath ?? FileLoggerProvider.DefaultLogPath()));
+        builder.Logging.AddFilter(AspNetCoreLogCategory, LogLevel.Warning);
 
         builder.Services.AddSingleton<SessionManager>();
         builder.Services.AddSingleton<IInjectorService, Injection.InjectorService>();
