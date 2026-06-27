@@ -67,7 +67,7 @@ jobs:
           Copy-Item $msi "SnoopMCP.Installer/SnoopMCP-${{ steps.ver.outputs.version }}.msi"
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: SnoopMCP ${{ steps.ver.outputs.version }}
           files: SnoopMCP.Installer/SnoopMCP-${{ steps.ver.outputs.version }}.msi
