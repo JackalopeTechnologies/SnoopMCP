@@ -18,6 +18,10 @@
           xUnit1051 — TestContext.Current.CancellationToken. Optional
                      responsiveness improvement; CancellationToken.None
                      is acceptable for fast in-memory round-trips.
+          CA1848   — LoggerMessage delegates. A performance rule; tests
+                     drive ILogger through the same LogError/LogInformation
+                     extension methods real callers (and the MCP SDK) use,
+                     which is the behaviour under test.
 
         These suppressions are scoped to tests/ only via this file's
         directory placement; production source under src/ keeps the
@@ -26,6 +30,6 @@
     <Import Project="..\Directory.Build.props" />
 
     <PropertyGroup>
-        <NoWarn>$(NoWarn);CA1707;STY0006;STY0008;NUM0002;STY0002;xUnit1051</NoWarn>
+        <NoWarn>$(NoWarn);CA1707;STY0006;STY0008;NUM0002;STY0002;xUnit1051;CA1848</NoWarn>
     </PropertyGroup>
 </Project>

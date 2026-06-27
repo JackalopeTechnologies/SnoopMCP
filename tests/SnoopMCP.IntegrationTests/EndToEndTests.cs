@@ -8,9 +8,11 @@ namespace SnoopMCP.IntegrationTests;
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
+using ModelContextProtocol;
 using Host;
 using Host.Injection;
 using Host.Tools;
+using Protocol.Errors;
 using Xunit;
 
 /// <summary>
@@ -26,6 +28,7 @@ public sealed class EndToEndTests : IAsyncLifetime
     private Process? mSampleProcess;
     private SessionManager? mSession;
     private McpTools? mTools;
+    private JsonElement mAttach;
 
     public async ValueTask InitializeAsync()
     {
@@ -44,7 +47,7 @@ public sealed class EndToEndTests : IAsyncLifetime
         var injector = new InjectorService(NullLogger<InjectorService>.Instance);
         mTools = new McpTools(mSession, injector);
 
-        await mTools.Attach(mSampleProcess.Id, TestContext.Current.CancellationToken);
+        mAttach = await mTools.Attach(mSampleProcess.Id, TestContext.Current.CancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -171,5 +174,29 @@ public sealed class EndToEndTests : IAsyncLifetime
 
         Assert.True(found, "SampleWpfApp not found in listWpfProcesses output.");
         Assert.True(attachable, "SampleWpfApp was discovered but reported as non-attachable.");
+    }
+
+    [Fact]
+    public async Task Attach_SeedsAndReturnsRoots_AndExpiredIdsReportAnActionableHint()
+    {
+        Assert.NotNull(mTools);
+        CancellationToken ct = TestContext.Current.CancellationToken;
+
+        // Attach now hands back the live visual roots and seeds the payload registry with them.
+        Assert.True(mAttach.TryGetProperty("visualRoots", out JsonElement roots));
+        Assert.Equal(JsonValueKind.Array, roots.ValueKind);
+        Assert.True(roots.GetArrayLength() > 0);
+        int rootElementId = roots[0].GetProperty("rootElementId").GetInt32();
+
+        // Because attach seeded the registry, the root id resolves immediately - no list_visual_roots
+        // call is made in this test before describing it.
+        JsonElement desc = await mTools!.DescribeElement(rootElementId, ct);
+        Assert.True(desc.TryGetProperty("type", out _));
+
+        // A never-registered id surfaces the enriched, self-correcting ElementExpired message.
+        McpException ex = await Assert.ThrowsAsync<McpException>(
+            () => mTools.FindElements(999_999, new Protocol.Tools.ElementPredicateDto { Type = "Button" }, ct));
+        Assert.Contains(nameof(ErrorCode.ElementExpired), ex.Message);
+        Assert.Contains("list_visual_roots", ex.Message);
     }
 }
