@@ -21,6 +21,10 @@ jobs:
         with:
           # external/snoopwpf is a submodule the native injector builds from.
           submodules: recursive
+          # GitVersion (used by snoopwpf's Snoop.InjectorLauncher) needs full history; a shallow
+          # clone fails with "Repository is a shallow clone" when the installer builds the injector.
+          # Mirrors the same fix in ci.yml.
+          fetch-depth: 0
           # icon.ico and other binary assets are stored in Git LFS; without this the MSI would embed
           # LFS pointer files instead of the real binaries.
           lfs: true
