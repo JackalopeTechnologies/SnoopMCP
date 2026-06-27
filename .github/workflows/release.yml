@@ -51,6 +51,11 @@ jobs:
 
       - name: Build installer (MSI)
         shell: pwsh
+        # DisableGitVersionTask: the vendored snoopwpf Snoop.InjectorLauncher pulls GitVersion.MsBuild,
+        # which fails to guess a branch on the detached tag checkout. SnoopMCP doesn't use the
+        # launcher's version; disable the task (env var so it reaches the nested arch builds too).
+        env:
+          DisableGitVersionTask: 'true'
         run: ./SnoopMCP.Installer/build-installer.ps1 -Version ${{ steps.ver.outputs.version }} -Configuration Release
 
       - name: Rename MSI with version
