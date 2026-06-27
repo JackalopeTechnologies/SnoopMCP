@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout (with submodules + LFS)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # external/snoopwpf is a submodule the native injector builds from.
           submodules: recursive
@@ -26,7 +26,7 @@ jobs:
           lfs: true
 
       - name: Set up .NET 10 SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
