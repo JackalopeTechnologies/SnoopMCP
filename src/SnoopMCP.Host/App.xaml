@@ -11,6 +11,9 @@
         <ContextMenu x:Key="TrayMenu" x:Shared="False">
             <MenuItem Header="Start MCP" Command="{Binding StartCommand}" />
             <MenuItem Header="Stop MCP" Command="{Binding StopCommand}" />
+            <MenuItem Header="Allow app interaction (driving)" IsCheckable="True"
+                      IsChecked="{Binding InteractionEnabled, Mode=OneWay}"
+                      Command="{Binding ToggleInteractionCommand}" />
             <Separator />
 
             <MenuItem Header="Install into">

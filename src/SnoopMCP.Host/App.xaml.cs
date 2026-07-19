@@ -83,7 +83,9 @@ public partial class App
         mTrayIcon = (TaskbarIcon?) FindResource(TrayIconResourceKey) ?? throw new InvalidOperationException("Tray icon resource not found.");
         mTrayIcon.DataContext = new TrayViewModel(mController, Shutdown,
             (title, message) => mTrayIcon.ShowNotification(title, message),
-            ShowOwnedDialog);
+            ShowOwnedDialog,
+            InteractionGate.ForCurrentUser(),
+            ElevationInfo.IsElevated());
         mTrayIcon.ForceCreate();
         SessionEnding += OnSessionEnding;
         _ = mController.StartAsync();
