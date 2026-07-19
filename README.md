@@ -2,7 +2,11 @@
 
 An MCP server that injects a payload DLL into a running WPF process so an LLM
 client can diagnose styling, binding, and dependency-property resolution
-problems live. **v1 is read-only.**
+problems live — and, as a separate gated capability, drives that same app
+through UI Automation (click, set values, wait for elements) and captures its
+window as an image. **Inspection is read-only; driving is off by default** and
+must be explicitly enabled — see
+[Driving the app](#driving-the-app-ui-automation) below.
 
 The host speaks MCP over **Streamable HTTP** (Kestrel, `http://127.0.0.1:6300`,
 endpoint `/mcp`) to the LLM client, and length-prefixed JSON over a named pipe to
@@ -25,6 +29,10 @@ LLM client ──HTTP /mcp──▶ SnoopMCP.Host.exe
                               ▲
                           host ◀── tool calls marshalled onto the UI Dispatcher
 ```
+
+Driving tools bypass this path entirely: `getUiaTree`, `findUiaElement`, `captureWindow`,
+`waitForUia`, `invokeUia`, and `setUiaValue` talk to the target directly from the host via
+Windows UI Automation and `PrintWindow` — no injection, no `attach()` call, just a `pid`.
 
 ## Quickstart
 
@@ -215,6 +223,45 @@ Twenty read-only tools, plus `attach`/`detach`:
 | `listBindings(id, includeDescendants)` | Every binding on an element / under a subtree — wide audit |
 | `exportXaml(id)` | `XamlWriter` snapshot of the element's live state (bindings appear as evaluated values; use `listBindings` for binding shape) |
 
+## Driving the app (UI Automation)
+
+Beyond inspection, SnoopMCP can also drive a running WPF app — click, select, type
+into fields, and wait for elements to appear — and capture its window as an image,
+entirely from the host process via Windows UI Automation. This is the first of two
+planned driving tiers: the **UIA tier** below needs no `attach()` call (every tool is
+keyed directly by `pid`); a **payload tier**, for controls UIA can't reach, is planned
+for a later phase. See the [`snoopmcp-uia`](skills/snoopmcp-uia/SKILL.md) skill for
+agent-facing guidance (locator-stability order, wait-vs-sleep, recovering a stale
+element handle).
+
+| Tool | Use it for |
+|---|---|
+| `getUiaTree(pid, fromElement?, depth)` | Walk the UIA tree to a bounded depth. Read-only |
+| `findUiaElement(pid, by, value)` | Locate an element by `automationId`, `name`, `helpText`, or `controlType`. Read-only |
+| `captureWindow(pid)` | Capture the window as a PNG image via `PrintWindow` — works even while occluded. Read-only |
+| `waitForUia(pid, by, value, timeoutMs)` | Poll for an element instead of sleeping. Read-only |
+| `invokeUia(element, pattern?)` | Click, select, toggle, or expand an element. **Mutates** the target |
+| `setUiaValue(element, value)` | Set a text/numeric field via `ValuePattern`. **Mutates** the target |
+
+**No synthesized input.** Driving is UIA action patterns only, and capture is
+`PrintWindow` only — SnoopMCP never synthesizes mouse or keyboard input and never
+steals focus or raises the target window. A control UIA can't drive returns
+`NotDrivable`.
+
+**Interaction gate.** The two mutating tools above are refused unless the host's
+interaction gate is on, and it's **off by default**. Enable it from the tray menu —
+**"Allow app interaction (driving)"** — its state lives under `%LocalAppData%\SnoopMCP`
+and is reflected in `/health` as `interactionEnabled`. The read-only tools (both here
+and in [Tool surface](#tool-surface)) are never gated.
+
+**Elevation.** Driving or capturing an elevated (Administrator) target requires the
+SnoopMCP host itself to run elevated — the same rule as attach (see
+[Prerequisites](#prerequisites)). Enabling autostart registers an elevated
+(`/RL HIGHEST`) logon task (one UAC prompt, at registration only); both the logon
+launch and a manual `SnoopMCP.Cli start` route through that task. This is admin-only —
+a standard user sees a clear "elevated-target driving unavailable" note in the tray
+tooltip instead.
+
 ## Error codes
 
 | Code | Meaning |
@@ -230,7 +277,11 @@ Twenty read-only tools, plus `attach`/`detach`:
 
 ## Known v1 limitations
 
-- **Read-only.** No property writes, no method invocation, no scripting.
+- **Inspection is read-only.** The attach/payload tools support no property writes or
+  method invocation, and there's no scripting — driving (writes, invocation) is a
+  separate capability; see [Driving the app](#driving-the-app-ui-automation).
+- **UIA driving only; no payload-tier fallback yet.** A control UI Automation can't
+  reach returns `NotDrivable`; a payload-tier fallback is a later-phase candidate.
 - **One target at a time.** Phase 2 may add multi-target.
 - **x64 only.** x86/ARM64 targets are rejected at probe time.
 - **No persistent reattach.** Sessions die with the target process.
