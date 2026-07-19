@@ -11,12 +11,12 @@ using Xunit;
 public sealed class AutostartTaskTests
 {
     [Fact]
-    public void BuildCreateArguments_IsOnLogonLimitedForcedWithHostPath()
+    public void BuildCreateArguments_IsOnLogonHighestForcedWithHostPath()
     {
         IReadOnlyList<string> args = AutostartTask.BuildCreateArguments(@"C:\app\SnoopMCP.Host.exe");
 
         Assert.Equal(
-            ["/Create", "/TN", "SnoopMCP Host", "/SC", "ONLOGON", "/RL", "LIMITED",
+            ["/Create", "/TN", "SnoopMCP Host", "/SC", "ONLOGON", "/RL", "HIGHEST",
              "/TR", @"C:\app\SnoopMCP.Host.exe", "/F"],
             args);
     }
