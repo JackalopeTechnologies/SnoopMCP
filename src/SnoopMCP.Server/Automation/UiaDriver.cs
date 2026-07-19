@@ -25,6 +25,8 @@ public sealed class UiaDriver : IUiaDriver
     private const string PatternSelectionItem = "SelectionItem";
     private const string PatternExpandCollapse = "ExpandCollapse";
     private const string PatternValue = "Value";
+    private const string MessageNoActionPattern =
+        "Element exposes no Invoke/SelectionItem/Toggle/ExpandCollapse pattern.";
     private const int WaitPollMs = 200;
 
     private static readonly TimeSpan smCallTimeout = TimeSpan.FromSeconds(5);
@@ -102,6 +104,86 @@ public sealed class UiaDriver : IUiaDriver
     {
         ArgumentNullException.ThrowIfNull(reference);
         return RunUia(() => ResolveCore(reference), ct);
+    }
+
+    /// <inheritdoc />
+    public async Task InvokeAsync(UiaElementRef reference, string? pattern, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        AutomationElement element = await ResolveAsync(reference, ct).ConfigureAwait(false);
+        await RunUia<object?>(() =>
+        {
+            Act(element, pattern);
+            return null;
+        }, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task SetValueAsync(UiaElementRef reference, string value, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(value);
+        AutomationElement element = await ResolveAsync(reference, ct).ConfigureAwait(false);
+        await RunUia<object?>(() =>
+        {
+            if (!element.TryGetCurrentPattern(ValuePattern.Pattern, out object raw))
+            {
+                throw new SnoopMcpException(ErrorCode.NotDrivable, "Element does not support ValuePattern.");
+            }
+            var valuePattern = (ValuePattern)raw;
+            if (valuePattern.Current.IsReadOnly)
+            {
+                throw new SnoopMcpException(ErrorCode.ValueReadOnly, "Element value is read-only.");
+            }
+            valuePattern.SetValue(value);
+            return null;
+        }, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Drives <paramref name="element"/> via the named <paramref name="pattern"/>, or — when null —
+    /// auto-selects the first available pattern in priority order (Invoke, SelectionItem, Toggle,
+    /// ExpandCollapse). Throws <see cref="ErrorCode.NotDrivable"/> when no pattern applies.
+    /// </summary>
+    private static void Act(AutomationElement element, string? pattern)
+    {
+        bool tryInvoke = pattern is null || string.Equals(pattern, PatternInvoke, StringComparison.OrdinalIgnoreCase);
+        bool trySelectionItem =
+            pattern is null || string.Equals(pattern, PatternSelectionItem, StringComparison.OrdinalIgnoreCase);
+        bool tryToggle = pattern is null || string.Equals(pattern, PatternToggle, StringComparison.OrdinalIgnoreCase);
+        bool tryExpandCollapse =
+            pattern is null || string.Equals(pattern, PatternExpandCollapse, StringComparison.OrdinalIgnoreCase);
+
+        bool acted = false;
+        if (tryInvoke && element.TryGetCurrentPattern(InvokePattern.Pattern, out object invoke))
+        {
+            ((InvokePattern)invoke).Invoke();
+            acted = true;
+        }
+        if (!acted && trySelectionItem && element.TryGetCurrentPattern(SelectionItemPattern.Pattern, out object select))
+        {
+            ((SelectionItemPattern)select).Select();
+            acted = true;
+        }
+        if (!acted && tryToggle && element.TryGetCurrentPattern(TogglePattern.Pattern, out object toggle))
+        {
+            ((TogglePattern)toggle).Toggle();
+            acted = true;
+        }
+        if (!acted && tryExpandCollapse
+            && element.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out object expand))
+        {
+            ((ExpandCollapsePattern)expand).Expand();
+            acted = true;
+        }
+        if (!acted)
+        {
+            throw new SnoopMcpException(
+                ErrorCode.NotDrivable,
+                pattern is null
+                    ? MessageNoActionPattern
+                    : $"Element does not support the '{pattern}' pattern.");
+        }
     }
 
     /// <summary>The <see cref="GetTreeAsync"/> work body, run under <see cref="RunUia{T}"/> off the caller's thread.</summary>

@@ -29,4 +29,10 @@ public interface IUiaDriver
     /// durable <see cref="UiaElementRef.By"/>/<see cref="UiaElementRef.Value"/> locator on a cache miss.
     /// </summary>
     Task<AutomationElement> ResolveAsync(UiaElementRef reference, CancellationToken ct);
+
+    /// <summary>Invokes the element's action pattern (auto-selected, or the named one).</summary>
+    Task InvokeAsync(UiaElementRef reference, string? pattern, CancellationToken ct);
+
+    /// <summary>Sets the element's value via ValuePattern; throws if read-only.</summary>
+    Task SetValueAsync(UiaElementRef reference, string value, CancellationToken ct);
 }
