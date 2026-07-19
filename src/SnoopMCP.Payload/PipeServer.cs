@@ -8,7 +8,6 @@ namespace SnoopMCP.Payload;
 using System.IO;
 using System.IO.Pipes;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
 using Tools;
 using Protocol.Errors;
 using Protocol.Wire;
@@ -17,13 +16,14 @@ using Protocol.Wire;
 /// Named-pipe server that accepts one client at a time and dispatches incoming
 /// <see cref="RpcRequest"/> frames to a <see cref="ToolRegistry"/>.
 /// </summary>
-public sealed partial class PipeServer : IAsyncDisposable
+public sealed class PipeServer : IAsyncDisposable
 {
     private const int PipeBufferSize = 64 * 1024;
+    private static readonly TimeSpan smInitialRetryDelay = TimeSpan.FromMilliseconds(50);
+    private static readonly TimeSpan smMaxRetryDelay = TimeSpan.FromSeconds(5);
 
     private readonly string mPipeName;
     private readonly ToolRegistry mRegistry;
-    private readonly ILogger<PipeServer> mLogger;
     private readonly CancellationTokenSource mShutdown = new();
     private Task? mAcceptLoop;
 
@@ -32,15 +32,12 @@ public sealed partial class PipeServer : IAsyncDisposable
     /// </summary>
     /// <param name="pipeName">The named-pipe instance to create.</param>
     /// <param name="registry">The tool registry to dispatch into.</param>
-    /// <param name="logger">The logger to record diagnostics into.</param>
-    public PipeServer(string pipeName, ToolRegistry registry, ILogger<PipeServer> logger)
+    public PipeServer(string pipeName, ToolRegistry registry)
     {
         ArgumentException.ThrowIfNullOrEmpty(pipeName);
         ArgumentNullException.ThrowIfNull(registry);
-        ArgumentNullException.ThrowIfNull(logger);
         mPipeName = pipeName;
         mRegistry = registry;
-        mLogger = logger;
     }
 
     /// <summary>
@@ -68,15 +65,10 @@ public sealed partial class PipeServer : IAsyncDisposable
         mShutdown.Dispose();
     }
 
-    [LoggerMessage(EventId = 1, Level = LogLevel.Warning, Message = "Pipe IO exception in accept loop; will retry.")]
-    private partial void LogPipeIoException(Exception ex);
-
-    [LoggerMessage(EventId = 2, Level = LogLevel.Error, Message = "Unhandled exception in tool '{Tool}'.")]
-    private partial void LogToolException(Exception ex, string tool);
-
     private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
         bool keepRunning = true;
+        TimeSpan retryDelay = smInitialRetryDelay;
         while (keepRunning && !cancellationToken.IsCancellationRequested)
         {
             try
@@ -91,17 +83,50 @@ public sealed partial class PipeServer : IAsyncDisposable
                     PipeBufferSize);
 
                 await pipe.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
+                retryDelay = smInitialRetryDelay;
                 await ServeClientAsync(pipe, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
                 keepRunning = false;
             }
-            catch (IOException ex)
+            catch (IOException)
             {
-                LogPipeIoException(ex);
+                // Transient pipe error; back off before re-creating the server stream so a persistent
+                // failure cannot spin the accept loop. The delay grows to a cap and resets on the next
+                // successful connection; a shutdown request during the delay stops the loop.
+                keepRunning = await DelayBeforeRetryAsync(retryDelay, cancellationToken).ConfigureAwait(false);
+                retryDelay = NextRetryDelay(retryDelay);
             }
         }
+    }
+
+    /// <summary>
+    /// Waits <paramref name="delay"/> before the accept loop re-creates the pipe after a transient
+    /// error. Returns <c>false</c> if shutdown was requested during the wait, signalling the loop to stop.
+    /// </summary>
+    private static async Task<bool> DelayBeforeRetryAsync(TimeSpan delay, CancellationToken cancellationToken)
+    {
+        bool keepRunning = true;
+        try
+        {
+            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            keepRunning = false;
+        }
+        return keepRunning;
+    }
+
+    /// <summary>
+    /// Doubles <paramref name="current"/> up to <see cref="smMaxRetryDelay"/>, giving exponential
+    /// backoff while pipe errors persist.
+    /// </summary>
+    private static TimeSpan NextRetryDelay(TimeSpan current)
+    {
+        long doubledTicks = current.Ticks * 2;
+        return doubledTicks >= smMaxRetryDelay.Ticks ? smMaxRetryDelay : TimeSpan.FromTicks(doubledTicks);
     }
 
     private async Task ServeClientAsync(NamedPipeServerStream pipe, CancellationToken cancellationToken)
@@ -160,7 +185,6 @@ public sealed partial class PipeServer : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                LogToolException(ex, request.Tool);
                 response = new RpcResponse
                 {
                     Id = request.Id,

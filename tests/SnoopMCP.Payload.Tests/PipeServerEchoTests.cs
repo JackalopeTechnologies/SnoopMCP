@@ -7,7 +7,6 @@ namespace SnoopMCP.Payload.Tests;
 
 using System.IO.Pipes;
 using System.Text.Json;
-using Microsoft.Extensions.Logging.Abstractions;
 using Payload;
 using Tools;
 using Protocol.Wire;
@@ -23,7 +22,7 @@ public sealed class PipeServerEchoTests
         var registry = new ToolRegistry();
         registry.Register(new EchoToolHandler());
 
-        await using var server = new PipeServer(pipeName, registry, NullLogger<PipeServer>.Instance);
+        await using var server = new PipeServer(pipeName, registry);
         server.Start();
 
         await using var client = new NamedPipeClientStream(

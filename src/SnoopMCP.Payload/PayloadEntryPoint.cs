@@ -8,8 +8,6 @@ namespace SnoopMCP.Payload;
 using System.IO;
 using System.Reflection;
 using System.Windows;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Inspection;
 using PathStrings;
 using Tools;
@@ -29,11 +27,12 @@ public static class PayloadEntryPoint
     /// <summary>
     /// Called by <c>ManagedInjector</c> from within the target process. This is a thin bootstrap:
     /// it installs an <see cref="AppDomain.AssemblyResolve"/> handler that probes the payload's own
-    /// directory, THEN delegates to <see cref="Run"/>. The split matters — the payload's dependencies
-    /// (<c>SnoopMCP.Protocol</c>, <c>Microsoft.Extensions.Logging.Abstractions</c>) sit next to the
-    /// payload, not in the target app's base directory, so without this handler the CLR fails to
-    /// resolve them when JIT-compiling <see cref="Run"/>. The bootstrap itself references only shared
-    /// framework types, so it JITs cleanly before the handler is needed.
+    /// directory, THEN delegates to <see cref="Run"/>. The split matters — the payload's private
+    /// dependency (<c>SnoopMCP.Protocol</c>) sits next to the payload, not in the target app's base
+    /// directory, so without this handler the CLR fails to resolve it when JIT-compiling
+    /// <see cref="Run"/>. The payload carries no version-sensitive third-party assemblies, so it can
+    /// never collide with a version the host already loaded. The bootstrap itself references only
+    /// shared framework types, so it JITs cleanly before the handler is needed.
     /// </summary>
     /// <param name="args">The named-pipe instance to bind. Must not be empty.</param>
     /// <returns><c>0</c> on success; non-zero when payload initialisation fails.</returns>
@@ -125,8 +124,7 @@ public static class PayloadEntryPoint
             toolRegistry.Register(new ListBindingsToolHandler(registry, bindingInspector, marshal));
             toolRegistry.Register(new ExportXamlToolHandler(registry, xamlExporter, marshal));
 
-            ILogger<PipeServer> logger = NullLogger<PipeServer>.Instance;
-            psServer = new PipeServer(pipeName, toolRegistry, logger);
+            psServer = new PipeServer(pipeName, toolRegistry);
             psServer.Start();
         }
         catch (Exception)
