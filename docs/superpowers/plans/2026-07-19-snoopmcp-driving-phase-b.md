@@ -112,6 +112,26 @@ Rewrite Task 10 to: attach to `SampleWpfApp`; enable the gate; `executeCommand` 
 
 ---
 
+## Codex Round 2 — additional binding fixes (a second read-only Codex pass found these in the Round-1 corrections; apply on top; SUPERSEDES C5's runtime-id text)
+
+**R2-H (C5 — runtime-id is inaccessible; ship a forward-only bridge; resolves the C5/spec contradiction).** `AutomationPeer.GetRuntimeId()` is `protected internal` in WPF — a caller in `PeerInfoReader` **cannot invoke it** (won't compile). Do NOT add `RuntimeId`. Final, consistent contract (matches the updated spec §4.2, forward-only):
+```csharp
+public sealed record GetAutomationPeerInfoResponse(
+    string AutomationId, string Name, string ClassName, string ControlType);
+```
+`PeerInfoReader.Read` returns exactly those four (as the original Task 6 did). Cross-tier correlation keys on **`AutomationId`** — not runtime-id (Plan A's C5 "correlate runtime IDs" line is withdrawn; ignore it). A UIA→Snoop-id reverse-lookup tool is deferred to v-next (spec §4.2 updated to say so). This makes prior finding #5 a deliberate, documented scope decision rather than a gap.
+
+**R2-I (C7 — a posted action must not report `false` outcomes it doesn't know).** In `"post"` (fire-and-forget) mode the command has not run when the response returns, so `Executed=false`/`CanExecute=false` would be a lie. Make the outcome fields **nullable**:
+```csharp
+public sealed record PeerInvokeResponse(bool? Ok, bool Dispatched);
+public sealed record ExecuteCommandResponse(bool? Executed, bool? CanExecute, bool Dispatched);
+```
+- `"wait"` mode → `Ok:true` / `Executed:true, CanExecute:true`, `Dispatched:false`.
+- `"post"` mode → `Ok:null` / `Executed:null, CanExecute:null`, `Dispatched:true` (verify the effect via `waitForValue`/`captureWindow`).
+Update the Task 4/5 handler code, the wire records (Task 2), and the C7 text accordingly. `null` outcome fields are omitted on the wire (omit-null), which is the correct signal to the agent.
+
+---
+
 ## File Structure
 
 **Create:**

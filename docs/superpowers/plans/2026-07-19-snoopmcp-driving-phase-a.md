@@ -187,6 +187,54 @@ Add explicit tests: find by `automationId`/`name`/`helpText`/`controlType` (Task
 
 ---
 
+## Codex Round 2 — additional binding fixes (a second read-only Codex pass found these in the Round-1 corrections; apply on top)
+
+**R2-A (C1 image API — the Round-1 initializer does NOT compile).** `ModelContextProtocol` 1.3.0 declares `ImageContentBlock.Data` as `ReadOnlyMemory<byte>`, not `string`, and both `CallToolResult`/`ImageContentBlock` need `using ModelContextProtocol.Protocol;`. Use the raw bytes:
+```csharp
+using ModelContextProtocol.Protocol;
+// ...
+byte[] png = Convert.FromBase64String(r.Base64);
+return Task.FromResult(new CallToolResult
+{
+    Content = [ImageContentBlock.FromBytes(png, "image/png")]
+});
+```
+If `FromBytes` is absent in the installed build, use `new ImageContentBlock { Data = png, MimeType = "image/png" }` (byte[] converts to `ReadOnlyMemory<byte>`). The implementer confirms the exact surface at compile time and notes it.
+
+**R2-B (C2 — `App.xaml.cs` cannot reference `SnoopMCP.Cli.AutostartTask`).** The Host project references Server/ClientIntegration/Injection/Payload, **not Cli** — so the self-elevation code cannot compile against `AutostartTask`. **Move `AutostartTask` into `SnoopMCP.ClientIntegration`** (the one assembly both `SnoopMCP.Cli` and `SnoopMCP.Host` already reference). Update its namespace to `SnoopMCP.ClientIntegration`, fix `using`s in `Program.cs`/`HostProcess.cs`, and move `AutostartTaskTests.cs` to `tests/SnoopMCP.ClientIntegration.Tests`. Do this move as the FIRST step of Task 11 (before the `/RL HIGHEST` change), in its own commit.
+
+**R2-C (C2 mutex/relaunch ordering — the Round-1 algorithm is unsafe).** Do not `ReleaseMutex()` (the single-instance mutex at `App.xaml.cs:33` is created `initiallyOwned:false`; releasing a non-owned mutex throws). Correct order in `OnStartup`:
+```
+if (!ElevationInfo.IsElevated() && AutostartTask.Exists() && ElevationInfo.CanElevate())
+{
+    if (AutostartTask.RunNow())        // launch the elevated task FIRST
+    {
+        mutex.Dispose();               // close our handle (do NOT ReleaseMutex)
+        Shutdown();                    // exit this Medium instance; the elevated one acquires the mutex
+        return;
+    }
+    // RunNow failed (user declined UAC / task error): fall through and continue at Medium.
+}
+```
+Only shut down after `RunNow()` succeeds; otherwise keep running Medium.
+
+**R2-D (C3 guard ordering + error mapping).** In the **mutating** tools (`InvokeUia`, `SetUiaValue`) call `RequireGate()` BEFORE `WpfTargetGuard.EnsureWpf(...)`, so a gate-off target yields `InteractionDisabled` (not `AttachFailed`) — this keeps the gate-first unit test valid. Also fix `WpfTargetGuard`: a `Win32Exception` from module enumeration is an access/elevation failure → map to **`AccessDenied`**, NOT `AttachFailed`; reserve `AttachFailed` ("not a WPF app") for the case where enumeration SUCCEEDS but `PresentationFramework.dll` is absent.
+
+**R2-E (C4 pid validation on `getUiaTree`).** `GetTreeAsync(int pid, UiaElementRef? fromElement, …)` must reject `fromElement.Pid != pid` with `InvalidArgument` (or ignore `pid` and derive it from `fromElement.Pid`). Otherwise a ref for process B is walked while child refs are minted labeled process A. `ElementHandleCache.TryGet(handle, expectedPid, …)` already validates the handle prefix; pass the intended pid consistently.
+
+**R2-F (C10 cached pattern reads).** `element.Cached` exposes `AutomationId`/`Name`/`ControlType`/`HelpText`/`BoundingRectangle`, but has **no** `IsInvokePatternAvailable`-style members. Read the cached pattern-availability flags with `GetCachedPropertyValue`:
+```csharp
+bool CanInvoke = (bool)element.GetCachedPropertyValue(AutomationElement.IsInvokePatternAvailableProperty);
+// ...same for Toggle/SelectionItem/ExpandCollapse/Value; build Patterns from these.
+```
+
+**R2-G (C9 fixture must be UIA-verifiable).** For Phase A to prove invocation through UIA alone, the Task 0 fixture must surface results to UIA and let the command read the textbox:
+- Bind `ProbeText.Text` two-way to a VM string `ProbeInput` (so `RunProbeCommand` reads it from the VM, not the control).
+- Show `ProbeStatus` in a `TextBlock` with `AutomationProperties.AutomationId="ProbeStatus"` (so a UIA `findUiaElement(by:automationId,"ProbeStatus")` read confirms `"done"` without the payload tier).
+- `RunProbeCommand` sets `ProbeStatus="done"` and `ProbeResult=ProbeInput`. This fully closes finding #9 for the Phase-A UIA-only invocation test and the Phase-B E2E.
+
+---
+
 ## File Structure
 
 **Create:**
