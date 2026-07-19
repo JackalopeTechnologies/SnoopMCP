@@ -32,6 +32,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
@@ -108,6 +109,24 @@
             <Button x:Name="DeleteButton"
                     Content="Delete"
                     Style="{StaticResource DangerButtonStyle}" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,12,0,0">
+            <TextBlock Text="Probe:" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBox x:Name="ProbeText"
+                     Width="200"
+                     AutomationProperties.AutomationId="ProbeText"
+                     Text="{Binding ProbeInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            <Button x:Name="RunProbeButton"
+                    Content="Run Probe"
+                    Margin="8,0,0,0"
+                    AutomationProperties.AutomationId="RunProbe"
+                    Command="{Binding RunProbeCommand}" />
+            <TextBlock Text="Status:" VerticalAlignment="Center" Margin="16,0,8,0" />
+            <TextBlock x:Name="ProbeStatusText"
+                       VerticalAlignment="Center"
+                       AutomationProperties.AutomationId="ProbeStatus"
+                       Text="{Binding ProbeStatus}" />
         </StackPanel>
     </Grid>
 </Window>
