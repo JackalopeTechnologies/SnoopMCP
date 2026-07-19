@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
+using Automation;
 using Logging;
 using Tools;
 
@@ -31,8 +32,10 @@ public static class ServerHost
     /// <param name="port">Loopback port to listen on; defaults to <see cref="ListenPort"/>. Pass 0 to bind a free port (used by tests).</param>
     /// <param name="logPath">Absolute path for the server log file; defaults to
     /// <see cref="FileLoggerProvider.DefaultLogPath"/> under %LOCALAPPDATA%. Tests pass a temp path so they never touch the real log.</param>
+    /// <param name="gate">The interaction gate instance to register; defaults to <see cref="InteractionGate.ForCurrentUser"/>.
+    /// Tests pass an explicit gate backed by a temp state path so they never touch the real per-user state file.</param>
     /// <returns>The configured, not-yet-started web application.</returns>
-    public static WebApplication Build(string[] args, int port = ListenPort, string? logPath = null)
+    public static WebApplication Build(string[] args, int port = ListenPort, string? logPath = null, InteractionGate? gate = null)
     {
         ArgumentNullException.ThrowIfNull(args);
 
@@ -46,6 +49,12 @@ public static class ServerHost
         // file focused on warnings, errors, and lifecycle.
         builder.Logging.AddProvider(new FileLoggerProvider(logPath ?? FileLoggerProvider.DefaultLogPath()));
         builder.Logging.AddFilter(AspNetCoreLogCategory, LogLevel.Warning);
+
+        InteractionGate interactionGate = gate ?? InteractionGate.ForCurrentUser();
+        builder.Services.AddSingleton(interactionGate);
+        builder.Services.AddSingleton<ElementHandleCache>();
+        builder.Services.AddSingleton<IUiaDriver, UiaDriver>();
+        builder.Services.AddSingleton<IScreenCapture, PrintWindowCapture>();
 
         builder.Services.AddSingleton<SessionManager>();
         builder.Services.AddSingleton<IInjectorService, Injection.InjectorService>();
@@ -77,8 +86,8 @@ public static class ServerHost
         app.UseRouting();
 
         app.MapMcp(McpEndpointPattern);
-        app.MapGet(HealthEndpointPattern, (SessionManager session) =>
-            Results.Ok(HealthStatus.Create(ThisAssembly.InformationalVersion, session.IsAttached)));
+        app.MapGet(HealthEndpointPattern, (SessionManager session, InteractionGate gate) =>
+            Results.Ok(HealthStatus.Create(ThisAssembly.InformationalVersion, session.IsAttached, gate.IsEnabled)));
 
         return app;
     }
