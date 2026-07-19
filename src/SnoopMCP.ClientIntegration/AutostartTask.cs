@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 // Licensed under the MIT License. See LICENSE in the repository root.
 
-namespace SnoopMCP.Cli;
+namespace SnoopMCP.ClientIntegration;
 
 using System.Diagnostics;
 

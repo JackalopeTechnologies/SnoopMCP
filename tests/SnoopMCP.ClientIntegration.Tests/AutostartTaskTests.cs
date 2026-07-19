@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MIT
 // Licensed under the MIT License. See LICENSE in the repository root.
 
-namespace SnoopMCP.Cli.Tests;
+namespace SnoopMCP.ClientIntegration.Tests;
 
-using Cli;
+using ClientIntegration;
 using Xunit;
 
 public sealed class AutostartTaskTests
