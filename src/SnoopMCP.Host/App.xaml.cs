@@ -63,8 +63,8 @@ public partial class App
                 }
                 else
                 {
-                    // User declined the UAC prompt, or the task failed to run: continue at Medium.
-                    HostLog.Info("Elevated relaunch declined or failed; continuing at Medium integrity.");
+                    // RunNow failed (Task Scheduler could not trigger the elevated task): fall through and run at Medium integrity.
+                    HostLog.Info("Elevated relaunch could not be triggered; continuing at Medium integrity.");
                 }
             }
             if (!relaunchingElevated)
