@@ -54,9 +54,10 @@ public sealed class ElementHandleCache
     /// Resolves a handle to its element and locator; false when unknown, expired, or the handle's
     /// embedded pid does not match <paramref name="expectedPid"/>.
     /// </summary>
-    // STR0010 suppression: the analyzer treats `out` parameters identically to `in` parameters,
-    // but validating an `out` is incoherent — it carries no caller input. There is no alternative
-    // expression of TryGet that preserves the standard .NET `Try*` semantics.
+    // STR0010 suppression: 'element' is an out parameter — the analyzer treats it like an
+    // input that must be validated, but validating an `out` is incoherent (it carries no
+    // caller input). There is no alternative expression of this out-parameter that would
+    // satisfy the analyzer while preserving the standard .NET `Try*` shape.
 #pragma warning disable STR0010
     public bool TryGet(
         string handle,
@@ -70,7 +71,7 @@ public sealed class ElementHandleCache
         by = null;
         value = null;
         bool ok = false;
-        if (HandlePidMatches(handle, expectedPid) && mEntries.TryGetValue(handle, out Entry? entry))
+        if (handle != null && HandlePidMatches(handle, expectedPid) && mEntries.TryGetValue(handle, out Entry? entry))
         {
             bool fresh = mClock() - entry.Stamp <= mTtl;
             if (fresh)
