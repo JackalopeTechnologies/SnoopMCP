@@ -42,4 +42,10 @@ public sealed class AutostartTaskTests
     {
         Assert.Throws<ArgumentException>(() => AutostartTask.BuildCreateArguments(string.Empty));
     }
+
+    [Fact]
+    public void BuildRunArguments_RunsTheTask()
+    {
+        Assert.Equal(["/Run", "/TN", "SnoopMCP Host"], AutostartTask.BuildRunArguments());
+    }
 }

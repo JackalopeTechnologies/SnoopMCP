@@ -27,6 +27,7 @@ public static class AutostartTask
     private const string Highest = "HIGHEST";
     private const string TaskRunSwitch = "/TR";
     private const string ForceSwitch = "/F";
+    private const string RunSwitch = "/Run";
 
     /// <summary>Builds the <c>schtasks</c> arguments that create the logon task for the host exe.</summary>
     /// <param name="hostExePath">Absolute path to <c>SnoopMCP.Host.exe</c>.</param>
@@ -52,6 +53,12 @@ public static class AutostartTask
         return [QuerySwitch, TaskNameSwitch, TaskName];
     }
 
+    /// <summary>Builds the <c>schtasks</c> arguments that run the logon task now (inherits its RunLevel).</summary>
+    public static IReadOnlyList<string> BuildRunArguments()
+    {
+        return [RunSwitch, TaskNameSwitch, TaskName];
+    }
+
     /// <summary>
     /// Creates (or replaces) the elevated logon task. Registering a /RL HIGHEST task requires an
     /// elevated caller, so this relaunches schtasks with the "runas" verb, producing one UAC prompt.
@@ -74,6 +81,12 @@ public static class AutostartTask
     public static bool Exists()
     {
         return Run(BuildQueryArguments()) == 0;
+    }
+
+    /// <summary>Runs the registered task immediately (elevated if it is a HIGHEST task). Returns true on success.</summary>
+    public static bool RunNow()
+    {
+        return Run(BuildRunArguments()) == 0;
     }
 
     private static bool RunElevated(IReadOnlyList<string> arguments)

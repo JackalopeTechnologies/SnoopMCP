@@ -6,6 +6,7 @@
 namespace SnoopMCP.Cli;
 
 using System.Diagnostics;
+using ClientIntegration;
 
 /// <summary>
 /// Starts and stops the SnoopMCP host process (<c>SnoopMCP.Host.exe</c>), which sits next to this
@@ -24,17 +25,30 @@ public static class HostProcess
         return Path.Combine(AppContext.BaseDirectory, HostExeName);
     }
 
-    /// <summary>Launches the host. Returns true if a process was started.</summary>
+    /// <summary>
+    /// Launches the host. Prefers running the registered elevated logon task (so a manual start is
+    /// elevated just like autostart); falls back to a direct launch when the task is absent.
+    /// Returns true if a launch was initiated.
+    /// </summary>
     public static bool Start()
     {
-        var psi = new ProcessStartInfo
+        bool started;
+        if (AutostartTask.Exists())
         {
-            FileName = ExePath(),
-            UseShellExecute = false
-        };
-        // Dispose only the handle, not the process: the host keeps running after this returns.
-        using var process = Process.Start(psi);
-        return process is not null;
+            started = AutostartTask.RunNow();
+        }
+        else
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = ExePath(),
+                UseShellExecute = false
+            };
+            // Dispose only the handle, not the process: the host keeps running after this returns.
+            using var process = Process.Start(psi);
+            started = process is not null;
+        }
+        return started;
     }
 
     /// <summary>Stops any running host instances. Returns the count stopped.</summary>
