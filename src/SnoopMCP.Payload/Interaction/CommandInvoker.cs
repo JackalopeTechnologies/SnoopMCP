@@ -5,7 +5,6 @@
 
 namespace SnoopMCP.Payload.Interaction;
 
-using System.Reflection;
 using System.Windows;
 using System.Windows.Input;
 using Protocol.Errors;
@@ -103,31 +102,14 @@ public sealed class CommandInvoker
     {
         object context = (element as FrameworkElement)?.DataContext
             ?? throw new SnoopMcpException(ErrorCode.NotDrivable, "Element has no DataContext to resolve the command path.");
-        object resolved = WalkPath(context, path);
+        if (!DataContextPath.TryWalk(context, path, out object? resolved))
+        {
+            throw new SnoopMcpException(ErrorCode.BindingPathError, $"DataContext path '{path}' could not be resolved.");
+        }
+
         (ICommand Command, object? Parameter) result = resolved is ICommand pathCommand
             ? (pathCommand, null)
             : throw new SnoopMcpException(ErrorCode.NotDrivable, $"DataContext path '{path}' is not an ICommand.");
         return result;
-    }
-
-    // DRY: shared with ValueWaiter in Task 7 — this will be extracted to a shared
-    // Interaction/DataContextPath.cs and both call sites updated to use it.
-    private static object WalkPath(object root, string path)
-    {
-        // No null check on `current` inside the loop: `root` is non-nullable and every step below
-        // either yields a non-null value or throws BindingPathError (a missing property AND a
-        // property that legitimately evaluates to null are both treated as an unwalkable segment),
-        // so `current` provably never goes null mid-walk — confirmed by nullable-flow analysis.
-        object current = root;
-        foreach (string segment in path.Split('.', StringSplitOptions.RemoveEmptyEntries))
-        {
-            PropertyInfo? property = current.GetType().GetProperty(
-                segment, BindingFlags.Public | BindingFlags.Instance);
-            current = property?.GetValue(current)
-                ?? throw new SnoopMcpException(
-                    ErrorCode.BindingPathError,
-                    $"Path segment '{segment}' not found on {current.GetType().Name}.");
-        }
-        return current;
     }
 }
