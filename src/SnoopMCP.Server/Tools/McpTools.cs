@@ -170,53 +170,53 @@ public sealed class McpTools
     public Task<JsonElement> GetTemplatedParent(int id, CancellationToken cancellationToken) =>
         Dispatch(ToolNames.GetTemplatedParent, new GetTemplatedParentRequest(id), cancellationToken);
 
-    /// <summary>Finds elements under a root matching an AND-combined predicate.</summary>
-    /// <param name="rootId">The root element id whose subtree is searched.</param>
+    /// <summary>Finds elements under an element matching an AND-combined predicate.</summary>
+    /// <param name="id">The element id whose subtree (including itself) is searched. Any element id works, not only a literal <c>attach</c> visual root.</param>
     /// <param name="predicate">The AND-combined predicate; every supplied field must match.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Find elements under rootId matching the AND-combined predicate.")]
+    [McpServerTool, Description("Find elements under id matching the AND-combined predicate.")]
     public Task<JsonElement> FindElements(
-        int rootId,
+        int id,
         ElementPredicateDto predicate,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(predicate);
         return Dispatch(
             ToolNames.FindElements,
-            new FindElementsRequest(rootId, predicate),
+            new FindElementsRequest(id, predicate),
             cancellationToken);
     }
 
-    /// <summary>Hit tests a root-relative point and returns the deepest visual.</summary>
-    /// <param name="rootId">The root element id whose coordinate space the point is expressed in.</param>
-    /// <param name="x">The root-relative X coordinate in DIPs.</param>
-    /// <param name="y">The root-relative Y coordinate in DIPs.</param>
+    /// <summary>Hit tests a point expressed relative to an element and returns the deepest visual.</summary>
+    /// <param name="id">The element id whose coordinate space the point is expressed in.</param>
+    /// <param name="x">The element-relative X coordinate in DIPs.</param>
+    /// <param name="y">The element-relative Y coordinate in DIPs.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Hit test a root-relative point and return the deepest visual.")]
+    [McpServerTool, Description("Hit test a point relative to id and return the deepest visual.")]
     public Task<JsonElement> HitTest(
-        int rootId,
+        int id,
         double x,
         double y,
         CancellationToken cancellationToken) =>
-        Dispatch(ToolNames.HitTest, new HitTestRequest(rootId, x, y), cancellationToken);
+        Dispatch(ToolNames.HitTest, new HitTestRequest(id, x, y), cancellationToken);
 
-    /// <summary>Resolves a canonical path string under a root.</summary>
-    /// <param name="rootId">The root element id whose subtree is walked.</param>
+    /// <summary>Resolves a canonical path string under an element.</summary>
+    /// <param name="id">The element id whose subtree is walked.</param>
     /// <param name="pathString">The canonical path string to resolve.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Resolve a canonical path string under rootId.")]
+    [McpServerTool, Description("Resolve a canonical path string under id.")]
     public Task<JsonElement> ResolvePath(
-        int rootId,
+        int id,
         string pathString,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(pathString);
         return Dispatch(
             ToolNames.ResolvePath,
-            new ResolvePathRequest(rootId, pathString),
+            new ResolvePathRequest(id, pathString),
             cancellationToken);
     }
 

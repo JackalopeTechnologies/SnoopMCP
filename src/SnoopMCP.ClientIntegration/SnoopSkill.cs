@@ -52,7 +52,7 @@ public static class SnoopSkill
         | To find out | Call |
         |---|---|
         | What windows/popups exist | `listVisualRoots()` |
-        | Which element is *that* one | `findElements(rootId, predicate)` when you know a name/type; `hitTest(rootId, x, y)` when you only have a location; `resolvePath(rootId, path)` to re-resolve a path string from an earlier `describeElement` |
+        | Which element is *that* one | `findElements(id, predicate)` when you know a name/type; `hitTest(id, x, y)` when you only have a location; `resolvePath(id, path)` to re-resolve a path string from an earlier `describeElement` |
         | What a node is | `describeElement(id)` |
         | Tree shape | `getChildren(id, tree)`, `getParent(id, tree)`, `getTemplatedParent(id)` |
         | Why a property holds this value | `getDependencyProperty(id, name)` — value **and** precedence trace; `listDependencyProperties(id)` |
@@ -67,14 +67,19 @@ public static class SnoopSkill
         `findElements` predicate fields, all optional and AND-combined: `type` (case-sensitive substring of
         the full type name), `name` (exact `x:Name`), `automationId` (exact), `textContains` (case-insensitive,
         against capped visible text), `propertyEquals` (stringified DP comparison), and the nested predicates
-        `hasAncestor`, `hasDescendant`, `inTemplateOf`.
+        `hasAncestor`, `hasDescendant`, `inTemplateOf`. For bulk text searches, also `leafOnly`, `maxResults`,
+        and `suppressPath` to keep large result sets bounded and readable.
 
         ## Common mistakes
 
         - **Carrying element ids across sessions.** Ids are per-session. If the target exits, the session goes
           with it (`SessionLost`) — `attach` the new pid and re-resolve. Within a live session, an id whose
           element has been garbage-collected returns `ElementExpired` — re-resolve from
-          `listVisualRoots`/`findElements`.
+          `listVisualRoots`/`findElements`. Worse, a live-looking id can silently describe a different row: a
+          virtualizing panel recycles the *same* container for a different data item as it scrolls — same id,
+          no error, no `ElementExpired`. If you're holding ids across calls that might span a scroll or data
+          change, re-`describeElement` and compare `dataContextHashCode` against the value you saw before; a
+          changed value means this id now names different data.
         - **Blaming the binding first.** For a wrong value, read the precedence trace from
           `getDependencyProperty` — a local value, style trigger, or animation may be beating the binding.
         - **Trusting `exportXaml` for binding shape.** It serializes evaluated values, not `{Binding}` markup;
@@ -120,6 +125,20 @@ public static class SnoopSkill
            - `peerInvoke(id, pattern, dispatch?)` — drive the real WPF `AutomationPeer` pattern (Invoke | Toggle | SelectionItem | ExpandCollapse) in-process. MUTATES.
            - `executeCommand(id, path?, parameter?, dispatch?)` — execute the `ICommand` bound to an element (or at a DataContext `path`), CanExecute-gated. MUTATES.
 
+        ## An element visibly on screen isn't found by `findUiaElement`/`getUiaTree`
+
+        This is not necessarily a SnoopMCP defect. A UIA tree walk only descends through the automation
+        peers a parent peer reports as its children (`AutomationPeer.GetChildrenCore()`); a custom control
+        whose peer never implemented child-peer support (or reports none) prunes everything below it from
+        every UIA client's search, regardless of scope (`Children`/`Descendants`) or `by` locator — this is
+        unrelated to the raw/control/content tree "view" concept, which only affects `TreeWalker`/caching,
+        not `FindAll`/`FindFirst`. Suspect this whenever a `name`/`controlType` search comes up empty for
+        something you can see rendered.
+
+        **Workaround:** fall back to the payload tier. `attach()` then `findElements(id, { textContains, leafOnly: true })`
+        walks the real WPF visual tree via `VisualTreeHelper` and never consults automation peers, so it
+        finds elements a pruned peer hides from UIA entirely.
+
         ## Rules
 
         - Never ask SnoopMCP to synthesize mouse/keyboard input — there is no such tool by design. If a control
@@ -138,6 +157,11 @@ public static class SnoopSkill
           autostart registers an elevated logon task (one UAC). This is admin-only.
         - Element handles are short-lived; pass back the `element` reference you received. If it is stale,
           SnoopMCP re-resolves it by locator, or returns `UiaElementStale`/`UiaAmbiguousLocator` — re-find in that case.
+        - The UIA tools deliberately use two argument shapes, not one: `findUiaElement`/`waitForUia` take a flat
+          `pid`/`by`/`value` locator because there is no reference yet; `invokeUia`/`setUiaValue`/`getUiaTree`
+          take an `element`/`fromElement` reference object (handle + locator fallback) because there is. This is
+          an accepted design decision, not an inconsistency — don't flatten the reference calls or wrap the
+          locator calls to make them match.
         - Endpoint: http://127.0.0.1:6300/mcp. Start the SnoopMCP host (tray app) first.
         """;
 

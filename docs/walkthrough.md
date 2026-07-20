@@ -310,7 +310,7 @@ by name, by visible text, by screen coordinate, or round-trips a path string.
 "Find the element named SaveButton, starting from root 1."
 
 ```json
-{ "tool": "findElements", "arguments": { "rootId": 1, "predicate": { "name": "SaveButton" } } }
+{ "tool": "findElements", "arguments": { "id": 1, "predicate": { "name": "SaveButton" } } }
 ```
 
 ```json
@@ -339,7 +339,7 @@ element whose visible text contains the string matches, from the container down
 to the leaf.
 
 ```json
-{ "tool": "findElements", "arguments": { "rootId": 1, "predicate": { "textContains": "Springfield" } } }
+{ "tool": "findElements", "arguments": { "id": 1, "predicate": { "textContains": "Springfield" } } }
 ```
 
 ```json
@@ -364,7 +364,7 @@ README's v1 limitations.)
 but don't know which element owns it.
 
 ```json
-{ "tool": "hitTest", "arguments": { "rootId": 1, "x": 50, "y": 50 } }
+{ "tool": "hitTest", "arguments": { "id": 1, "x": 50, "y": 50 } }
 ```
 
 ```json
@@ -391,7 +391,7 @@ Paths from `describeElement` aren't just labels; they round-trip. Here Doug
 feeds the root's own path back in.
 
 ```json
-{ "tool": "resolvePath", "arguments": { "rootId": 1, "pathString": "/MainWindow" } }
+{ "tool": "resolvePath", "arguments": { "id": 1, "pathString": "/MainWindow" } }
 ```
 
 ```json

@@ -60,7 +60,9 @@ public sealed class ElementDescriber
         bool hasBindingErrors = AnyBindingHasError(element);
         string path = mEmitter.Emit(element);
         int childCount = SafeChildCount(element);
-        string? dataContextType = (element as FrameworkElement)?.DataContext?.GetType().FullName;
+        object? dataContext = (element as FrameworkElement)?.DataContext;
+        string? dataContextType = dataContext?.GetType().FullName;
+        int? dataContextHashCode = dataContext is null ? null : RuntimeHelpers.GetHashCode(dataContext);
         int hashCode = RuntimeHelpers.GetHashCode(element);
 
         return new DescribeElementResponse(
@@ -77,6 +79,7 @@ public sealed class ElementDescriber
             ChildCount: childCount,
             DataContextType: dataContextType,
             HashCode: hashCode,
+            DataContextHashCode: dataContextHashCode,
             IsAlive: true);
     }
 

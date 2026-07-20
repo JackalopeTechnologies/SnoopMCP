@@ -24,6 +24,15 @@ public sealed record ElementPredicateDto
     /// <summary>Case-insensitive substring search inside the element's capped visible text.</summary>
     public string? TextContains { get; init; }
 
+    /// <summary>Restricts <see cref="TextContains"/> matches to leaf nodes only.</summary>
+    public bool LeafOnly { get; init; }
+
+    /// <summary>Limits the number of matches returned for <see cref="TextContains"/>.</summary>
+    public int? MaxResults { get; init; }
+
+    /// <summary>Suppresses the canonical path in returned matches when <see cref="TextContains"/> is used.</summary>
+    public bool SuppressPath { get; init; }
+
     /// <summary>Stringified equality check against a named dependency property.</summary>
     public PropertyEqualsDto? PropertyEquals { get; init; }
 
