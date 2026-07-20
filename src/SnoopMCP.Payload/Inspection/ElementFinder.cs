@@ -5,6 +5,7 @@
 
 namespace SnoopMCP.Payload.Inspection;
 
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Windows;
@@ -45,7 +46,9 @@ public sealed class ElementFinder
 
         var matches = new List<DescribeElementResponse>();
         Walk(root, predicate, matches);
-        return new FindElementsResponse(matches);
+
+        IReadOnlyList<DescribeElementResponse> limited = ApplyTextSearchLimit(predicate, matches);
+        return new FindElementsResponse(limited);
     }
 
     private void Walk(DependencyObject element, ElementPredicateDto predicate, List<DescribeElementResponse> sink)
@@ -55,7 +58,7 @@ public sealed class ElementFinder
         {
             if (MatchesPredicate(element, predicate))
             {
-                sink.Add(mDescriber.Describe(element));
+                sink.Add(Describe(element, predicate));
             }
             int count = VisualTreeHelper.GetChildrenCount(element);
             for (int i = 0; i < count; i++)
@@ -65,6 +68,38 @@ public sealed class ElementFinder
         }
     }
 
+    private DescribeElementResponse Describe(DependencyObject element, ElementPredicateDto predicate)
+    {
+        DescribeElementResponse description = mDescriber.Describe(element);
+        DescribeElementResponse result = description;
+        if (predicate.SuppressPath)
+        {
+            result = description with { Path = string.Empty };
+        }
+
+        return result;
+    }
+
+    private static IReadOnlyList<DescribeElementResponse> ApplyTextSearchLimit(
+        ElementPredicateDto predicate,
+        List<DescribeElementResponse> matches)
+    {
+        IReadOnlyList<DescribeElementResponse> result = matches;
+        if (predicate.MaxResults is not null && predicate.MaxResults.Value > 0)
+        {
+            int limit = Math.Min(predicate.MaxResults.Value, matches.Count);
+            if (limit < matches.Count)
+            {
+                Trace.WriteLine(
+                    $"findElements truncated {matches.Count} matches to {limit}; {matches.Count - limit} dropped.");
+            }
+
+            result = matches.Take(limit).ToList();
+        }
+
+        return result;
+    }
+
     private bool MatchesPredicate(DependencyObject element, ElementPredicateDto predicate)
     {
         bool matches = true;
@@ -72,6 +107,7 @@ public sealed class ElementFinder
         matches = matches && MatchesName(element, predicate.Name);
         matches = matches && MatchesAutomationId(element, predicate.AutomationId);
         matches = matches && MatchesTextContains(element, predicate.TextContains);
+        matches = matches && MatchesLeafOnly(element, predicate.LeafOnly);
         matches = matches && MatchesPropertyEquals(element, predicate.PropertyEquals);
         matches = matches && MatchesAncestor(element, predicate.HasAncestor);
         matches = matches && MatchesDescendant(element, predicate.HasDescendant);
@@ -120,6 +156,18 @@ public sealed class ElementFinder
             DescribeElementResponse description = mDescriber.Describe(element);
             matches = description.VisibleText.Contains(needle, StringComparison.OrdinalIgnoreCase);
         }
+        return matches;
+    }
+
+    private static bool MatchesLeafOnly(DependencyObject element, bool leafOnly)
+    {
+        bool matches = true;
+        if (leafOnly)
+        {
+            bool isVisual = element is Visual or System.Windows.Media.Media3D.Visual3D;
+            matches = isVisual && VisualTreeHelper.GetChildrenCount(element) == 0;
+        }
+
         return matches;
     }
 

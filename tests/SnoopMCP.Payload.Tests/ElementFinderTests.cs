@@ -92,6 +92,69 @@ public sealed class ElementFinderTests
     }
 
     [StaFact]
+    public void Find_ByTextContains_LeafOnly_ExcludesAncestorContainers()
+    {
+        var registry = new ElementRegistry();
+        var finder = CreateFinder(registry);
+        var root = new Grid();
+        var container = new StackPanel();
+        container.Children.Add(new TextBlock { Text = "Hello from the leaf" });
+        root.Children.Add(container);
+
+        var predicate = new ElementPredicateDto
+        {
+            TextContains = "hello",
+            LeafOnly = true
+        };
+
+        FindElementsResponse response = finder.Find(root, predicate);
+
+        Assert.Single(response.Matches);
+        Assert.Equal("TextBlock", response.Matches[0].Type);
+    }
+
+    [StaFact]
+    public void Find_ByTextContains_MaxResults_LimitsMatches()
+    {
+        var registry = new ElementRegistry();
+        var finder = CreateFinder(registry);
+        var root = new StackPanel();
+        root.Children.Add(new TextBlock { Text = "Hello" });
+        root.Children.Add(new TextBlock { Text = "Hello again" });
+        root.Children.Add(new TextBlock { Text = "Hello once more" });
+
+        var predicate = new ElementPredicateDto
+        {
+            TextContains = "hello",
+            MaxResults = 2
+        };
+
+        FindElementsResponse response = finder.Find(root, predicate);
+
+        Assert.Equal(2, response.Matches.Count);
+    }
+
+    [StaFact]
+    public void Find_ByTextContains_SuppressPath_BlanksPath()
+    {
+        var registry = new ElementRegistry();
+        var finder = CreateFinder(registry);
+        var root = new StackPanel();
+        root.Children.Add(new TextBlock { Text = "Hello" });
+
+        var predicate = new ElementPredicateDto
+        {
+            TextContains = "hello",
+            SuppressPath = true
+        };
+
+        FindElementsResponse response = finder.Find(root, predicate);
+
+        Assert.Equal(2, response.Matches.Count);
+        Assert.All(response.Matches, match => Assert.Equal(string.Empty, match.Path));
+    }
+
+    [StaFact]
     public void Find_ByPropertyEquals_StringifiedComparison()
     {
         var registry = new ElementRegistry();
