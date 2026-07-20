@@ -43,7 +43,7 @@ public sealed class AutomationPeerDriver
             throw new SnoopMcpException(ErrorCode.NotDrivable, "Element has no AutomationPeer.");
         }
 
-        switch (pattern)
+        switch (NormalizePattern(pattern))
         {
             case PatternInvoke:
                 Get<IInvokeProvider>(peer, PatternInterface.Invoke).Invoke();
@@ -60,6 +60,27 @@ public sealed class AutomationPeerDriver
             default:
                 throw new SnoopMcpException(ErrorCode.InvalidArgument, $"Unknown peer pattern '{pattern}'.");
         }
+    }
+
+    /// <summary>
+    /// Maps <paramref name="pattern"/> to its canonical-case constant via a case-insensitive match, so
+    /// callers may pass e.g. <c>"invoke"</c> as readily as <c>"Invoke"</c> — matching the case-insensitive
+    /// comparison <c>UiaDriver</c> (Phase A, out-of-process UIA2 tier) already uses for the same four
+    /// pattern names. Returns the original string unchanged when it matches none of the known patterns,
+    /// so the caller's <c>default</c> case still reports the caller's original (un-normalized) text.
+    /// </summary>
+    private static string NormalizePattern(string pattern)
+    {
+        return pattern switch
+        {
+            _ when string.Equals(pattern, PatternInvoke, StringComparison.OrdinalIgnoreCase) => PatternInvoke,
+            _ when string.Equals(pattern, PatternToggle, StringComparison.OrdinalIgnoreCase) => PatternToggle,
+            _ when string.Equals(pattern, PatternSelectionItem, StringComparison.OrdinalIgnoreCase) =>
+                PatternSelectionItem,
+            _ when string.Equals(pattern, PatternExpandCollapse, StringComparison.OrdinalIgnoreCase) =>
+                PatternExpandCollapse,
+            _ => pattern
+        };
     }
 
     private static AutomationPeer? CreatePeer(DependencyObject element)

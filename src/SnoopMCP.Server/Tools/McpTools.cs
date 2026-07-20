@@ -342,7 +342,7 @@ public sealed class McpTools
     /// <param name="id">The element id whose DP or DataContext is polled.</param>
     /// <param name="dependencyProperty">The DP registered name to poll, or null.</param>
     /// <param name="dataContextPath">The dotted DataContext path to poll, or null.</param>
-    /// <param name="expected">The expected value, compared via invariant-culture string equality.</param>
+    /// <param name="expected">The expected value, compared via ordinal string equality.</param>
     /// <param name="timeoutMs">The maximum time to poll, in milliseconds.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
@@ -366,12 +366,16 @@ public sealed class McpTools
     /// <summary>MUTATES the target: drives an element's AutomationPeer pattern in-process.</summary>
     /// <param name="id">The element id whose AutomationPeer is driven.</param>
     /// <param name="pattern">The peer pattern to invoke: Invoke | Toggle | SelectionItem | ExpandCollapse.</param>
-    /// <param name="dispatch">Dispatch mode: null/"wait" (default) waits; "post" fires-and-forgets.</param>
+    /// <param name="dispatch">
+    /// Dispatch mode: null/"wait" (default) waits; "post" fires-and-forgets. In "post" mode
+    /// CanExecute/errors are NOT surfaced — the caller must verify the effect separately (e.g. waitForValue).
+    /// </param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description(
         "MUTATES the target: drive an element's AutomationPeer pattern in-process. Requires the " +
-        "interaction gate. Optional dispatch='post' fires-and-forgets a dialog-opening action.")]
+        "interaction gate. Optional dispatch='post' fires-and-forgets a dialog-opening action; in " +
+        "'post' mode the outcome (including errors) is not surfaced — verify the effect separately.")]
     public Task<JsonElement> PeerInvoke(int id, string pattern, string? dispatch, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(pattern);
@@ -383,12 +387,16 @@ public sealed class McpTools
     /// <param name="id">The element id: an ICommandSource or the root for <paramref name="path"/>.</param>
     /// <param name="path">Optional dotted DataContext path to an ICommand; null uses the element's own Command.</param>
     /// <param name="parameter">Optional command parameter; null uses the element's CommandParameter.</param>
-    /// <param name="dispatch">Dispatch mode: null/"wait" (default) waits; "post" fires-and-forgets.</param>
+    /// <param name="dispatch">
+    /// Dispatch mode: null/"wait" (default) waits; "post" fires-and-forgets. In "post" mode
+    /// CanExecute/errors are NOT surfaced — the caller must verify the effect separately (e.g. waitForValue).
+    /// </param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description(
         "MUTATES the target: execute the ICommand bound to an element (CanExecute-gated). Requires the " +
-        "interaction gate. Optional dispatch='post' fires-and-forgets.")]
+        "interaction gate. Optional dispatch='post' fires-and-forgets; in 'post' mode the outcome " +
+        "(including CanExecute==false or errors) is not surfaced — verify the effect separately.")]
     public Task<JsonElement> ExecuteCommand(
         int id,
         string? path,

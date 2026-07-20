@@ -12,6 +12,6 @@ namespace SnoopMCP.Protocol.Tools;
 /// <param name="Id">Element id whose DP or DataContext is polled.</param>
 /// <param name="DependencyProperty">The DP registered name to poll, or null.</param>
 /// <param name="DataContextPath">The dotted DataContext path to poll, or null.</param>
-/// <param name="Expected">The expected value, compared via invariant-culture string equality.</param>
+/// <param name="Expected">The expected value, compared via ordinal string equality.</param>
 /// <param name="TimeoutMs">Maximum time to poll.</param>
 public sealed record WaitForValueRequest(int Id, string? DependencyProperty, string? DataContextPath, string Expected, int TimeoutMs);

@@ -33,6 +33,20 @@ public sealed class AutomationPeerDriverTests
     }
 
     [WpfFact]
+    public void Invoke_Button_LowercasePattern_FiresClick()
+    {
+        bool clicked = false;
+        var button = new Button();
+        button.Click += (_, _) => clicked = true;
+        var driver = new AutomationPeerDriver();
+
+        driver.Invoke(button, "invoke");
+        PumpDispatcher();
+
+        Assert.True(clicked);
+    }
+
+    [WpfFact]
     public void PeerInvoke_WaitMode_RunsSynchronously_AndReportsOk()
     {
         bool clicked = false;
