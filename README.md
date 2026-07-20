@@ -200,19 +200,25 @@ app — real tool calls and captured responses diagnosing real bugs — see
 
 Twenty read-only tools, plus `attach`/`detach`:
 
+> **Two address spaces — do not mix them.** Every tool below is keyed by a numeric WPF **element `id`**
+> (minted by `attach`/`listVisualRoots`/`findElements`). The UIA driving tools further down are keyed by
+> **`pid`** plus, where a specific element is needed, a UIA **`element`/`fromElement` reference**
+> (`{pid, handle, by, value}`). A WPF `id` and a UIA reference are never interchangeable — passing one
+> where the other is expected fails.
+
 | Tool | Use it for |
 |---|---|
 | `listWpfProcesses()` | Discover WPF processes the host can attach to (pid, name, window title, bitness). Host-side, pre-attach — no session required |
 | `attach(pid)` | Open a session by process id |
 | `detach()` | Close the current session |
 | `listVisualRoots()` | Find windows, popups, tooltip layers |
-| `describeElement(id)` | Per-node identity: type, name, layout `bounds`, painted `renderBounds`, path, binding-error flag |
+| `describeElement(id)` | Per-node identity: type, name, layout `bounds`, painted `renderBounds`, path, binding-error flag, `dataContextHashCode` for detecting a recycled container (see limitations) |
 | `getChildren(id, tree)` | Walk visual or logical tree, virtualization-aware |
 | `getParent(id, tree)` | Climb upward |
 | `getTemplatedParent(id)` | Climb out of a template |
-| `findElements(rootId, predicate)` | Search by type, name, AutomationId, text, DP value, has-ancestor, has-descendant, in-template-of |
-| `hitTest(rootId, x, y)` | Deepest visual at a point. Hit testing follows painted content, so an element that draws outside its layout box (a modal-overlay host, a custom `OnRender`) can answer a hit with zero-size `bounds` — compare `renderBounds` |
-| `resolvePath(rootId, pathString)` | Path string back to element |
+| `findElements(id, predicate)` | Search by type, name, AutomationId, text, DP value, has-ancestor, has-descendant, in-template-of. Returns `{matches:[...]}` |
+| `hitTest(id, x, y)` | Deepest visual at a point, `x`/`y` expressed relative to `id`. Hit testing follows painted content, so an element that draws outside its layout box (a modal-overlay host, a custom `OnRender`) can answer a hit with zero-size `bounds` — compare `renderBounds` |
+| `resolvePath(id, pathString)` | Path string back to element |
 | `describeDataContext(id)` | CLR type shape of the DataContext |
 | `readDataContextPath(id, path)` | Read a dotted path off the DataContext |
 | `listDependencyProperties(id)` | All DPs available on an element |
@@ -243,8 +249,8 @@ tier).
 
 | Tool | Use it for |
 |---|---|
-| `getUiaTree(pid, depth, fromElement?)` | Walk the UIA tree to a bounded depth; omit `fromElement` to start at the process root. Read-only |
-| `findUiaElement(pid, by, value)` | Locate an element by `automationId`, `name`, `helpText`, or `controlType`. Read-only |
+| `getUiaTree(pid, depth, fromElement?)` | Walk the UIA tree to a bounded depth; omit `fromElement` to start at the process root. Returns `{elements:[...]}`. Read-only |
+| `findUiaElement(pid, by, value)` | Locate an element by `automationId`, `name`, `helpText`, or `controlType`. Returns `{matches:[...]}`. Read-only |
 | `captureWindow(pid)` | Capture the window as a PNG image via `PrintWindow` — works even while occluded. Read-only |
 | `waitForUia(pid, by, value, timeoutMs)` | Poll for an element instead of sleeping. Read-only |
 | `invokeUia(element, pattern?)` | Click, select, toggle, or expand an element. **Mutates** the target |
@@ -336,6 +342,12 @@ tooltip instead.
 - **`textContains` searches capped visible text** (~200 chars per element).
 - **`propertyEquals` does not support attached properties.**
 - **`recentTraceLines` always empty** on `inspectBinding`. Phase 2 will wire up `PresentationTraceSources`.
+- **An id can silently start describing a different row under virtualization.** A virtualizing panel
+  recycles the same container for a different data item as it scrolls — same `id`, same `hashCode`
+  (that identifies the container, not its content), no error, no id change. Nothing marks an id stale
+  until you use it. If you're holding onto ids across calls that might span a scroll/data change,
+  re-`describeElement` and compare `dataContextHashCode` against the value you saw before acting on
+  cached facts; a changed value means the container was recycled for different data.
 
 See [`docs/superpowers/specs/2026-05-27-snoopmcp-investigation-design.md`](docs/superpowers/specs/2026-05-27-snoopmcp-investigation-design.md)
 for the Phase 2 candidate list (writes, method invocation, scripting, web inspector UI).

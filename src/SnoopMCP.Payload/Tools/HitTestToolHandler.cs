@@ -53,12 +53,12 @@ public sealed class HitTestToolHandler : IToolHandler
         HitTestRequest request = arguments.Deserialize<HitTestRequest>(WireSerializer.JsonOptions)
             ?? throw new SnoopMcpException(ErrorCode.InvalidArgument, "Missing request payload.");
 
-        bool resolved = mRegistry.TryResolve(request.RootId, out DependencyObject? root);
+        bool resolved = mRegistry.TryResolve(request.Id, out DependencyObject? root);
         if (!resolved || root is null)
         {
             throw new SnoopMcpException(
                 ErrorCode.ElementExpired,
-                $"Root element id {request.RootId} is not alive.");
+                $"Element id {request.Id} is not alive.");
         }
 
         HitTestResponse response;

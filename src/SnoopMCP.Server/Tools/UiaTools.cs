@@ -96,7 +96,7 @@ public sealed class UiaTools
             WpfTargetGuard.EnsureWpf(pid);
             IReadOnlyList<UiaElementInfo> hits =
                 await mDriver.FindAsync(pid, by, value, cancellationToken).ConfigureAwait(false);
-            result = SerializeResult(new { elements = hits });
+            result = SerializeResult(new { matches = hits });
         }
         catch (SnoopMcpException ex) { throw Promote(ex); }
         catch (Exception ex) when (ex is not McpException and not OperationCanceledException)

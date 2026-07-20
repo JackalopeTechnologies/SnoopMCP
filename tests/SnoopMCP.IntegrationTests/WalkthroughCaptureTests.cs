@@ -134,19 +134,19 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
 
         // --- Search & spatial ---
         JsonElement byName = await mTools.FindElements(rootId, new ElementPredicateDto { Name = "SaveButton" }, ct);
-        mTranscript.Add("Search", "findElements", new { rootId, predicate = new { name = "SaveButton" } }, byName);
+        mTranscript.Add("Search", "findElements", new { id = rootId, predicate = new { name = "SaveButton" } }, byName);
 
         JsonElement byText = await mTools.FindElements(
             rootId, new ElementPredicateDto { TextContains = "Springfield" }, ct);
         mTranscript.Add(
-            "Search", "findElements", new { rootId, predicate = new { textContains = "Springfield" } }, byText);
+            "Search", "findElements", new { id = rootId, predicate = new { textContains = "Springfield" } }, byText);
 
         JsonElement hit = await mTools.HitTest(rootId, 50, 50, ct);
-        mTranscript.Add("Search", "hitTest", new { rootId, x = 50, y = 50 }, hit);
+        mTranscript.Add("Search", "hitTest", new { id = rootId, x = 50, y = 50 }, hit);
 
         string rootPath = desc.GetProperty("path").GetString() ?? "/Window";
         JsonElement resolved = await mTools.ResolvePath(rootId, rootPath, ct);
-        mTranscript.Add("Search", "resolvePath", new { rootId, pathString = rootPath }, resolved);
+        mTranscript.Add("Search", "resolvePath", new { id = rootId, pathString = rootPath }, resolved);
 
         // --- DataContext ---
         int brokenBindingId = await FindFirstIdAsync(rootId, new ElementPredicateDto { Name = "BrokenBinding" }, ct);
