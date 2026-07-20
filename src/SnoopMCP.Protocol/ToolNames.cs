@@ -65,4 +65,16 @@ public static class ToolNames
 
     /// <summary>Serialize an element to XAML reflecting its current live state.</summary>
     public const string ExportXaml = "exportXaml";
+
+    /// <summary>Bridge a Snoop element id to its UIA identity (AutomationId/Name/ClassName/ControlType).</summary>
+    public const string GetAutomationPeerInfo = "getAutomationPeerInfo";
+
+    /// <summary>Drive an element's AutomationPeer pattern in-process (fallback for what UIA2 cannot do).</summary>
+    public const string PeerInvoke = "peerInvoke";
+
+    /// <summary>Execute the ICommand bound to an element (CanExecute-gated).</summary>
+    public const string ExecuteCommand = "executeCommand";
+
+    /// <summary>Poll a dependency property or DataContext path until it matches an expected value.</summary>
+    public const string WaitForValue = "waitForValue";
 }
