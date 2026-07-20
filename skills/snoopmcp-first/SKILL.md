@@ -28,7 +28,7 @@ SnoopMCP tray menu ("Allow app interaction (driving)"). See the **snoopmcp-uia**
 | To find out | Call |
 |---|---|
 | What windows/popups exist | `listVisualRoots()` |
-| Which element is *that* one | `findElements(rootId, predicate)` when you know a name/type; `hitTest(rootId, x, y)` when you only have a location; `resolvePath(rootId, path)` to re-resolve a path string from an earlier `describeElement` |
+| Which element is *that* one | `findElements(id, predicate)` when you know a name/type; `hitTest(id, x, y)` when you only have a location; `resolvePath(id, path)` to re-resolve a path string from an earlier `describeElement` |
 | What a node is | `describeElement(id)` |
 | Tree shape | `getChildren(id, tree)`, `getParent(id, tree)`, `getTemplatedParent(id)` |
 | Why a property holds this value | `getDependencyProperty(id, name)` — value **and** precedence trace; `listDependencyProperties(id)` |
@@ -43,14 +43,19 @@ gives the exact spellings available on an element.
 `findElements` predicate fields, all optional and AND-combined: `type` (case-sensitive substring of
 the full type name), `name` (exact `x:Name`), `automationId` (exact), `textContains` (case-insensitive,
 against capped visible text), `propertyEquals` (stringified DP comparison), and the nested predicates
-`hasAncestor`, `hasDescendant`, `inTemplateOf`.
+`hasAncestor`, `hasDescendant`, `inTemplateOf`. For bulk text searches, also `leafOnly`, `maxResults`,
+and `suppressPath` to keep large result sets bounded and readable.
 
 ## Common mistakes
 
 - **Carrying element ids across sessions.** Ids are per-session. If the target exits, the session goes
   with it (`SessionLost`) — `attach` the new pid and re-resolve. Within a live session, an id whose
   element has been garbage-collected returns `ElementExpired` — re-resolve from
-  `listVisualRoots`/`findElements`.
+  `listVisualRoots`/`findElements`. Worse, a live-looking id can silently describe a different row: a
+  virtualizing panel recycles the *same* container for a different data item as it scrolls — same id,
+  no error, no `ElementExpired`. If you're holding ids across calls that might span a scroll or data
+  change, re-`describeElement` and compare `dataContextHashCode` against the value you saw before; a
+  changed value means this id now names different data.
 - **Blaming the binding first.** For a wrong value, read the precedence trace from
   `getDependencyProperty` — a local value, style trigger, or animation may be beating the binding.
 - **Trusting `exportXaml` for binding shape.** It serializes evaluated values, not `{Binding}` markup;

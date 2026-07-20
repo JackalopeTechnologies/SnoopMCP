@@ -100,6 +100,58 @@ public sealed class ElementDescriberTests
     }
 
     [StaFact]
+    public void Describe_DataContextSet_ReturnsDataContextHashCode()
+    {
+        var registry = new ElementRegistry();
+        var describer = CreateDescriber(registry);
+        var customer = new Customer { Name = "Alice" };
+        var grid = new Grid { DataContext = customer };
+
+        DescribeElementResponse response = describer.Describe(grid);
+
+        Assert.Equal(System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(customer), response.DataContextHashCode);
+    }
+
+    [StaFact]
+    public void Describe_NoDataContext_DataContextHashCodeIsNull()
+    {
+        var registry = new ElementRegistry();
+        var describer = CreateDescriber(registry);
+        var grid = new Grid();
+
+        DescribeElementResponse response = describer.Describe(grid);
+
+        Assert.Null(response.DataContextHashCode);
+    }
+
+    /// <summary>
+    /// Issue #78: a virtualizing panel can recycle the same container for a different row with no
+    /// error and no id change. This asserts the actual detection signal: describing the SAME
+    /// container after its DataContext is swapped (simulating recycling) returns the same <c>Id</c>
+    /// and the same container <c>HashCode</c> — proving <c>HashCode</c> alone cannot reveal the
+    /// swap, since it identifies the container, not its content — but a different
+    /// <c>DataContextHashCode</c>, which a caller can compare against a previously cached value to
+    /// learn its facts about this id are stale before acting on them.
+    /// </summary>
+    [StaFact]
+    public void Describe_ContainerRecycledForDifferentRow_SameIdAndHashCode_ButDifferentDataContextHashCode()
+    {
+        var registry = new ElementRegistry();
+        var describer = CreateDescriber(registry);
+        var container = new Grid { DataContext = new Customer { Name = "Alice" } };
+
+        DescribeElementResponse before = describer.Describe(container);
+
+        // Simulate a virtualizing panel recycling this exact container instance for a new row.
+        container.DataContext = new Customer { Name = "Bob" };
+        DescribeElementResponse after = describer.Describe(container);
+
+        Assert.Equal(before.Id, after.Id);
+        Assert.Equal(before.HashCode, after.HashCode);
+        Assert.NotEqual(before.DataContextHashCode, after.DataContextHashCode);
+    }
+
+    [StaFact]
     public void Describe_BrokenBinding_HasBindingErrorsTrue()
     {
         var registry = new ElementRegistry();

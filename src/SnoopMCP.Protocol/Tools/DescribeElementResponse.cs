@@ -28,6 +28,15 @@ namespace SnoopMCP.Protocol.Tools;
 /// <param name="ChildCount">Visual child count, or 0 for non-visual elements.</param>
 /// <param name="DataContextType">Full CLR type name of the element's data context, or <c>null</c>.</param>
 /// <param name="HashCode">Result of <see cref="System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(object)"/> for cross-call equality checks.</param>
+/// <param name="DataContextHashCode">
+/// <see cref="System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(object)"/> of the element's
+/// current <c>DataContext</c> instance, or <c>null</c> when it has none. A virtualizing panel can
+/// recycle the same container (same <paramref name="Id"/>, same <paramref name="HashCode"/>) for a
+/// different row's data with no error and no id change — <paramref name="HashCode"/> cannot detect
+/// this because it identifies the container, not its content. Re-describing a cached <paramref
+/// name="Id"/> and comparing this value against the one you saw before tells you whether the id
+/// still names the same logical row before you act on stale facts (issue #78).
+/// </param>
 /// <param name="IsAlive">True when the element is still in memory at the time of describe.</param>
 public sealed record DescribeElementResponse(
     int Id,
@@ -43,4 +52,5 @@ public sealed record DescribeElementResponse(
     int ChildCount,
     string? DataContextType,
     int HashCode,
+    int? DataContextHashCode,
     bool IsAlive);
