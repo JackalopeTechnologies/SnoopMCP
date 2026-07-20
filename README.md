@@ -274,6 +274,13 @@ tooltip instead.
 | `ElementExpired` | Element id has been garbage collected |
 | `InvalidArgument` | Bad tool argument |
 | `PathParseError` | Malformed path string |
+| `InteractionDisabled` | Mutating driving tool called while the host interaction gate is off (enable it in the tray) |
+| `NotDrivable` | No UIA action pattern (or payload fallback) can drive the element |
+| `ValueReadOnly` | The target value element is read-only |
+| `CaptureUnavailable` | Window can't be captured (minimized / no printable content) |
+| `UiaElementStale` | An element reference expired and couldn't be re-resolved by its locator |
+| `UiaAmbiguousLocator` | A locator matched multiple elements; caller must disambiguate |
+| `TargetUnresponsive` | A UI Automation call timed out against an unresponsive target |
 
 ## Known v1 limitations
 
