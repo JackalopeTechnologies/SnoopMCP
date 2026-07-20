@@ -206,12 +206,12 @@ Twenty read-only tools, plus `attach`/`detach`:
 | `attach(pid)` | Open a session by process id |
 | `detach()` | Close the current session |
 | `listVisualRoots()` | Find windows, popups, tooltip layers |
-| `describeElement(id)` | Per-node identity: type, name, bounds, path, binding-error flag |
+| `describeElement(id)` | Per-node identity: type, name, layout `bounds`, painted `renderBounds`, path, binding-error flag |
 | `getChildren(id, tree)` | Walk visual or logical tree, virtualization-aware |
 | `getParent(id, tree)` | Climb upward |
 | `getTemplatedParent(id)` | Climb out of a template |
 | `findElements(rootId, predicate)` | Search by type, name, AutomationId, text, DP value, has-ancestor, has-descendant, in-template-of |
-| `hitTest(rootId, x, y)` | Deepest visual at a point |
+| `hitTest(rootId, x, y)` | Deepest visual at a point. Hit testing follows painted content, so an element that draws outside its layout box (a modal-overlay host, a custom `OnRender`) can answer a hit with zero-size `bounds` — compare `renderBounds` |
 | `resolvePath(rootId, pathString)` | Path string back to element |
 | `describeDataContext(id)` | CLR type shape of the DataContext |
 | `readDataContextPath(id, path)` | Read a dotted path off the DataContext |
