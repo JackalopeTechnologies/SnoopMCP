@@ -83,6 +83,70 @@ public sealed class CommandInvokerTests
     }
 
     [WpfFact]
+    public void Execute_RoutedCommand_CanExecuteFalse_DoesNotRun_AndReportsBlocked()
+    {
+        // C8: the routed branch's gate uses the 2-arg routed.CanExecute(parameter, target) overload,
+        // a distinct code path from the plain ICommand.CanExecute(parameter) exercised by
+        // Execute_CanExecuteFalse_DoesNotRun_AndReportsBlocked above. The Executed handler throws if
+        // it ever runs, so a passing test proves both "did not execute" and "reported blocked".
+        var routed = new RoutedCommand("Test", typeof(Button));
+        var target = new Button();
+        target.CommandBindings.Add(new CommandBinding(
+            routed,
+            (_, _) => throw new Xunit.Sdk.XunitException("should not run"),
+            (_, e) => e.CanExecute = false));
+        var source = new Button { Command = routed, CommandTarget = target };
+        var invoker = new CommandInvoker();
+
+        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(() => invoker.Execute(source, null, null));
+
+        Assert.Equal(ErrorCode.CommandNotExecutable, ex.Code);
+    }
+
+    [WpfFact]
+    public void Execute_DataContextPath_ResolvesCommand_RunsWhenCanExecute()
+    {
+        bool ran = false;
+        var cmd = new RelayTestCommand(_ => ran = true, _ => true);
+        var viewModel = new TestViewModel { MyCommand = cmd };
+        var element = new ContentControl { DataContext = viewModel };
+        var invoker = new CommandInvoker();
+
+        ExecuteCommandResponse r = invoker.Execute(element, path: nameof(TestViewModel.MyCommand), parameter: null);
+
+        Assert.True(r.CanExecute);
+        Assert.True(r.Executed);
+        Assert.False(r.Dispatched);
+        Assert.True(ran);
+    }
+
+    [WpfFact]
+    public void Execute_DataContextPath_MissingSegment_ThrowsBindingPathError()
+    {
+        var viewModel = new TestViewModel();
+        var element = new ContentControl { DataContext = viewModel };
+        var invoker = new CommandInvoker();
+
+        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(
+            () => invoker.Execute(element, path: "NoSuchProp", parameter: null));
+
+        Assert.Equal(ErrorCode.BindingPathError, ex.Code);
+    }
+
+    [WpfFact]
+    public void Execute_DataContextPath_ResolvesNonCommand_ThrowsNotDrivable()
+    {
+        var viewModel = new TestViewModel();
+        var element = new ContentControl { DataContext = viewModel };
+        var invoker = new CommandInvoker();
+
+        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(
+            () => invoker.Execute(element, path: nameof(TestViewModel.NotACommand), parameter: null));
+
+        Assert.Equal(ErrorCode.NotDrivable, ex.Code);
+    }
+
+    [WpfFact]
     public void ExecuteCommand_WaitMode_RunsSynchronously_AndReportsExecuted()
     {
         bool ran = false;
@@ -153,5 +217,13 @@ public sealed class CommandInvokerTests
         public bool CanExecute(object? parameter) => mCanExecute(parameter);
 
         public void Execute(object? parameter) => mExecute(parameter);
+    }
+
+    /// <summary>Tiny DataContext view model for the dotted-path Resolve tests.</summary>
+    private sealed class TestViewModel
+    {
+        public ICommand? MyCommand { get; set; }
+
+        public object NotACommand { get; } = "not a command";
     }
 }
