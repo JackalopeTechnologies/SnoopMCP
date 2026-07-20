@@ -8,6 +8,7 @@ namespace SnoopMCP.Host.Tests;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol;
 using Host;
+using Host.Automation;
 using Host.Tools;
 using Protocol.Errors;
 using Xunit;
@@ -25,7 +26,7 @@ public sealed class McpToolsTests
     public async Task InspectionTool_WhenNotAttached_ThrowsMcpExceptionCarryingCodeAndMessage()
     {
         var session = new SessionManager(NullLogger<SessionManager>.Instance, NullLoggerFactory.Instance);
-        var tools = new McpTools(session, new NullInjectorService());
+        var tools = new McpTools(session, new NullInjectorService(), CreateGate());
 
         McpException ex = await Assert.ThrowsAsync<McpException>(
             () => tools.DescribeElement(1, TestContext.Current.CancellationToken));
@@ -40,11 +41,15 @@ public sealed class McpToolsTests
     public async Task Attach_WhenInjectorFails_ThrowsMcpExceptionCarryingCode()
     {
         var session = new SessionManager(NullLogger<SessionManager>.Instance, NullLoggerFactory.Instance);
-        var tools = new McpTools(session, new NullInjectorService());
+        var tools = new McpTools(session, new NullInjectorService(), CreateGate());
 
         McpException ex = await Assert.ThrowsAsync<McpException>(
             () => tools.Attach(1234, TestContext.Current.CancellationToken));
 
         Assert.Contains(nameof(ErrorCode.AttachFailed), ex.Message);
     }
+
+    /// <summary>Builds a fresh, default-off interaction gate backed by a per-test temp file (unused by these tests).</summary>
+    private static InteractionGate CreateGate() =>
+        new(Path.Combine(Path.GetTempPath(), "gate-" + Guid.NewGuid().ToString("N") + ".json"));
 }

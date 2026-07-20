@@ -10,6 +10,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol;
 using Host;
+using Host.Automation;
 using Host.Injection;
 using Host.Tools;
 using Protocol.Errors;
@@ -45,7 +46,8 @@ public sealed class EndToEndTests : IAsyncLifetime
 
         mSession = new SessionManager(NullLogger<SessionManager>.Instance, NullLoggerFactory.Instance);
         var injector = new InjectorService(NullLogger<InjectorService>.Instance);
-        mTools = new McpTools(mSession, injector);
+        string gatePath = Path.Combine(Path.GetTempPath(), "gate-" + Guid.NewGuid().ToString("N") + ".json");
+        mTools = new McpTools(mSession, injector, new InteractionGate(gatePath));
 
         mAttach = await mTools.Attach(mSampleProcess.Id, TestContext.Current.CancellationToken);
     }

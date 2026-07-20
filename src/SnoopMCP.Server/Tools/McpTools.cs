@@ -9,6 +9,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
+using Automation;
 using Injection;
 using Protocol;
 using Protocol.Errors;
@@ -23,6 +24,11 @@ using Protocol.Wire;
 /// holds no magic strings. This class is also the one boundary where SnoopMCP's own
 /// <see cref="SnoopMcpException"/> is promoted to <see cref="McpException"/> (see <see cref="Promote"/>)
 /// so the curated code + message reach the model instead of the SDK's sanitised fallback text.
+/// Read-only relays (<c>getAutomationPeerInfo</c>, <c>waitForValue</c>) are ungated; the two mutating
+/// relays (<c>peerInvoke</c>, <c>executeCommand</c>) additionally require the host
+/// <see cref="InteractionGate"/> to be enabled, checked BEFORE <see cref="Dispatch"/> so a gate-off
+/// call always reports <see cref="ErrorCode.InteractionDisabled"/> rather than a session/attach
+/// failure - the host is the trust boundary here; the payload handlers are not gate-aware.
 /// </summary>
 [McpServerToolType]
 public sealed class McpTools
@@ -33,18 +39,22 @@ public sealed class McpTools
 
     private readonly SessionManager mSession;
     private readonly IInjectorService mInjector;
+    private readonly InteractionGate mGate;
 
     /// <summary>
     /// Initialises a new <see cref="McpTools"/>.
     /// </summary>
     /// <param name="session">The session manager that owns the attached target.</param>
     /// <param name="injector">The injector used to attach the payload to a target process.</param>
-    public McpTools(SessionManager session, IInjectorService injector)
+    /// <param name="gate">The host interaction gate guarding the mutating relay tools.</param>
+    public McpTools(SessionManager session, IInjectorService injector, InteractionGate gate)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(injector);
+        ArgumentNullException.ThrowIfNull(gate);
         mSession = session;
         mInjector = injector;
+        mGate = gate;
     }
 
     /// <summary>
@@ -319,6 +329,80 @@ public sealed class McpTools
     public Task<JsonElement> ExportXaml(int id, CancellationToken cancellationToken) =>
         Dispatch(ToolNames.ExportXaml, new ExportXamlRequest(id), cancellationToken);
 
+    /// <summary>Bridges a Snoop element id to its UIA identity via its AutomationPeer.</summary>
+    /// <param name="id">The element id.</param>
+    /// <param name="cancellationToken">A token to observe while dispatching.</param>
+    /// <returns>The payload's result element.</returns>
+    [McpServerTool, Description(
+        "Bridge a Snoop element id to its UIA identity (AutomationId/Name/ClassName/ControlType). Read-only.")]
+    public Task<JsonElement> GetAutomationPeerInfo(int id, CancellationToken cancellationToken) =>
+        Dispatch(ToolNames.GetAutomationPeerInfo, new GetAutomationPeerInfoRequest(id), cancellationToken);
+
+    /// <summary>Polls a dependency property or DataContext path until it matches an expected value.</summary>
+    /// <param name="id">The element id whose DP or DataContext is polled.</param>
+    /// <param name="dependencyProperty">The DP registered name to poll, or null.</param>
+    /// <param name="dataContextPath">The dotted DataContext path to poll, or null.</param>
+    /// <param name="expected">The expected value, compared via invariant-culture string equality.</param>
+    /// <param name="timeoutMs">The maximum time to poll, in milliseconds.</param>
+    /// <param name="cancellationToken">A token to observe while dispatching.</param>
+    /// <returns>The payload's result element.</returns>
+    [McpServerTool, Description(
+        "Poll a DP or DataContext path until it equals an expected value (ground-truth check). Read-only.")]
+    public Task<JsonElement> WaitForValue(
+        int id,
+        string? dependencyProperty,
+        string? dataContextPath,
+        string expected,
+        int timeoutMs,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(expected);
+        return Dispatch(
+            ToolNames.WaitForValue,
+            new WaitForValueRequest(id, dependencyProperty, dataContextPath, expected, timeoutMs),
+            cancellationToken);
+    }
+
+    /// <summary>MUTATES the target: drives an element's AutomationPeer pattern in-process.</summary>
+    /// <param name="id">The element id whose AutomationPeer is driven.</param>
+    /// <param name="pattern">The peer pattern to invoke: Invoke | Toggle | SelectionItem | ExpandCollapse.</param>
+    /// <param name="dispatch">Dispatch mode: null/"wait" (default) waits; "post" fires-and-forgets.</param>
+    /// <param name="cancellationToken">A token to observe while dispatching.</param>
+    /// <returns>The payload's result element.</returns>
+    [McpServerTool, Description(
+        "MUTATES the target: drive an element's AutomationPeer pattern in-process. Requires the " +
+        "interaction gate. Optional dispatch='post' fires-and-forgets a dialog-opening action.")]
+    public Task<JsonElement> PeerInvoke(int id, string pattern, string? dispatch, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(pattern);
+        RequireGate();
+        return Dispatch(ToolNames.PeerInvoke, new PeerInvokeRequest(id, pattern, dispatch), cancellationToken);
+    }
+
+    /// <summary>MUTATES the target: executes the ICommand bound to an element (CanExecute-gated).</summary>
+    /// <param name="id">The element id: an ICommandSource or the root for <paramref name="path"/>.</param>
+    /// <param name="path">Optional dotted DataContext path to an ICommand; null uses the element's own Command.</param>
+    /// <param name="parameter">Optional command parameter; null uses the element's CommandParameter.</param>
+    /// <param name="dispatch">Dispatch mode: null/"wait" (default) waits; "post" fires-and-forgets.</param>
+    /// <param name="cancellationToken">A token to observe while dispatching.</param>
+    /// <returns>The payload's result element.</returns>
+    [McpServerTool, Description(
+        "MUTATES the target: execute the ICommand bound to an element (CanExecute-gated). Requires the " +
+        "interaction gate. Optional dispatch='post' fires-and-forgets.")]
+    public Task<JsonElement> ExecuteCommand(
+        int id,
+        string? path,
+        string? parameter,
+        string? dispatch,
+        CancellationToken cancellationToken)
+    {
+        RequireGate();
+        return Dispatch(
+            ToolNames.ExecuteCommand,
+            new ExecuteCommandRequest(id, path, parameter, dispatch),
+            cancellationToken);
+    }
+
     /// <summary>
     /// Dispatches a tool call through the open session and, on failure, promotes SnoopMCP's curated
     /// <see cref="SnoopMcpException"/> to <see cref="McpException"/> so the SDK propagates its code +
@@ -362,6 +446,17 @@ public sealed class McpTools
             roots = null;
         }
         return roots;
+    }
+
+    /// <summary>Throws a promoted <see cref="ErrorCode.InteractionDisabled"/> unless the host gate is enabled.</summary>
+    private void RequireGate()
+    {
+        if (!mGate.IsEnabled)
+        {
+            throw Promote(new SnoopMcpException(
+                ErrorCode.InteractionDisabled,
+                "Driving is disabled. Ask the user to enable interaction in the SnoopMCP tray menu."));
+        }
     }
 
     private static McpException Promote(SnoopMcpException ex)
