@@ -29,13 +29,14 @@ public static class DataContextPath
     /// trailing, or doubled dots) are ignored.
     /// </param>
     /// <param name="value">
-    /// When the method returns <c>true</c>, the value at the end of the path — which may itself be
-    /// <c>null</c>. When it returns <c>false</c>, always <c>null</c>.
+    /// When the method returns <c>true</c>, the non-null value at the end of the path. When it
+    /// returns <c>false</c>, always <c>null</c>.
     /// </param>
     /// <returns>
-    /// <c>true</c> if every segment resolved to a declared public instance property; <c>false</c>
-    /// if a segment's property could not be found on the current type, or if a <c>null</c> value
-    /// was encountered before the final segment (so there was nothing left to walk onto).
+    /// Returns <c>true</c> and the resolved value only when every segment resolves to a non-null
+    /// value; <c>false</c> (value=null) otherwise — whether because a segment's property could not
+    /// be found on the current type, a <c>null</c> was encountered before the final segment (so
+    /// there was nothing left to walk onto), or the final segment itself resolved to <c>null</c>.
     /// </returns>
     public static bool TryWalk(object root, string path, out object? value)
     {
@@ -62,6 +63,7 @@ public static class DataContextPath
             current = property.GetValue(current);
         }
 
+        resolved = resolved && current is not null;
         value = resolved ? current : null;
         return resolved;
     }

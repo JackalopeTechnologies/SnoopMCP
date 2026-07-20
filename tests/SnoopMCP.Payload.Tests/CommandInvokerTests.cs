@@ -134,6 +134,22 @@ public sealed class CommandInvokerTests
     }
 
     [WpfFact]
+    public void Execute_DataContextPath_NullFinalSegment_ThrowsBindingPathError()
+    {
+        // Regression: DataContextPath.TryWalk must treat a null FINAL-segment value the same as a
+        // missing segment (BindingPathError), matching the original WalkPath contract (`?? throw`
+        // on every segment, including the last). MyCommand is left unset (null) on purpose.
+        var viewModel = new TestViewModel();
+        var element = new ContentControl { DataContext = viewModel };
+        var invoker = new CommandInvoker();
+
+        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(
+            () => invoker.Execute(element, path: nameof(TestViewModel.MyCommand), parameter: null));
+
+        Assert.Equal(ErrorCode.BindingPathError, ex.Code);
+    }
+
+    [WpfFact]
     public void Execute_DataContextPath_ResolvesNonCommand_ThrowsNotDrivable()
     {
         var viewModel = new TestViewModel();
