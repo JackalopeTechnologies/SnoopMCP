@@ -60,10 +60,19 @@ public static class ServerHost
         builder.Services.AddSingleton<IInjectorService, Injection.InjectorService>();
 
         builder.Services
-            .AddMcpServer(options => options.ServerInfo = new Implementation
+            .AddMcpServer(options =>
             {
-                Name = ServerName,
-                Version = ThisAssembly.InformationalVersion
+                options.ServerInfo = new Implementation
+                {
+                    Name = ServerName,
+                    Version = ThisAssembly.InformationalVersion
+                };
+
+                // Give every failure a typed, self-describing message. Without this the SDK replaces
+                // anything that is not an McpException with "An error occurred invoking '…'", leaving
+                // the real cause only in the server log - including argument-binding and serialization
+                // failures, which occur outside any tool body and so cannot be caught within one.
+                options.Filters.Request.CallToolFilters.Add(ToolErrorFilter.Create());
             })
             .WithHttpTransport(transport => transport.Stateless = true)
             .WithToolsFromAssembly(typeof(McpTools).Assembly);
@@ -86,8 +95,9 @@ public static class ServerHost
         app.UseRouting();
 
         app.MapMcp(McpEndpointPattern);
-        app.MapGet(HealthEndpointPattern, (SessionManager session, InteractionGate gate) =>
-            Results.Ok(HealthStatus.Create(ThisAssembly.InformationalVersion, session.IsAttached, gate.IsEnabled)));
+        app.MapGet(HealthEndpointPattern, (SessionManager session, InteractionGate healthGate) =>
+            Results.Ok(HealthStatus.Create(
+                ThisAssembly.InformationalVersion, session.IsAttached, healthGate.IsEnabled)));
 
         return app;
     }

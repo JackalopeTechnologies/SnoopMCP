@@ -16,10 +16,12 @@ using Protocol.Errors;
 /// </summary>
 public sealed class AutomationPeerDriver
 {
-    private const string PatternInvoke = "Invoke";
-    private const string PatternToggle = "Toggle";
-    private const string PatternSelectionItem = "SelectionItem";
-    private const string PatternExpandCollapse = "ExpandCollapse";
+    // Shared with PeerInfoReader so the set peerInvoke accepts and the set getAutomationPeerInfo
+    // reports cannot drift apart (issue #77).
+    private const string PatternInvoke = PeerPatternNames.Invoke;
+    private const string PatternToggle = PeerPatternNames.Toggle;
+    private const string PatternSelectionItem = PeerPatternNames.SelectionItem;
+    private const string PatternExpandCollapse = PeerPatternNames.ExpandCollapse;
 
     /// <summary>Invokes the named pattern on the element's automation peer. Runs on the UI thread.</summary>
     /// <param name="element">The element to drive.</param>

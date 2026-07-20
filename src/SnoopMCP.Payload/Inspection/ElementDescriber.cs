@@ -54,6 +54,7 @@ public sealed class ElementDescriber
         string? name = (element as FrameworkElement)?.Name;
         string? automationId = AutomationProperties.GetAutomationId(element);
         BoundsDto bounds = ComputeBounds(element);
+        BoundsDto renderBounds = ComputeRenderBounds(element, bounds);
         string visibleText = ExtractVisibleText(element);
         bool isInTemplate = ResolveTemplatedParent(element) is not null;
         bool hasBindingErrors = AnyBindingHasError(element);
@@ -68,6 +69,7 @@ public sealed class ElementDescriber
             Name: string.IsNullOrEmpty(name) ? null : name,
             AutomationId: string.IsNullOrEmpty(automationId) ? null : automationId,
             Bounds: bounds,
+            RenderBounds: renderBounds,
             VisibleText: visibleText,
             IsInTemplate: isInTemplate,
             HasBindingErrors: hasBindingErrors,
@@ -120,6 +122,40 @@ public sealed class ElementDescriber
             }
         }
         return bounds;
+    }
+
+    /// <summary>
+    /// Computes the area the element and its descendants actually paint, in the same coordinate space
+    /// as <paramref name="layoutBounds"/>.
+    /// </summary>
+    /// <param name="element">The element being described.</param>
+    /// <param name="layoutBounds">The already-computed layout bounds, returned when nothing is painted.</param>
+    /// <returns>The painted extent, or <paramref name="layoutBounds"/> when it cannot be determined.</returns>
+    /// <remarks>
+    /// Hit testing follows painted content, not <c>RenderSize</c>, so an element that draws outside its
+    /// layout box legitimately answers a hit while reporting zero-size bounds. Reporting only the layout
+    /// rect made such a result look impossible — see issue #75.
+    /// </remarks>
+    private static BoundsDto ComputeRenderBounds(DependencyObject element, BoundsDto layoutBounds)
+    {
+        BoundsDto rendered = layoutBounds;
+        if (element is UIElement { IsArrangeValid: true } ui)
+        {
+            try
+            {
+                Visual? rootVisual = FindRootVisual(ui);
+                Rect descendant = VisualTreeHelper.GetDescendantBounds(ui);
+                if (rootVisual is not null && !descendant.IsEmpty)
+                {
+                    Rect rect = ui.TransformToAncestor(rootVisual).TransformBounds(descendant);
+                    rendered = new BoundsDto(rect.X, rect.Y, rect.Width, rect.Height);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+        return rendered;
     }
 
     private static Visual? FindRootVisual(Visual start)

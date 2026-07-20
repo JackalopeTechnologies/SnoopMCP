@@ -206,12 +206,12 @@ Twenty read-only tools, plus `attach`/`detach`:
 | `attach(pid)` | Open a session by process id |
 | `detach()` | Close the current session |
 | `listVisualRoots()` | Find windows, popups, tooltip layers |
-| `describeElement(id)` | Per-node identity: type, name, bounds, path, binding-error flag |
+| `describeElement(id)` | Per-node identity: type, name, layout `bounds`, painted `renderBounds`, path, binding-error flag |
 | `getChildren(id, tree)` | Walk visual or logical tree, virtualization-aware |
 | `getParent(id, tree)` | Climb upward |
 | `getTemplatedParent(id)` | Climb out of a template |
 | `findElements(rootId, predicate)` | Search by type, name, AutomationId, text, DP value, has-ancestor, has-descendant, in-template-of |
-| `hitTest(rootId, x, y)` | Deepest visual at a point |
+| `hitTest(rootId, x, y)` | Deepest visual at a point. Hit testing follows painted content, so an element that draws outside its layout box (a modal-overlay host, a custom `OnRender`) can answer a hit with zero-size `bounds` — compare `renderBounds` |
 | `resolvePath(rootId, pathString)` | Path string back to element |
 | `describeDataContext(id)` | CLR type shape of the DataContext |
 | `readDataContextPath(id, path)` | Read a dotted path off the DataContext |
@@ -243,7 +243,7 @@ tier).
 
 | Tool | Use it for |
 |---|---|
-| `getUiaTree(pid, fromElement?, depth)` | Walk the UIA tree to a bounded depth. Read-only |
+| `getUiaTree(pid, depth, fromElement?)` | Walk the UIA tree to a bounded depth; omit `fromElement` to start at the process root. Read-only |
 | `findUiaElement(pid, by, value)` | Locate an element by `automationId`, `name`, `helpText`, or `controlType`. Read-only |
 | `captureWindow(pid)` | Capture the window as a PNG image via `PrintWindow` — works even while occluded. Read-only |
 | `waitForUia(pid, by, value, timeoutMs)` | Poll for an element instead of sleeping. Read-only |
@@ -254,10 +254,18 @@ tier).
 
 | Tool | Use it for |
 |---|---|
-| `getAutomationPeerInfo(id)` | Bridge a Snoop element id to its UIA identity (AutomationId, Name, ClassName, ControlType) — correlates the two tiers. Read-only |
-| `waitForValue(id, dependencyProperty?, dataContextPath?, expected, timeoutMs)` | Poll a DP or DataContext path until it equals `expected` — ground-truth check. Read-only |
+| `getAutomationPeerInfo(id)` | Bridge a Snoop element id to its UIA identity (AutomationId, Name, ClassName, ControlType) — correlates the two tiers — plus the `patterns` the peer provides, i.e. what `peerInvoke` will accept for it. Read-only |
+| `waitForValue(id, expected, timeoutMs, dependencyProperty?, dataContextPath?)` | Poll a DP or DataContext path until it equals `expected` — ground-truth check. Supply exactly one of the two poll targets. Read-only |
 | `peerInvoke(id, pattern, dispatch?)` | Drive the element's real `AutomationPeer` pattern (`Invoke`, `Toggle`, `SelectionItem`, `ExpandCollapse`) in-process — the fallback when UIA can't reach the control. **Mutates** the target |
 | `executeCommand(id, path?, parameter?, dispatch?)` | Execute the `ICommand` bound to an element (or at a DataContext `path`), gated by `CanExecute`. **Mutates** the target |
+
+**Optional arguments are genuinely optional.** Every `?` above may be omitted. (Before v1.4 they were
+published as required, so omitting one failed the call before it reached a handler — see
+[#72](https://github.com/JackalopeTechnologies/SnoopMCP/issues/72).)
+
+**Offscreen elements report no bounds.** UI Automation has no rectangle for an element that is not on
+screen, so `x`/`y`/`width`/`height` are omitted from that element's entry rather than reported as a
+position it does not occupy.
 
 **No synthesized input.** Driving is UIA action patterns and in-process
 `AutomationPeer`/`ICommand` invocation only, and capture is `PrintWindow` only —

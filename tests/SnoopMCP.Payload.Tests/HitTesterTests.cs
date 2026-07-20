@@ -106,6 +106,47 @@ public sealed class HitTesterTests
         Assert.Equal(innerId, response.Element!.Id);
     }
 
+    /// <summary>
+    /// Issue #75 reported hit_test returning a 0x0 element that could not contain the point. This
+    /// pins the invariant the tool exists to provide: whatever comes back must contain the point,
+    /// and a zero-size sibling must never win.
+    /// </summary>
+    [StaFact]
+    public void HitTest_WithZeroSizeSibling_ReturnsElementWhoseBoundsContainThePoint()
+    {
+        var registry = new ElementRegistry();
+        var tester = CreateTester(registry);
+        var grid = new Grid { Width = 200, Height = 200 };
+        var zeroSize = new Border
+        {
+            Width = 0,
+            Height = 0,
+            Background = Brushes.Green,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top
+        };
+        var target = new Border
+        {
+            Width = 60,
+            Height = 60,
+            Background = Brushes.Red,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(100, 100, 0, 0)
+        };
+        grid.Children.Add(zeroSize);
+        grid.Children.Add(target);
+        ForceArrange(grid);
+
+        HitTestResponse response = tester.HitTest(grid, 120, 120);
+
+        Assert.NotNull(response.Element);
+        Assert.NotEqual(registry.GetOrAssign(zeroSize), response.Element!.Id);
+        BoundsDto bounds = response.Element.Bounds;
+        Assert.InRange(120d, bounds.X, bounds.X + bounds.Width);
+        Assert.InRange(120d, bounds.Y, bounds.Y + bounds.Height);
+    }
+
     [StaFact]
     public void HitTest_OutsideAllHittables_ReturnsNull()
     {

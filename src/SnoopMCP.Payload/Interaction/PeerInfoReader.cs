@@ -7,6 +7,7 @@ namespace SnoopMCP.Payload.Interaction;
 
 using System.Windows;
 using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using Protocol.Errors;
 using SnoopMCP.Protocol.Tools;
 
@@ -43,6 +44,41 @@ public sealed class PeerInfoReader
             AutomationId: peer.GetAutomationId() ?? string.Empty,
             Name: peer.GetName() ?? string.Empty,
             ClassName: peer.GetClassName() ?? string.Empty,
-            ControlType: peer.GetAutomationControlType().ToString());
+            ControlType: peer.GetAutomationControlType().ToString(),
+            Patterns: ReadPatterns(peer));
+    }
+
+    /// <summary>
+    /// Reports the patterns the peer actually provides, asking for each provider interface exactly as
+    /// <c>AutomationPeerDriver</c> does — so a pattern listed here is one <c>peerInvoke</c> will accept
+    /// (except <see cref="PeerPatternNames.Value"/>, which is reported for correlation with the UIA
+    /// tier but is not an action).
+    /// </summary>
+    /// <param name="peer">The peer to interrogate.</param>
+    /// <returns>The supported pattern names; empty when the element cannot be driven.</returns>
+    private static List<string> ReadPatterns(AutomationPeer peer)
+    {
+        var patterns = new List<string>();
+        if (peer.GetPattern(PatternInterface.Invoke) is IInvokeProvider)
+        {
+            patterns.Add(PeerPatternNames.Invoke);
+        }
+        if (peer.GetPattern(PatternInterface.Toggle) is IToggleProvider)
+        {
+            patterns.Add(PeerPatternNames.Toggle);
+        }
+        if (peer.GetPattern(PatternInterface.SelectionItem) is ISelectionItemProvider)
+        {
+            patterns.Add(PeerPatternNames.SelectionItem);
+        }
+        if (peer.GetPattern(PatternInterface.ExpandCollapse) is IExpandCollapseProvider)
+        {
+            patterns.Add(PeerPatternNames.ExpandCollapse);
+        }
+        if (peer.GetPattern(PatternInterface.Value) is IValueProvider)
+        {
+            patterns.Add(PeerPatternNames.Value);
+        }
+        return patterns;
     }
 }
