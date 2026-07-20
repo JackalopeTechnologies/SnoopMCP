@@ -23,6 +23,20 @@ focus, and capture the window even when it is occluded. Driving is two-tier:
    - `peerInvoke(id, pattern, dispatch?)` — drive the real WPF `AutomationPeer` pattern (Invoke | Toggle | SelectionItem | ExpandCollapse) in-process. MUTATES.
    - `executeCommand(id, path?, parameter?, dispatch?)` — execute the `ICommand` bound to an element (or at a DataContext `path`), CanExecute-gated. MUTATES.
 
+## An element visibly on screen isn't found by `findUiaElement`/`getUiaTree`
+
+This is not necessarily a SnoopMCP defect. A UIA tree walk only descends through the automation
+peers a parent peer reports as its children (`AutomationPeer.GetChildrenCore()`); a custom control
+whose peer never implemented child-peer support (or reports none) prunes everything below it from
+every UIA client's search, regardless of scope (`Children`/`Descendants`) or `by` locator — this is
+unrelated to the raw/control/content tree "view" concept, which only affects `TreeWalker`/caching,
+not `FindAll`/`FindFirst`. Suspect this whenever a `name`/`controlType` search comes up empty for
+something you can see rendered.
+
+**Workaround:** fall back to the payload tier. `attach()` then `findElements(id, { textContains, leafOnly: true })`
+walks the real WPF visual tree via `VisualTreeHelper` and never consults automation peers, so it
+finds elements a pruned peer hides from UIA entirely.
+
 ## Rules
 
 - Never ask SnoopMCP to synthesize mouse/keyboard input — there is no such tool by design. If a control
@@ -41,4 +55,9 @@ focus, and capture the window even when it is occluded. Driving is two-tier:
   autostart registers an elevated logon task (one UAC). This is admin-only.
 - Element handles are short-lived; pass back the `element` reference you received. If it is stale,
   SnoopMCP re-resolves it by locator, or returns `UiaElementStale`/`UiaAmbiguousLocator` — re-find in that case.
+- The UIA tools deliberately use two argument shapes, not one: `findUiaElement`/`waitForUia` take a flat
+  `pid`/`by`/`value` locator because there is no reference yet; `invokeUia`/`setUiaValue`/`getUiaTree`
+  take an `element`/`fromElement` reference object (handle + locator fallback) because there is. This is
+  an accepted design decision, not an inconsistency — don't flatten the reference calls or wrap the
+  locator calls to make them match.
 - Endpoint: http://127.0.0.1:6300/mcp. Start the SnoopMCP host (tray app) first.

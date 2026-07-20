@@ -2,8 +2,18 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:SampleWpfApp.ViewModels"
+        xmlns:controls="clr-namespace:SampleWpfApp.Controls"
         Title="SnoopMCP Sample App"
-        Width="900" Height="600">
+        Width="900" Height="600"
+        ShowActivated="False">
+    <!--
+        ShowActivated="False": this window is driven entirely through UI Automation, which needs
+        neither foreground activation nor keyboard focus. Left activatable, it steals OS keyboard
+        focus on launch on a live interactive desktop, which let stray real keystrokes from
+        whatever else has focus land in ProbeText mid-test (observed as a random leading character
+        prepended to a UIA-set value in UiaDriverTests.SetValue_OnProbeText_UpdatesValue). Disabling
+        activation removes that vector without touching how UIA drives the window.
+    -->
 
     <Window.DataContext>
         <vm:MainViewModel />
@@ -30,12 +40,32 @@
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+        <!--
+            Issue #80 repro fixture: a hand-rolled nav strip whose custom AutomationPeer reports no
+            children, so its items are pruned from every UIA tree walk even though they are real,
+            name-bearing TextBlocks. See Controls/TopicBarControl.cs for the full explanation and
+            tests/SnoopMCP.IntegrationTests/TopicBarUiaVisibilityTests.cs for the proof + workaround.
+        -->
+        <controls:TopicBarControl Grid.Row="0"
+                                   AutomationProperties.AutomationId="TopicBar"
+                                   Margin="0,0,0,12">
+            <controls:TopicBarControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </controls:TopicBarControl.ItemsPanel>
+            <TextBlock Text="Home" Margin="0,0,16,0" />
+            <TextBlock Text="Browse" Margin="0,0,16,0" />
+            <TextBlock Text="Settings" Margin="0,0,16,0" />
+        </controls:TopicBarControl>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
             <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,8,0" />
             <TextBox x:Name="SearchBox"
                      Width="240"
@@ -50,7 +80,7 @@
             </ComboBox>
         </StackPanel>
 
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="280" />
                 <ColumnDefinition Width="*" />
@@ -96,7 +126,7 @@
             </ContentControl>
         </Grid>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button x:Name="CancelButton"
                     Content="Cancel"
                     Style="{StaticResource BaseButtonStyle}"
@@ -111,7 +141,7 @@
                     Style="{StaticResource DangerButtonStyle}" />
         </StackPanel>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,12,0,0">
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,12,0,0">
             <TextBlock Text="Probe:" VerticalAlignment="Center" Margin="0,0,8,0" />
             <TextBox x:Name="ProbeText"
                      Width="200"
