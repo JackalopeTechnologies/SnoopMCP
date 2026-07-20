@@ -24,4 +24,12 @@ public sealed class ErrorCodeTests
         Assert.Equal(17, (int)ErrorCode.UiaAmbiguousLocator);
         Assert.Equal(18, (int)ErrorCode.TargetUnresponsive);
     }
+
+    [Fact]
+    public void PhaseBDrivingCodes_HaveStableNumbers()
+    {
+        Assert.Equal(19, (int)ErrorCode.ActionPending);
+        Assert.Equal(20, (int)ErrorCode.ActionDispatched);
+        Assert.Equal(21, (int)ErrorCode.CommandNotExecutable);
+    }
 }

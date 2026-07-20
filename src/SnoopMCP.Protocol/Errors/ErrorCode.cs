@@ -65,5 +65,14 @@ public enum ErrorCode
     UiaAmbiguousLocator = 17,
 
     /// <summary>A UI Automation call exceeded its timeout against an unresponsive target.</summary>
-    TargetUnresponsive = 18
+    TargetUnresponsive = 18,
+
+    /// <summary>A mutating action timed out on the dispatcher; it may still have applied — verify.</summary>
+    ActionPending = 19,
+
+    /// <summary>Reserved (append-only): a fire-and-forget/dialog-opening action was posted. NOT thrown — successful fire-and-forget is signaled by the response's Dispatched field, not by this code. Kept for potential future error use.</summary>
+    ActionDispatched = 20,
+
+    /// <summary>The bound command's CanExecute returned false.</summary>
+    CommandNotExecutable = 21
 }
