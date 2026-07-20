@@ -5,6 +5,7 @@
 
 namespace SnoopMCP.Host.Tests;
 
+using System.Diagnostics;
 using Injection;
 using Protocol.Errors;
 using Xunit;
@@ -25,6 +26,15 @@ public sealed class ProcessProbeElevationTests
     public void Probe_InaccessibleProcess_ThrowsAccessDeniedNotWin32()
     {
         SnoopMcpException ex = Assert.Throws<SnoopMcpException>(() => ProcessProbe.Probe(SystemProcessId));
+
+        Assert.Equal(ErrorCode.AccessDenied, ex.Code);
+    }
+
+    [Fact]
+    public void ReadModules_InaccessibleProcess_ThrowsAccessDenied()
+    {
+        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(() =>
+            ProcessProbe.ReadModules(Process.GetProcessById(SystemProcessId)));
 
         Assert.Equal(ErrorCode.AccessDenied, ex.Code);
     }
