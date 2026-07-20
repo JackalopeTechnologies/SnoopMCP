@@ -340,21 +340,27 @@ public sealed class McpTools
 
     /// <summary>Polls a dependency property or DataContext path until it matches an expected value.</summary>
     /// <param name="id">The element id whose DP or DataContext is polled.</param>
-    /// <param name="dependencyProperty">The DP registered name to poll, or null.</param>
-    /// <param name="dataContextPath">The dotted DataContext path to poll, or null.</param>
     /// <param name="expected">The expected value, compared via ordinal string equality.</param>
     /// <param name="timeoutMs">The maximum time to poll, in milliseconds.</param>
+    /// <param name="dependencyProperty">The DP registered name to poll, or null.</param>
+    /// <param name="dataContextPath">The dotted DataContext path to poll, or null.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
+    /// <remarks>
+    /// The two poll targets are an either/or pair and are declared last, with defaults, so each is
+    /// published as optional. A nullable parameter without a default is published as REQUIRED (the SDK
+    /// derives that from the missing default, not from nullability), which previously forced callers to
+    /// supply both halves of the pair — see issue #72.
+    /// </remarks>
     [McpServerTool, Description(
         "Poll a DP or DataContext path until it equals an expected value (ground-truth check). Read-only.")]
     public Task<JsonElement> WaitForValue(
         int id,
-        string? dependencyProperty,
-        string? dataContextPath,
         string expected,
         int timeoutMs,
-        CancellationToken cancellationToken)
+        string? dependencyProperty = null,
+        string? dataContextPath = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(expected);
         return Dispatch(
@@ -376,7 +382,11 @@ public sealed class McpTools
         "MUTATES the target: drive an element's AutomationPeer pattern in-process. Requires the " +
         "interaction gate. Optional dispatch='post' fires-and-forgets a dialog-opening action; in " +
         "'post' mode the outcome (including errors) is not surfaced — verify the effect separately.")]
-    public Task<JsonElement> PeerInvoke(int id, string pattern, string? dispatch, CancellationToken cancellationToken)
+    public Task<JsonElement> PeerInvoke(
+        int id,
+        string pattern,
+        string? dispatch = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(pattern);
         RequireGate();
@@ -399,10 +409,10 @@ public sealed class McpTools
         "(including CanExecute==false or errors) is not surfaced — verify the effect separately.")]
     public Task<JsonElement> ExecuteCommand(
         int id,
-        string? path,
-        string? parameter,
-        string? dispatch,
-        CancellationToken cancellationToken)
+        string? path = null,
+        string? parameter = null,
+        string? dispatch = null,
+        CancellationToken cancellationToken = default)
     {
         RequireGate();
         return Dispatch(

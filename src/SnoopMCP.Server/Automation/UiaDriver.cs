@@ -303,8 +303,10 @@ public sealed class UiaDriver : IUiaDriver
         }
         string handle = mCache.Add(pid, element, effectiveBy, effectiveValue);
         var reference = new UiaElementRef(pid, handle, effectiveBy, effectiveValue);
+        // Rect.Empty (±Infinity) for an offscreen element; Create maps that to null bounds so one
+        // offscreen match cannot abort serialization of the whole response. See issue #73.
         Rect bounds = element.Cached.BoundingRectangle;
-        return new UiaElementInfo(
+        return UiaElementInfo.Create(
             reference,
             automationId,
             element.Cached.Name ?? string.Empty,

@@ -119,7 +119,11 @@ public sealed class DrivingE2ETests : IAsyncLifetime
         // dataContextPath="ProbeStatus" reads MainViewModel.ProbeStatus directly (dependencyProperty
         // stays null - exactly one source, per the waiter's XOR rule).
         JsonElement wait = await mTools.WaitForValue(
-            rootElementId, null, ProbeStatusDataContextPath, ProbeStatusDoneValue, WaitForValueTimeoutMs, ct);
+            rootElementId,
+            ProbeStatusDoneValue,
+            WaitForValueTimeoutMs,
+            dataContextPath: ProbeStatusDataContextPath,
+            cancellationToken: ct);
         Assert.True(wait.GetProperty("matched").GetBoolean());
         if (wait.TryGetProperty("actualValue", out JsonElement actual) && actual.ValueKind == JsonValueKind.String)
         {

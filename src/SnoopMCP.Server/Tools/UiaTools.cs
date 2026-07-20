@@ -57,7 +57,7 @@ public sealed class UiaTools
     /// <returns>The discovered elements.</returns>
     [McpServerTool, Description("Walk the UIA tree of a WPF process (by pid) to a bounded depth. Read-only.")]
     public async Task<JsonElement> GetUiaTree(
-        int pid, UiaElementRef? fromElement, int depth, CancellationToken cancellationToken)
+        int pid, int depth, UiaElementRef? fromElement = null, CancellationToken cancellationToken = default)
     {
         JsonElement result;
         try
@@ -148,7 +148,8 @@ public sealed class UiaTools
     [McpServerTool, Description(
         "MUTATES the target application: invokes an element's action pattern " +
         "(Invoke/SelectionItem/Toggle/ExpandCollapse). Requires the host interaction gate to be enabled.")]
-    public async Task<JsonElement> InvokeUia(UiaElementRef element, string? pattern, CancellationToken cancellationToken)
+    public async Task<JsonElement> InvokeUia(
+        UiaElementRef element, string? pattern = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(element);
         RequireGate();
