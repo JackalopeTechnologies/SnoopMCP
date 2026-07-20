@@ -14,4 +14,14 @@ namespace SnoopMCP.Protocol.Tools;
 /// <param name="Name">The peer's accessible <c>Name</c>.</param>
 /// <param name="ClassName">The peer's <c>ClassName</c> as reported by UIA.</param>
 /// <param name="ControlType">The peer's <c>ControlType</c> localized/programmatic name.</param>
-public sealed record GetAutomationPeerInfoResponse(string AutomationId, string Name, string ClassName, string ControlType);
+/// <param name="Patterns">
+/// The patterns the peer actually provides, which is what <c>peerInvoke</c> will accept for this
+/// element. Without it, a caller had to cross-check a different tool in the other address space to
+/// learn whether an action was even available — see issue #77.
+/// </param>
+public sealed record GetAutomationPeerInfoResponse(
+    string AutomationId,
+    string Name,
+    string ClassName,
+    string ControlType,
+    IReadOnlyList<string> Patterns);

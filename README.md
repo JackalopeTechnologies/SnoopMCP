@@ -254,7 +254,7 @@ tier).
 
 | Tool | Use it for |
 |---|---|
-| `getAutomationPeerInfo(id)` | Bridge a Snoop element id to its UIA identity (AutomationId, Name, ClassName, ControlType) — correlates the two tiers. Read-only |
+| `getAutomationPeerInfo(id)` | Bridge a Snoop element id to its UIA identity (AutomationId, Name, ClassName, ControlType) — correlates the two tiers — plus the `patterns` the peer provides, i.e. what `peerInvoke` will accept for it. Read-only |
 | `waitForValue(id, expected, timeoutMs, dependencyProperty?, dataContextPath?)` | Poll a DP or DataContext path until it equals `expected` — ground-truth check. Supply exactly one of the two poll targets. Read-only |
 | `peerInvoke(id, pattern, dispatch?)` | Drive the element's real `AutomationPeer` pattern (`Invoke`, `Toggle`, `SelectionItem`, `ExpandCollapse`) in-process — the fallback when UIA can't reach the control. **Mutates** the target |
 | `executeCommand(id, path?, parameter?, dispatch?)` | Execute the `ICommand` bound to an element (or at a DataContext `path`), gated by `CanExecute`. **Mutates** the target |
