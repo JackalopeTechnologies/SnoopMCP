@@ -15,14 +15,28 @@ focus, and capture the window even when it is occluded. Driving is two-tier:
    - `waitForUia(pid, by, value, timeoutMs)` — wait for an element instead of sleeping.
    - `invokeUia(element, pattern?)` — click/select/toggle/expand. MUTATES.
    - `setUiaValue(element, value)` — set a text/numeric field. MUTATES.
-2. **Payload tier (requires `attach`).** For controls UIA can't drive and for ground-truth checks — see the driving tools added under attach (peerInvoke, executeCommand, waitForValue).
+2. **Payload tier (requires `attach`).** For controls UIA can't drive and for ground-truth checks.
+   Element ids are the Snoop element ids from `attach`/`listVisualRoots`/`findElements`, not UIA-tier
+   `element` references.
+   - `getAutomationPeerInfo(id)` — bridge a Snoop element id to its UIA identity (AutomationId, Name, ClassName, ControlType); correlates the two tiers by `AutomationId`. Read-only.
+   - `waitForValue(id, dependencyProperty?, dataContextPath?, expected, timeoutMs)` — poll a DP or DataContext path until it equals `expected` — ground-truth check (VM/DP state, not pixels). Read-only.
+   - `peerInvoke(id, pattern, dispatch?)` — drive the real WPF `AutomationPeer` pattern (Invoke | Toggle | SelectionItem | ExpandCollapse) in-process. MUTATES.
+   - `executeCommand(id, path?, parameter?, dispatch?)` — execute the `ICommand` bound to an element (or at a DataContext `path`), CanExecute-gated. MUTATES.
 
 ## Rules
 
 - Never ask SnoopMCP to synthesize mouse/keyboard input — there is no such tool by design. If a control
   is `NotDrivable`, tell the user and ask them to act, or try the payload tier.
-- Mutating tools (`invokeUia`, `setUiaValue`) require the host **interaction gate**. If you get
-  `InteractionDisabled`, ask the user to enable "Allow app interaction (driving)" in the SnoopMCP tray.
+- Mutating tools (`invokeUia`, `setUiaValue`, `peerInvoke`, `executeCommand`) require the host
+  **interaction gate**. If you get `InteractionDisabled`, ask the user to enable "Allow app interaction
+  (driving)" in the SnoopMCP tray.
+- `peerInvoke`/`executeCommand` accept an optional `dispatch="post"` for actions that open a modal
+  dialog and would otherwise block the wait indefinitely — it fires the action and returns immediately
+  (`Dispatched: true`) without observing the outcome, i.e. `ActionDispatched`; verify the effect
+  separately with `waitForValue`/`captureWindow`.
+- Without `dispatch="post"` (the default is `dispatch="wait"`), a mutating call that times out on the
+  dispatcher returns `ActionPending` — the action may already have applied before the wait gave up;
+  verify with `waitForValue`/`captureWindow` before assuming failure or retrying.
 - Driving/capturing an elevated (admin) app requires the SnoopMCP host to run elevated — enabling
   autostart registers an elevated logon task (one UAC). This is admin-only.
 - Element handles are short-lived; pass back the `element` reference you received. If it is stale,
