@@ -3,20 +3,20 @@
 // SPDX-License-Identifier: MIT
 // Licensed under the MIT License. See LICENSE in the repository root.
 
-namespace SnoopMCP.Cli.Tests;
+namespace SnoopMCP.ClientIntegration.Tests;
 
-using Cli;
+using ClientIntegration;
 using Xunit;
 
 public sealed class AutostartTaskTests
 {
     [Fact]
-    public void BuildCreateArguments_IsOnLogonLimitedForcedWithHostPath()
+    public void BuildCreateArguments_IsOnLogonHighestForcedWithHostPath()
     {
         IReadOnlyList<string> args = AutostartTask.BuildCreateArguments(@"C:\app\SnoopMCP.Host.exe");
 
         Assert.Equal(
-            ["/Create", "/TN", "SnoopMCP Host", "/SC", "ONLOGON", "/RL", "LIMITED",
+            ["/Create", "/TN", "SnoopMCP Host", "/SC", "ONLOGON", "/RL", "HIGHEST",
              "/TR", @"C:\app\SnoopMCP.Host.exe", "/F"],
             args);
     }
@@ -41,5 +41,11 @@ public sealed class AutostartTaskTests
     public void BuildCreateArguments_NullOrEmptyHostPath_Throws()
     {
         Assert.Throws<ArgumentException>(() => AutostartTask.BuildCreateArguments(string.Empty));
+    }
+
+    [Fact]
+    public void BuildRunArguments_RunsTheTask()
+    {
+        Assert.Equal(["/Run", "/TN", "SnoopMCP Host"], AutostartTask.BuildRunArguments());
     }
 }

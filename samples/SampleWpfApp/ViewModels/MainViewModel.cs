@@ -8,17 +8,24 @@ namespace SampleWpfApp.ViewModels;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 
 public sealed class MainViewModel : INotifyPropertyChanged
 {
+    private const string ProbeStatusDone = "done";
+
     private Customer? mSelectedCustomer;
     private string mSearchText = string.Empty;
+    private string mProbeInput = string.Empty;
+    private string mProbeStatus = string.Empty;
+    private string mProbeResult = string.Empty;
 
     public MainViewModel()
     {
         Customers = [];
         SeedCustomers();
         SelectedCustomer = Customers[0];
+        RunProbeCommand = new RelayCommand(RunProbe);
     }
 
     public ObservableCollection<Customer> Customers { get; }
@@ -35,7 +42,33 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set => SetField(ref mSearchText, value);
     }
 
+    public string ProbeInput
+    {
+        get => mProbeInput;
+        set => SetField(ref mProbeInput, value);
+    }
+
+    public string ProbeStatus
+    {
+        get => mProbeStatus;
+        set => SetField(ref mProbeStatus, value);
+    }
+
+    public string ProbeResult
+    {
+        get => mProbeResult;
+        set => SetField(ref mProbeResult, value);
+    }
+
+    public ICommand RunProbeCommand { get; }
+
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void RunProbe()
+    {
+        ProbeStatus = ProbeStatusDone;
+        ProbeResult = ProbeInput;
+    }
 
     private void SeedCustomers()
     {

@@ -44,5 +44,35 @@ public enum ErrorCode
     BindingPathError = 10,
 
     /// <summary>A textual path could not be parsed.</summary>
-    PathParseError = 11
+    PathParseError = 11,
+
+    /// <summary>The host interaction gate is disabled; the requested mutating action was refused.</summary>
+    InteractionDisabled = 12,
+
+    /// <summary>No UIA action pattern (and no payload fallback) can drive the target element.</summary>
+    NotDrivable = 13,
+
+    /// <summary>The target value element is read-only.</summary>
+    ValueReadOnly = 14,
+
+    /// <summary>The window cannot be captured (e.g. minimized, no printable content).</summary>
+    CaptureUnavailable = 15,
+
+    /// <summary>An element handle expired and could not be re-resolved by its locator.</summary>
+    UiaElementStale = 16,
+
+    /// <summary>A locator re-resolved to more than one element; the caller must disambiguate.</summary>
+    UiaAmbiguousLocator = 17,
+
+    /// <summary>A UI Automation call exceeded its timeout against an unresponsive target.</summary>
+    TargetUnresponsive = 18,
+
+    /// <summary>A mutating action timed out on the dispatcher; it may still have applied — verify.</summary>
+    ActionPending = 19,
+
+    /// <summary>Reserved (append-only): a fire-and-forget/dialog-opening action was posted. NOT thrown — successful fire-and-forget is signaled by the response's Dispatched field, not by this code. Kept for potential future error use.</summary>
+    ActionDispatched = 20,
+
+    /// <summary>The bound command's CanExecute returned false.</summary>
+    CommandNotExecutable = 21
 }

@@ -7,6 +7,8 @@ namespace SnoopMCP.Host;
 
 using System.Windows;
 using H.NotifyIcon;
+using Automation;
+using ClientIntegration;
 
 /// <summary>
 /// WPF application root for the SnoopMCP tray app. Enforces single-instance, starts the in-process
@@ -45,16 +47,49 @@ public partial class App
         }
         else
         {
-            mController = new ServerController(e.Args);
-            mTrayIcon = (TaskbarIcon?) FindResource(TrayIconResourceKey) ?? throw new InvalidOperationException("Tray icon resource not found.");
-            mTrayIcon.DataContext = new TrayViewModel(mController, Shutdown,
-                (title, message) => mTrayIcon.ShowNotification(title, message),
-                ShowOwnedDialog);
-            mTrayIcon.ForceCreate();
-            SessionEnding += OnSessionEnding;
-            _ = mController.StartAsync();
-            HostLog.Info("SnoopMCP host started.");
+            bool relaunchingElevated = false;
+            if (!ElevationInfo.IsElevated() && AutostartTask.Exists() && ElevationInfo.CanElevate())
+            {
+                if (AutostartTask.RunNow())
+                {
+                    HostLog.Info("Relaunching elevated via the autostart task.");
+                    // Never ReleaseMutex: the mutex was created initiallyOwned:false, so releasing a
+                    // handle this instance never owned would throw. Dispose our handle and null the
+                    // field so OnExit's mInstanceMutex?.Dispose() cannot double-dispose it.
+                    mInstanceMutex?.Dispose();
+                    mInstanceMutex = null;
+                    Shutdown();
+                    relaunchingElevated = true;
+                }
+                else
+                {
+                    // RunNow failed (Task Scheduler could not trigger the elevated task): fall through and run at Medium integrity.
+                    HostLog.Info("Elevated relaunch could not be triggered; continuing at Medium integrity.");
+                }
+            }
+            if (!relaunchingElevated)
+            {
+                StartAtCurrentIntegrity(e);
+            }
         }
+    }
+
+    // Split out of OnStartup's else-branch so the elevated-relaunch guard above can skip it with a
+    // single boolean check instead of an early return (the repo's single-exit-point analyzer rule
+    // forbids a return statement inside an if in a void method).
+    private void StartAtCurrentIntegrity(StartupEventArgs e)
+    {
+        mController = new ServerController(e.Args);
+        mTrayIcon = (TaskbarIcon?) FindResource(TrayIconResourceKey) ?? throw new InvalidOperationException("Tray icon resource not found.");
+        mTrayIcon.DataContext = new TrayViewModel(mController, Shutdown,
+            (title, message) => mTrayIcon.ShowNotification(title, message),
+            ShowOwnedDialog,
+            InteractionGate.ForCurrentUser(),
+            ElevationInfo.IsElevated());
+        mTrayIcon.ForceCreate();
+        SessionEnding += OnSessionEnding;
+        _ = mController.StartAsync();
+        HostLog.Info("SnoopMCP host started.");
     }
 
     private void OnSessionEnding(object sender, SessionEndingCancelEventArgs e)

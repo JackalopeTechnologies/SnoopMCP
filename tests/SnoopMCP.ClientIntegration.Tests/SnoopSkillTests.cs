@@ -8,9 +8,11 @@ namespace SnoopMCP.ClientIntegration.Tests;
 using ClientIntegration;
 using Xunit;
 
-/// <summary>Tests for <see cref="SnoopSkill"/> installing/removing the snoopmcp-first skill.</summary>
+/// <summary>Tests for <see cref="SnoopSkill"/> installing/removing the SnoopMCP skills.</summary>
 public sealed class SnoopSkillTests : IDisposable
 {
+    private const string SolutionFileName = "SnoopMCP.sln";
+
     private readonly string mDir;
 
     public SnoopSkillTests()
@@ -64,5 +66,50 @@ public sealed class SnoopSkillTests : IDisposable
 
         Assert.True(ok);
         Assert.False(Directory.Exists(Path.Combine(skillsDir, "snoopmcp-first")));
+    }
+
+    [Fact]
+    public void Install_WritesBothSkills()
+    {
+        string skillsDir = Path.Combine(mDir, "skills");
+
+        Assert.True(SnoopSkill.Install(skillsDir));
+
+        Assert.True(File.Exists(Path.Combine(skillsDir, "snoopmcp-first", "SKILL.md")));
+        Assert.True(File.Exists(Path.Combine(skillsDir, "snoopmcp-uia", "SKILL.md")));
+    }
+
+    /// <summary>
+    /// Drift guard: every embedded skill body in <see cref="SnoopSkill.Definitions"/> must stay in sync with
+    /// its corresponding repo <c>skills/&lt;name&gt;/SKILL.md</c> file.
+    /// </summary>
+    [Fact]
+    public void EmbeddedBodies_MatchRepoFiles()
+    {
+        string repoRoot = FindRepoRoot();
+        foreach ((string name, string body) in SnoopSkill.Definitions)
+        {
+            string repoFile = Path.Combine(repoRoot, "skills", name, "SKILL.md");
+            Assert.True(File.Exists(repoFile), $"Missing repo skill file: {repoFile}");
+            Assert.Equal(
+                File.ReadAllText(repoFile).ReplaceLineEndings("\n").TrimEnd(),
+                body.ReplaceLineEndings("\n").TrimEnd());
+        }
+    }
+
+    /// <summary>Walks up from <see cref="AppContext.BaseDirectory"/> until it finds <c>SnoopMCP.sln</c>.</summary>
+    private static string FindRepoRoot()
+    {
+        DirectoryInfo? dir = new(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, SolutionFileName)))
+        {
+            dir = dir.Parent;
+        }
+        if (dir is null)
+        {
+            throw new InvalidOperationException(
+                $"Could not locate {SolutionFileName} above {AppContext.BaseDirectory}.");
+        }
+        return dir.FullName;
     }
 }

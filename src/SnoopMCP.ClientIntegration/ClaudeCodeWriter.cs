@@ -13,7 +13,7 @@ using System.Text.Json.Nodes;
 /// Registers SnoopMCP in Claude Code. Writes three things: the <c>mcpServers</c> entry in
 /// <c>~/.claude.json</c> (with a millisecond <c>timeout</c>), a whole-server <c>permissions.allow</c>
 /// entry (<c>mcp__snoopmcp</c>) in <c>~/.claude/settings.json</c> so the read-only tools are
-/// pre-approved, and the <c>snoopmcp-first</c> skill under <c>~/.claude/skills</c>.
+/// pre-approved, and the SnoopMCP skills under <c>~/.claude/skills</c>.
 /// </summary>
 public sealed class ClaudeCodeWriter : JsonMcpServerWriter
 {
@@ -28,9 +28,9 @@ public sealed class ClaudeCodeWriter : JsonMcpServerWriter
     private const string AllowKey = "allow";
     private const string WholeServerPermission = "mcp__snoopmcp";
     private const string TempSuffix = ".tmp";
-    private const string MsgPermsAndSkill = " Pre-approved tools and installed the snoopmcp-first skill.";
+    private const string MsgPermsAndSkill = " Pre-approved tools and installed the SnoopMCP skills.";
     private const string MsgPermsOnly = " Pre-approved tools; skill install failed.";
-    private const string MsgSkillOnly = " Installed the snoopmcp-first skill; permission write failed.";
+    private const string MsgSkillOnly = " Installed the SnoopMCP skills; permission write failed.";
     private const string MsgNeither = " Permission and skill writes failed.";
     private const int DefaultTimeoutSeconds = 120;
     private const int MinTimeoutSeconds = 10;
@@ -79,7 +79,7 @@ public sealed class ClaudeCodeWriter : JsonMcpServerWriter
     }
 
     /// <inheritdoc />
-    /// <remarks>Also pre-approves the SnoopMCP tools and installs the snoopmcp-first skill.</remarks>
+    /// <remarks>Also pre-approves the SnoopMCP tools and installs the SnoopMCP skills.</remarks>
     public override RegisterResult Register(McpEndpoint endpoint)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
@@ -102,7 +102,7 @@ public sealed class ClaudeCodeWriter : JsonMcpServerWriter
     }
 
     /// <inheritdoc />
-    /// <remarks>Also removes the pre-approval permission and the snoopmcp-first skill.</remarks>
+    /// <remarks>Also removes the pre-approval permission and the SnoopMCP skills.</remarks>
     public override UnregisterResult Unregister()
     {
         UnregisterResult baseResult = base.Unregister();

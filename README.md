@@ -2,7 +2,11 @@
 
 An MCP server that injects a payload DLL into a running WPF process so an LLM
 client can diagnose styling, binding, and dependency-property resolution
-problems live. **v1 is read-only.**
+problems live — and, as a separate gated capability, drives that same app
+through UI Automation (click, set values, wait for elements) and captures its
+window as an image. **Inspection is read-only; driving is off by default** and
+must be explicitly enabled — see
+[Driving the app](#driving-the-app-ui-automation) below.
 
 The host speaks MCP over **Streamable HTTP** (Kestrel, `http://127.0.0.1:6300`,
 endpoint `/mcp`) to the LLM client, and length-prefixed JSON over a named pipe to
@@ -25,6 +29,10 @@ LLM client ──HTTP /mcp──▶ SnoopMCP.Host.exe
                               ▲
                           host ◀── tool calls marshalled onto the UI Dispatcher
 ```
+
+Driving tools bypass this path entirely: `getUiaTree`, `findUiaElement`, `captureWindow`,
+`waitForUia`, `invokeUia`, and `setUiaValue` talk to the target directly from the host via
+Windows UI Automation and `PrintWindow` — no injection, no `attach()` call, just a `pid`.
 
 ## Quickstart
 
@@ -215,6 +223,71 @@ Twenty read-only tools, plus `attach`/`detach`:
 | `listBindings(id, includeDescendants)` | Every binding on an element / under a subtree — wide audit |
 | `exportXaml(id)` | `XamlWriter` snapshot of the element's live state (bindings appear as evaluated values; use `listBindings` for binding shape) |
 
+## Driving the app (UI Automation)
+
+Beyond inspection, SnoopMCP can also drive a running WPF app — click, select, type
+into fields, wait for elements to appear, verify ground truth, and capture its window
+as an image. Driving is two-tier:
+
+1. **UIA tier.** No `attach()` call needed — every tool is keyed directly by `pid` and
+   talks to the target via Windows UI Automation.
+2. **Payload tier.** Requires `attach()` first. It's the fallback for controls the UIA
+   tier can't reach, plus `waitForValue` for ground-truth checks (VM/DP state, not
+   pixels).
+
+See the [`snoopmcp-uia`](skills/snoopmcp-uia/SKILL.md) skill for agent-facing guidance
+(locator-stability order, wait-vs-sleep, recovering a stale element handle, choosing a
+tier).
+
+### UIA tier (no attach needed)
+
+| Tool | Use it for |
+|---|---|
+| `getUiaTree(pid, fromElement?, depth)` | Walk the UIA tree to a bounded depth. Read-only |
+| `findUiaElement(pid, by, value)` | Locate an element by `automationId`, `name`, `helpText`, or `controlType`. Read-only |
+| `captureWindow(pid)` | Capture the window as a PNG image via `PrintWindow` — works even while occluded. Read-only |
+| `waitForUia(pid, by, value, timeoutMs)` | Poll for an element instead of sleeping. Read-only |
+| `invokeUia(element, pattern?)` | Click, select, toggle, or expand an element. **Mutates** the target |
+| `setUiaValue(element, value)` | Set a text/numeric field via `ValuePattern`. **Mutates** the target |
+
+### Payload tier (requires attach)
+
+| Tool | Use it for |
+|---|---|
+| `getAutomationPeerInfo(id)` | Bridge a Snoop element id to its UIA identity (AutomationId, Name, ClassName, ControlType) — correlates the two tiers. Read-only |
+| `waitForValue(id, dependencyProperty?, dataContextPath?, expected, timeoutMs)` | Poll a DP or DataContext path until it equals `expected` — ground-truth check. Read-only |
+| `peerInvoke(id, pattern, dispatch?)` | Drive the element's real `AutomationPeer` pattern (`Invoke`, `Toggle`, `SelectionItem`, `ExpandCollapse`) in-process — the fallback when UIA can't reach the control. **Mutates** the target |
+| `executeCommand(id, path?, parameter?, dispatch?)` | Execute the `ICommand` bound to an element (or at a DataContext `path`), gated by `CanExecute`. **Mutates** the target |
+
+**No synthesized input.** Driving is UIA action patterns and in-process
+`AutomationPeer`/`ICommand` invocation only, and capture is `PrintWindow` only —
+SnoopMCP never synthesizes mouse or keyboard input and never steals focus or raises the
+target window. A control UIA can't drive returns `NotDrivable`.
+
+**Interaction gate.** The mutating tools above — `invokeUia`, `setUiaValue`,
+`peerInvoke`, `executeCommand` — are refused unless the host's interaction gate is on,
+and it's **off by default**. Enable it from the tray menu — **"Allow app interaction
+(driving)"** — its state lives under `%LocalAppData%\SnoopMCP` and is reflected in
+`/health` as `interactionEnabled`. The read-only tools (both here and in
+[Tool surface](#tool-surface)) are never gated.
+
+**Fire-and-forget dispatch.** `peerInvoke` and `executeCommand` accept an optional
+`dispatch="post"` for actions that open a modal dialog and would otherwise block the
+mutating wait indefinitely — it fires the action and returns immediately
+(`Dispatched: true`) without observing the outcome; verify separately with
+`waitForValue`/`captureWindow`. Without it (the default `dispatch="wait"`), a mutating
+call that times out on the dispatcher returns `ActionPending` rather than a hard
+failure — the action may already have applied before the wait gave up; verify before
+assuming failure or retrying.
+
+**Elevation.** Driving or capturing an elevated (Administrator) target requires the
+SnoopMCP host itself to run elevated — the same rule as attach (see
+[Prerequisites](#prerequisites)). Enabling autostart registers an elevated
+(`/RL HIGHEST`) logon task (one UAC prompt, at registration only); both the logon
+launch and a manual `SnoopMCP.Cli start` route through that task. This is admin-only —
+a standard user sees a clear "elevated-target driving unavailable" note in the tray
+tooltip instead.
+
 ## Error codes
 
 | Code | Meaning |
@@ -227,10 +300,28 @@ Twenty read-only tools, plus `attach`/`detach`:
 | `ElementExpired` | Element id has been garbage collected |
 | `InvalidArgument` | Bad tool argument |
 | `PathParseError` | Malformed path string |
+| `InteractionDisabled` | Mutating driving tool called while the host interaction gate is off (enable it in the tray) |
+| `NotDrivable` | No UIA action pattern (or payload fallback) can drive the element |
+| `ValueReadOnly` | The target value element is read-only |
+| `CaptureUnavailable` | Window can't be captured (minimized / no printable content) |
+| `UiaElementStale` | An element reference expired and couldn't be re-resolved by its locator |
+| `UiaAmbiguousLocator` | A locator matched multiple elements; caller must disambiguate |
+| `TargetUnresponsive` | A UI Automation call timed out against an unresponsive target |
+| `ActionPending` | A mutating action timed out on the dispatcher; it may still have applied — verify |
+| `ActionDispatched` | Reserved: a fire-and-forget (`dispatch="post"`) action was posted; observe for its effect |
+| `CommandNotExecutable` | The bound command's `CanExecute` returned false |
 
 ## Known v1 limitations
 
-- **Read-only.** No property writes, no method invocation, no scripting.
+- **Inspection is read-only; driving is separate and gated.** The `describe*`/`list*`/
+  `resolve*`/`export*` inspection tools support no property writes or method
+  invocation, and there's no scripting — mutation only happens through the driving
+  tools (UIA tier and payload tier), which are off by default; see
+  [Driving the app](#driving-the-app-ui-automation).
+- **No automatic UIA-to-payload fallback.** `invokeUia`/`setUiaValue` return
+  `NotDrivable` for a control UI Automation can't reach; the payload tier's
+  `peerInvoke`/`executeCommand` is a manual fallback the caller must choose to try,
+  not an automatic retry.
 - **One target at a time.** Phase 2 may add multi-target.
 - **x64 only.** x86/ARM64 targets are rejected at probe time.
 - **No persistent reattach.** Sessions die with the target process.

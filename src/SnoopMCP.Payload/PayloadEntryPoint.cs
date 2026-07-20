@@ -124,6 +124,17 @@ public static class PayloadEntryPoint
             toolRegistry.Register(new ListBindingsToolHandler(registry, bindingInspector, marshal));
             toolRegistry.Register(new ExportXamlToolHandler(registry, xamlExporter, marshal));
 
+            // Interaction (Phase B) — payload-tier driving fallback + ground-truth waits.
+            var peerDriver = new Interaction.AutomationPeerDriver();
+            var commandInvoker = new Interaction.CommandInvoker();
+            var peerInfoReader = new Interaction.PeerInfoReader();
+            var valueWaiter = new Interaction.ValueWaiter();
+
+            toolRegistry.Register(new GetAutomationPeerInfoToolHandler(registry, peerInfoReader, marshal));
+            toolRegistry.Register(new PeerInvokeToolHandler(registry, peerDriver, marshal));
+            toolRegistry.Register(new ExecuteCommandToolHandler(registry, commandInvoker, marshal));
+            toolRegistry.Register(new WaitForValueToolHandler(registry, valueWaiter, marshal));
+
             psServer = new PipeServer(pipeName, toolRegistry);
             psServer.Start();
         }

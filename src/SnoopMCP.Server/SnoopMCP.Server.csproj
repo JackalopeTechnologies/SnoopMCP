@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <FrameworkReference Include="Microsoft.AspNetCore.App" />
+        <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
     </ItemGroup>
 
     <!--
@@ -27,5 +28,9 @@
 
     <ItemGroup>
         <ProjectReference Include="..\SnoopMCP.Protocol\SnoopMCP.Protocol.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="SnoopMCP.Host.Tests" />
     </ItemGroup>
 </Project>

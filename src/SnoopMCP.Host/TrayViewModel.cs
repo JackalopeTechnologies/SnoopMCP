@@ -8,6 +8,7 @@ namespace SnoopMCP.Host;
 using System.ComponentModel;
 using System.Windows.Input;
 using System.Windows.Media;
+using Automation;
 using ClientIntegration;
 
 /// <summary>
@@ -30,35 +31,49 @@ public sealed class TrayViewModel : INotifyPropertyChanged
     private const string AbsentMark = "absent";
     private const string RegisteredMark = "registered";
     private const string NotRegisteredMark = "not registered";
+    private const string ElevatedDrivingUnavailableSuffix = " — elevated-target driving unavailable (not an administrator)";
 
     private readonly ServerController mController;
     private readonly Action<string, string> mNotify;
     private readonly Action<string, string> mShowDialog;
+    private readonly InteractionGate mGate;
+    private readonly bool mCanDriveElevatedTargets;
     private readonly RelayCommand mStartCommand;
     private readonly RelayCommand mStopCommand;
     private readonly RelayCommand mExitCommand;
     private readonly RelayCommand<McpClient> mInstallCommand;
     private readonly RelayCommand<McpClient> mUninstallCommand;
     private readonly RelayCommand mStatusCommand;
+    private readonly RelayCommand mToggleInteractionCommand;
 
     /// <summary>Creates the view model.</summary>
     /// <param name="controller">The server controller the Start/Stop menu drives.</param>
     /// <param name="exit">Callback that shuts the whole application down.</param>
     /// <param name="notify">Callback that surfaces a transient (title, message) tray notification.</param>
     /// <param name="showDialog">Callback that surfaces a modal (title, message) dialog for Status.</param>
+    /// <param name="gate">The interaction gate the tray toggle flips.</param>
+    /// <param name="canDriveElevatedTargets">
+    /// Whether the host process is elevated enough to drive elevated targets. Defaults to
+    /// <see langword="true"/> so existing 5-argument call sites see no tooltip change.
+    /// </param>
     public TrayViewModel(
         ServerController controller,
         Action exit,
         Action<string, string> notify,
-        Action<string, string> showDialog)
+        Action<string, string> showDialog,
+        InteractionGate gate,
+        bool canDriveElevatedTargets = true)
     {
         ArgumentNullException.ThrowIfNull(controller);
         ArgumentNullException.ThrowIfNull(exit);
         ArgumentNullException.ThrowIfNull(notify);
         ArgumentNullException.ThrowIfNull(showDialog);
+        ArgumentNullException.ThrowIfNull(gate);
         mController = controller;
         mNotify = notify;
         mShowDialog = showDialog;
+        mGate = gate;
+        mCanDriveElevatedTargets = canDriveElevatedTargets;
 
         mStartCommand = new RelayCommand(() => _ = mController.StartAsync(), () => ServerStateInfo.CanStart(mController.State));
         mStopCommand = new RelayCommand(() => _ = mController.StopAsync(), () => ServerStateInfo.CanStop(mController.State));
@@ -66,6 +81,7 @@ public sealed class TrayViewModel : INotifyPropertyChanged
         mInstallCommand = new RelayCommand<McpClient>(InstallExecute);
         mUninstallCommand = new RelayCommand<McpClient>(UninstallExecute);
         mStatusCommand = new RelayCommand(StatusExecute);
+        mToggleInteractionCommand = new RelayCommand(ToggleInteraction);
 
         mController.StateChanged += (_, _) => OnStateChanged();
     }
@@ -77,7 +93,15 @@ public sealed class TrayViewModel : INotifyPropertyChanged
     public ImageSource IconSource => TrayIconRenderer.ForState(mController.State);
 
     /// <summary>Gets the tray tooltip text for the current server state.</summary>
-    public string ToolTipText => ServerStateInfo.Tooltip(mController.State);
+    public string ToolTipText => mCanDriveElevatedTargets
+        ? ServerStateInfo.Tooltip(mController.State)
+        : ServerStateInfo.Tooltip(mController.State) + ElevatedDrivingUnavailableSuffix;
+
+    /// <summary>Gets whether mutating driving tools are currently permitted.</summary>
+    public bool InteractionEnabled => mGate.IsEnabled;
+
+    /// <summary>Gets whether the host process is elevated enough to drive elevated targets.</summary>
+    public bool CanDriveElevatedTargets => mCanDriveElevatedTargets;
 
     /// <summary>Gets the command that starts the MCP server.</summary>
     public ICommand StartCommand => mStartCommand;
@@ -96,6 +120,15 @@ public sealed class TrayViewModel : INotifyPropertyChanged
 
     /// <summary>Gets the command that reports SnoopMCP's registration status across all agents.</summary>
     public ICommand StatusCommand => mStatusCommand;
+
+    /// <summary>Gets the command that flips the interaction gate.</summary>
+    public ICommand ToggleInteractionCommand => mToggleInteractionCommand;
+
+    private void ToggleInteraction()
+    {
+        mGate.SetEnabled(!mGate.IsEnabled);
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InteractionEnabled)));
+    }
 
     private void InstallExecute(McpClient? client)
     {

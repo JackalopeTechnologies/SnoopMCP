@@ -5,6 +5,7 @@
 
 namespace SnoopMCP.Host.Injection;
 
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Protocol.Errors;
@@ -50,7 +51,19 @@ public static class ProcessProbe
 
     private static string DetermineBitness(Process process)
     {
-        IntPtr handle = process.Handle;
+        IntPtr handle;
+        try
+        {
+            handle = process.Handle;
+        }
+        catch (Win32Exception ex)
+        {
+            throw new SnoopMcpException(
+                ErrorCode.AccessDenied,
+                "Could not open the target process — usually means an elevation mismatch (target Admin, host not). "
+                + "Run the SnoopMCP host elevated (enable autostart, which registers an elevated logon task).",
+                ex);
+        }
         bool ok = IsWow64Process(handle, out bool isWow64);
         if (!ok)
         {
@@ -63,11 +76,28 @@ public static class ProcessProbe
         return bitness;
     }
 
+    internal static ProcessModuleCollection ReadModules(Process process)
+    {
+        ProcessModuleCollection modules;
+        try
+        {
+            modules = process.Modules;
+        }
+        catch (Win32Exception ex)
+        {
+            throw new SnoopMcpException(
+                ErrorCode.AccessDenied,
+                "Could not read the target process modules — usually means an elevation mismatch (target Admin, host not).",
+                ex);
+        }
+        return modules;
+    }
+
     private static (string Runtime, string Framework) DetermineRuntime(Process process)
     {
         string runtime = UnknownVersion;
         string framework = UnknownVersion;
-        foreach (ProcessModule module in process.Modules)
+        foreach (ProcessModule module in ReadModules(process))
         {
             string name = module.ModuleName;
             bool isHostFxr = string.Equals(name, HostFxrModule, StringComparison.OrdinalIgnoreCase);
@@ -87,7 +117,7 @@ public static class ProcessProbe
     private static void EnsureWpfLoaded(Process process)
     {
         bool found = false;
-        foreach (ProcessModule module in process.Modules)
+        foreach (ProcessModule module in ReadModules(process))
         {
             bool isWpf = string.Equals(module.ModuleName, WpfModule, StringComparison.OrdinalIgnoreCase);
             if (isWpf)

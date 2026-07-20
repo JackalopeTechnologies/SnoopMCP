@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Host;
+using Host.Automation;
 using Host.Injection;
 using Host.Tools;
 using Protocol.Tools;
@@ -49,7 +50,8 @@ public sealed class WalkthroughCaptureTests : IAsyncLifetime
 
         mSession = new SessionManager(NullLogger<SessionManager>.Instance, NullLoggerFactory.Instance);
         var injector = new InjectorService(NullLogger<InjectorService>.Instance);
-        mTools = new McpTools(mSession, injector);
+        string gatePath = Path.Combine(Path.GetTempPath(), "gate-" + Guid.NewGuid().ToString("N") + ".json");
+        mTools = new McpTools(mSession, injector, new InteractionGate(gatePath));
     }
 
     public async ValueTask DisposeAsync()
