@@ -356,7 +356,7 @@ public sealed class McpTools
         int timeoutMs,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrEmpty(expected);
+        ArgumentNullException.ThrowIfNull(expected);
         return Dispatch(
             ToolNames.WaitForValue,
             new WaitForValueRequest(id, dependencyProperty, dataContextPath, expected, timeoutMs),
