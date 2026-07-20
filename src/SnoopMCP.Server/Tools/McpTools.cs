@@ -437,6 +437,12 @@ public sealed class McpTools
         {
             throw Promote(ex);
         }
+        catch (Exception ex) when (ex is not McpException and not OperationCanceledException)
+        {
+            // Only an McpException's message reaches the client; anything else is replaced by the
+            // SDK's bare "An error occurred invoking '…'" (issue #81).
+            throw ToolErrorFilter.Describe(ex, toolName);
+        }
         return result;
     }
 

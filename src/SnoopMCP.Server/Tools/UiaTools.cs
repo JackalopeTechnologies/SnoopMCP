@@ -68,6 +68,13 @@ public sealed class UiaTools
             result = SerializeResult(new { elements = tree });
         }
         catch (SnoopMcpException ex) { throw Promote(ex); }
+        catch (Exception ex) when (ex is not McpException and not OperationCanceledException)
+        {
+            // Only an McpException's message reaches the client; everything else is replaced by the
+            // SDK's bare "An error occurred invoking '…'" (issue #81). A response that fails to
+            // serialize (issue #73) lands here, so it is classified before it can escape untyped.
+            throw ToolErrorFilter.Describe(ex, null);
+        }
         return result;
     }
 
@@ -92,6 +99,13 @@ public sealed class UiaTools
             result = SerializeResult(new { elements = hits });
         }
         catch (SnoopMcpException ex) { throw Promote(ex); }
+        catch (Exception ex) when (ex is not McpException and not OperationCanceledException)
+        {
+            // Only an McpException's message reaches the client; everything else is replaced by the
+            // SDK's bare "An error occurred invoking '…'" (issue #81). A response that fails to
+            // serialize (issue #73) lands here, so it is classified before it can escape untyped.
+            throw ToolErrorFilter.Describe(ex, null);
+        }
         return result;
     }
 
@@ -112,6 +126,13 @@ public sealed class UiaTools
             result = new CallToolResult { Content = [ImageContentBlock.FromBytes(png, ImagePngMimeType)] };
         }
         catch (SnoopMcpException ex) { throw Promote(ex); }
+        catch (Exception ex) when (ex is not McpException and not OperationCanceledException)
+        {
+            // Only an McpException's message reaches the client; everything else is replaced by the
+            // SDK's bare "An error occurred invoking '…'" (issue #81). A response that fails to
+            // serialize (issue #73) lands here, so it is classified before it can escape untyped.
+            throw ToolErrorFilter.Describe(ex, null);
+        }
         return Task.FromResult(result);
     }
 
@@ -137,6 +158,13 @@ public sealed class UiaTools
             result = SerializeResult(hit);
         }
         catch (SnoopMcpException ex) { throw Promote(ex); }
+        catch (Exception ex) when (ex is not McpException and not OperationCanceledException)
+        {
+            // Only an McpException's message reaches the client; everything else is replaced by the
+            // SDK's bare "An error occurred invoking '…'" (issue #81). A response that fails to
+            // serialize (issue #73) lands here, so it is classified before it can escape untyped.
+            throw ToolErrorFilter.Describe(ex, null);
+        }
         return result;
     }
 
@@ -161,6 +189,13 @@ public sealed class UiaTools
             result = SerializeResult(new { ok = true });
         }
         catch (SnoopMcpException ex) { throw Promote(ex); }
+        catch (Exception ex) when (ex is not McpException and not OperationCanceledException)
+        {
+            // Only an McpException's message reaches the client; everything else is replaced by the
+            // SDK's bare "An error occurred invoking '…'" (issue #81). A response that fails to
+            // serialize (issue #73) lands here, so it is classified before it can escape untyped.
+            throw ToolErrorFilter.Describe(ex, null);
+        }
         return result;
     }
 
@@ -185,6 +220,13 @@ public sealed class UiaTools
             result = SerializeResult(new { ok = true });
         }
         catch (SnoopMcpException ex) { throw Promote(ex); }
+        catch (Exception ex) when (ex is not McpException and not OperationCanceledException)
+        {
+            // Only an McpException's message reaches the client; everything else is replaced by the
+            // SDK's bare "An error occurred invoking '…'" (issue #81). A response that fails to
+            // serialize (issue #73) lands here, so it is classified before it can escape untyped.
+            throw ToolErrorFilter.Describe(ex, null);
+        }
         return result;
     }
 
