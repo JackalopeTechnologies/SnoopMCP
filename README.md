@@ -226,13 +226,20 @@ Twenty read-only tools, plus `attach`/`detach`:
 ## Driving the app (UI Automation)
 
 Beyond inspection, SnoopMCP can also drive a running WPF app — click, select, type
-into fields, and wait for elements to appear — and capture its window as an image,
-entirely from the host process via Windows UI Automation. This is the first of two
-planned driving tiers: the **UIA tier** below needs no `attach()` call (every tool is
-keyed directly by `pid`); a **payload tier**, for controls UIA can't reach, is planned
-for a later phase. See the [`snoopmcp-uia`](skills/snoopmcp-uia/SKILL.md) skill for
-agent-facing guidance (locator-stability order, wait-vs-sleep, recovering a stale
-element handle).
+into fields, wait for elements to appear, verify ground truth, and capture its window
+as an image. Driving is two-tier:
+
+1. **UIA tier.** No `attach()` call needed — every tool is keyed directly by `pid` and
+   talks to the target via Windows UI Automation.
+2. **Payload tier.** Requires `attach()` first. It's the fallback for controls the UIA
+   tier can't reach, plus `waitForValue` for ground-truth checks (VM/DP state, not
+   pixels).
+
+See the [`snoopmcp-uia`](skills/snoopmcp-uia/SKILL.md) skill for agent-facing guidance
+(locator-stability order, wait-vs-sleep, recovering a stale element handle, choosing a
+tier).
+
+### UIA tier (no attach needed)
 
 | Tool | Use it for |
 |---|---|
@@ -243,16 +250,35 @@ element handle).
 | `invokeUia(element, pattern?)` | Click, select, toggle, or expand an element. **Mutates** the target |
 | `setUiaValue(element, value)` | Set a text/numeric field via `ValuePattern`. **Mutates** the target |
 
-**No synthesized input.** Driving is UIA action patterns only, and capture is
-`PrintWindow` only — SnoopMCP never synthesizes mouse or keyboard input and never
-steals focus or raises the target window. A control UIA can't drive returns
-`NotDrivable`.
+### Payload tier (requires attach)
 
-**Interaction gate.** The two mutating tools above are refused unless the host's
-interaction gate is on, and it's **off by default**. Enable it from the tray menu —
-**"Allow app interaction (driving)"** — its state lives under `%LocalAppData%\SnoopMCP`
-and is reflected in `/health` as `interactionEnabled`. The read-only tools (both here
-and in [Tool surface](#tool-surface)) are never gated.
+| Tool | Use it for |
+|---|---|
+| `getAutomationPeerInfo(id)` | Bridge a Snoop element id to its UIA identity (AutomationId, Name, ClassName, ControlType) — correlates the two tiers. Read-only |
+| `waitForValue(id, dependencyProperty?, dataContextPath?, expected, timeoutMs)` | Poll a DP or DataContext path until it equals `expected` — ground-truth check. Read-only |
+| `peerInvoke(id, pattern, dispatch?)` | Drive the element's real `AutomationPeer` pattern (`Invoke`, `Toggle`, `SelectionItem`, `ExpandCollapse`) in-process — the fallback when UIA can't reach the control. **Mutates** the target |
+| `executeCommand(id, path?, parameter?, dispatch?)` | Execute the `ICommand` bound to an element (or at a DataContext `path`), gated by `CanExecute`. **Mutates** the target |
+
+**No synthesized input.** Driving is UIA action patterns and in-process
+`AutomationPeer`/`ICommand` invocation only, and capture is `PrintWindow` only —
+SnoopMCP never synthesizes mouse or keyboard input and never steals focus or raises the
+target window. A control UIA can't drive returns `NotDrivable`.
+
+**Interaction gate.** The mutating tools above — `invokeUia`, `setUiaValue`,
+`peerInvoke`, `executeCommand` — are refused unless the host's interaction gate is on,
+and it's **off by default**. Enable it from the tray menu — **"Allow app interaction
+(driving)"** — its state lives under `%LocalAppData%\SnoopMCP` and is reflected in
+`/health` as `interactionEnabled`. The read-only tools (both here and in
+[Tool surface](#tool-surface)) are never gated.
+
+**Fire-and-forget dispatch.** `peerInvoke` and `executeCommand` accept an optional
+`dispatch="post"` for actions that open a modal dialog and would otherwise block the
+mutating wait indefinitely — it fires the action and returns immediately
+(`Dispatched: true`) without observing the outcome; verify separately with
+`waitForValue`/`captureWindow`. Without it (the default `dispatch="wait"`), a mutating
+call that times out on the dispatcher returns `ActionPending` rather than a hard
+failure — the action may already have applied before the wait gave up; verify before
+assuming failure or retrying.
 
 **Elevation.** Driving or capturing an elevated (Administrator) target requires the
 SnoopMCP host itself to run elevated — the same rule as attach (see
@@ -281,14 +307,21 @@ tooltip instead.
 | `UiaElementStale` | An element reference expired and couldn't be re-resolved by its locator |
 | `UiaAmbiguousLocator` | A locator matched multiple elements; caller must disambiguate |
 | `TargetUnresponsive` | A UI Automation call timed out against an unresponsive target |
+| `ActionPending` | A mutating action timed out on the dispatcher; it may still have applied — verify |
+| `ActionDispatched` | Reserved: a fire-and-forget (`dispatch="post"`) action was posted; observe for its effect |
+| `CommandNotExecutable` | The bound command's `CanExecute` returned false |
 
 ## Known v1 limitations
 
-- **Inspection is read-only.** The attach/payload tools support no property writes or
-  method invocation, and there's no scripting — driving (writes, invocation) is a
-  separate capability; see [Driving the app](#driving-the-app-ui-automation).
-- **UIA driving only; no payload-tier fallback yet.** A control UI Automation can't
-  reach returns `NotDrivable`; a payload-tier fallback is a later-phase candidate.
+- **Inspection is read-only; driving is separate and gated.** The `describe*`/`list*`/
+  `resolve*`/`export*` inspection tools support no property writes or method
+  invocation, and there's no scripting — mutation only happens through the driving
+  tools (UIA tier and payload tier), which are off by default; see
+  [Driving the app](#driving-the-app-ui-automation).
+- **No automatic UIA-to-payload fallback.** `invokeUia`/`setUiaValue` return
+  `NotDrivable` for a control UI Automation can't reach; the payload tier's
+  `peerInvoke`/`executeCommand` is a manual fallback the caller must choose to try,
+  not an automatic retry.
 - **One target at a time.** Phase 2 may add multi-target.
 - **x64 only.** x86/ARM64 targets are rejected at probe time.
 - **No persistent reattach.** Sessions die with the target process.
