@@ -74,5 +74,8 @@ public enum ErrorCode
     ActionDispatched = 20,
 
     /// <summary>The bound command's CanExecute returned false.</summary>
-    CommandNotExecutable = 21
+    CommandNotExecutable = 21,
+
+    /// <summary>The element is disabled (IsEnabled is false); WPF refuses every action pattern on it until it is enabled.</summary>
+    ElementNotEnabled = 22
 }

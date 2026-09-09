@@ -206,6 +206,49 @@ public sealed class CommandInvokerTests
         Assert.Null(response.CanExecute);
     }
 
+    [WpfFact]
+    public void ExecuteCommand_WaitMode_FromForeignThread_CanExecuteFalse_SurfacesCommandNotExecutable()
+    {
+        // Raygun group 290708134232: CommandInvoker.Execute threw CommandNotExecutable inside the
+        // dispatcher delegate. Through the real pipe path (a foreign thread, as PipeServer's request
+        // loop is) the handler must surface that SnoopMcpException itself — not an AggregateException
+        // wrapper that PipeServer's catch-all would report as ErrorCode.Unknown.
+        var cmd = new RelayTestCommand(_ => throw new Xunit.Sdk.XunitException("should not run"), _ => false);
+        var button = new Button { Command = cmd };
+        var registry = new ElementRegistry();
+        int id = registry.GetOrAssign(button);
+        var invoker = new CommandInvoker();
+        var marshal = new DispatcherMarshal(Dispatcher.CurrentDispatcher, TimeSpan.FromSeconds(2));
+        var handler = new ExecuteCommandToolHandler(registry, invoker, marshal);
+        JsonElement arguments = ToArguments(new ExecuteCommandRequest(id, null, null, null));
+        Exception? caught = null;
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                handler.ExecuteAsync(arguments, default).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                caught = ex;
+            }
+        });
+        worker.Start();
+
+        var frame = new DispatcherFrame();
+        var pump = new Thread(() =>
+        {
+            worker.Join();
+            frame.Continue = false;
+        });
+        pump.Start();
+        Dispatcher.PushFrame(frame);
+        pump.Join();
+
+        SnoopMcpException mcp = Assert.IsType<SnoopMcpException>(caught);
+        Assert.Equal(ErrorCode.CommandNotExecutable, mcp.Code);
+    }
+
     private static JsonElement ToArguments(ExecuteCommandRequest request)
     {
         string json = JsonSerializer.Serialize(request, WireSerializer.JsonOptions);

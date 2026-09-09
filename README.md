@@ -289,7 +289,10 @@ and it's **off by default**. Enable it from the tray menu — **"Allow app inter
 `dispatch="post"` for actions that open a modal dialog and would otherwise block the
 mutating wait indefinitely — it fires the action and returns immediately
 (`Dispatched: true`) without observing the outcome; verify separately with
-`waitForValue`/`captureWindow`. Without it (the default `dispatch="wait"`), a mutating
+`waitForValue`/`captureWindow`. A failure inside a posted action (a disabled element, a
+`CanExecute` that returns false) is traced in the target process and never reported back,
+so check `IsEnabled` with `getDependencyProperty` first, or use the default mode when you
+need the error. Without it (the default `dispatch="wait"`), a mutating
 call that times out on the dispatcher returns `ActionPending` rather than a hard
 failure — the action may already have applied before the wait gave up; verify before
 assuming failure or retrying.
@@ -324,6 +327,7 @@ tooltip instead.
 | `ActionPending` | A mutating action timed out on the dispatcher; it may still have applied — verify |
 | `ActionDispatched` | Reserved: a fire-and-forget (`dispatch="post"`) action was posted; observe for its effect |
 | `CommandNotExecutable` | The bound command's `CanExecute` returned false |
+| `ElementNotEnabled` | The element is disabled (`IsEnabled` false), so WPF refuses every action pattern on it — enable it, or wait for it to become enabled, before driving |
 
 ## Known v1 limitations
 
