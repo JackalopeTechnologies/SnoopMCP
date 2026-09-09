@@ -380,8 +380,9 @@ public sealed class McpTools
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description(
         "MUTATES the target: drive an element's AutomationPeer pattern in-process. Requires the " +
-        "interaction gate. Optional dispatch='post' fires-and-forgets a dialog-opening action; in " +
-        "'post' mode the outcome (including errors) is not surfaced — verify the effect separately.")]
+        "interaction gate. A disabled element returns ElementNotEnabled: do not retry until it is " +
+        "enabled. Optional dispatch='post' fires-and-forgets a dialog-opening action; in 'post' mode " +
+        "the outcome (including errors) is not surfaced — verify the effect separately.")]
     public Task<JsonElement> PeerInvoke(
         int id,
         string pattern,

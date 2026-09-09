@@ -116,4 +116,106 @@ public sealed class DispatcherMarshalTests
         Assert.Throws<InvalidOperationException>(
             () => marshal.Invoke(() => 1, CancellationToken.None));
     }
+
+    [WpfFact]
+    public void Invoke_WorkThrowsSnoopMcpException_RethrowsItUnwrapped()
+    {
+        // Same contract as InvokeMutating: the caller sees the original exception, not Task.Wait's
+        // AggregateException wrapper, so PipeServer can map it to its structured code.
+        var marshal = new DispatcherMarshal(Dispatcher.CurrentDispatcher, TimeSpan.FromSeconds(2));
+        Exception? caught = null;
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                marshal.Invoke<object?>(
+                    static () => throw new SnoopMcpException(ErrorCode.ElementExpired, "Element is not alive."),
+                    CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                caught = ex;
+            }
+        });
+        worker.Start();
+        PumpUntilJoined(worker);
+
+        SnoopMcpException mcp = Assert.IsType<SnoopMcpException>(caught);
+        Assert.Equal(ErrorCode.ElementExpired, mcp.Code);
+    }
+
+    [WpfFact]
+    public void Invoke_TimedOutWorkThatLaterThrows_LeavesNoUnobservedTaskFault()
+    {
+        // On timeout the read path calls Abort(), which cannot stop work that has already started.
+        // If that work then throws, the abandoned operation's Task faults with nobody left to observe
+        // it — the same defect class as the ActionPending path, closed with the same fix.
+        string marker = $"timeout-fault-{Guid.NewGuid():N}";
+        using var probe = UnobservedFaultProbe.ForMessage(marker);
+        var marshal = new DispatcherMarshal(Dispatcher.CurrentDispatcher, TimeSpan.FromMilliseconds(100));
+        var workFinished = new ManualResetEventSlim();
+        Exception? caught = null;
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                marshal.Invoke<object?>(
+                    () =>
+                    {
+                        try
+                        {
+                            Thread.Sleep(400);
+                            throw new InvalidOperationException(marker);
+                        }
+                        finally
+                        {
+                            workFinished.Set();
+                        }
+                    },
+                    CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                caught = ex;
+            }
+        });
+        worker.Start();
+        PumpUntilSet(workFinished);
+        Assert.True(worker.Join(TimeSpan.FromSeconds(2)));
+
+        Assert.True(workFinished.IsSet, "The dispatched work never ran; the timeout raced ahead of the pump.");
+        SnoopMcpException mcp = Assert.IsType<SnoopMcpException>(caught);
+        Assert.Equal(ErrorCode.DispatcherTimeout, mcp.Code);
+        Assert.False(
+            probe.CollectAndCheckFired(),
+            "The abandoned operation's fault reached TaskScheduler.UnobservedTaskException in the host process.");
+    }
+
+    /// <summary>Pumps the current dispatcher until <paramref name="worker"/> has exited.</summary>
+    private static void PumpUntilJoined(Thread worker)
+    {
+        var frame = new DispatcherFrame();
+        var pump = new Thread(() =>
+        {
+            worker.Join();
+            frame.Continue = false;
+        });
+        pump.Start();
+        Dispatcher.PushFrame(frame);
+        pump.Join();
+    }
+
+    /// <summary>Pumps the current dispatcher until <paramref name="signal"/> is set (or 2 s elapse).</summary>
+    private static void PumpUntilSet(ManualResetEventSlim signal)
+    {
+        var frame = new DispatcherFrame();
+        var pump = new Thread(() =>
+        {
+            signal.Wait(TimeSpan.FromSeconds(2));
+            frame.Continue = false;
+        });
+        pump.Start();
+        Dispatcher.PushFrame(frame);
+        pump.Join();
+    }
 }

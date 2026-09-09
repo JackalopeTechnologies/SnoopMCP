@@ -5,6 +5,7 @@
 
 namespace SnoopMCP.Payload;
 
+using System.Diagnostics;
 using System.Windows.Threading;
 using Protocol.Errors;
 
@@ -13,8 +14,18 @@ using Protocol.Errors;
 /// A stuck UI thread surfaces as a structured <see cref="ErrorCode.DispatcherTimeout"/> per call,
 /// never as an indefinite hang of the payload.
 /// </summary>
+/// <remarks>
+/// Every delegate this class hands to the dispatcher is wrapped in <see cref="DispatchOutcome{T}"/>,
+/// so a payload exception never faults a <c>DispatcherOperation</c>: a waiting caller gets the original
+/// exception rethrown, and an operation the caller has stopped waiting for (timeout, fire-and-forget)
+/// has its error traced rather than left as an unobserved task fault that the HOST application's
+/// crash reporter would record as its own crash (Raygun handoff, 2026-09-09).
+/// </remarks>
 public sealed class DispatcherMarshal
 {
+    private const string AbandonedInvokeContext = "Dispatcher invoke abandoned after timeout";
+    private const string AbandonedMutationContext = "Mutating action abandoned as ActionPending";
+
     private static readonly TimeSpan smDefaultTimeout = TimeSpan.FromSeconds(5);
 
     /// <summary>Gets the default per-call timeout when none is supplied.</summary>
@@ -52,6 +63,7 @@ public sealed class DispatcherMarshal
     /// When the call already runs on the dispatcher thread, <paramref name="work"/> executes inline.
     /// Otherwise the call blocks until either the dispatcher finishes the work, the timeout elapses
     /// (raising <see cref="ErrorCode.DispatcherTimeout"/>), or <paramref name="cancellationToken"/> is signalled.
+    /// An exception thrown by <paramref name="work"/> is rethrown to the caller as-is.
     /// </summary>
     /// <typeparam name="T">The return type of <paramref name="work"/>.</typeparam>
     /// <param name="work">The function to execute on the dispatcher thread.</param>
@@ -82,16 +94,19 @@ public sealed class DispatcherMarshal
 
     private T InvokeFromForeignThread<T>(Func<T> work, CancellationToken cancellationToken)
     {
-        var operation = mDispatcher.InvokeAsync(work, DispatcherPriority.Normal, cancellationToken);
+        DispatcherOperation<DispatchOutcome<T>> operation = Dispatch(work, cancellationToken);
         bool completed = operation.Task.Wait(mTimeout, cancellationToken);
         T result;
         if (completed)
         {
-            result = operation.Task.GetAwaiter().GetResult();
+            result = operation.Task.GetAwaiter().GetResult().GetValueOrRethrow();
         }
         else
         {
+            // Abort() only succeeds while the operation is still queued. Work that has already
+            // started runs to completion after the caller has gone; keep its outcome observed.
             operation.Abort();
+            ObserveAbandoned(operation, AbandonedInvokeContext);
             throw new SnoopMcpException(
                 ErrorCode.DispatcherTimeout,
                 $"Dispatcher invoke exceeded {mTimeout.TotalMilliseconds:F0}ms.");
@@ -109,6 +124,7 @@ public sealed class DispatcherMarshal
     /// mutation actually applies. Instead the caller receives <see cref="ErrorCode.ActionPending"/>, a signal
     /// that the outcome is unknown rather than a (false) guarantee that nothing happened, so the caller can
     /// verify with a follow-up read (e.g. <c>waitForValue</c> or <c>captureWindow</c>).
+    /// An exception thrown by <paramref name="work"/> before the timeout is rethrown to the caller as-is.
     /// </summary>
     /// <typeparam name="T">The return type of <paramref name="work"/>.</typeparam>
     /// <param name="work">The mutating function to execute on the dispatcher thread.</param>
@@ -139,18 +155,19 @@ public sealed class DispatcherMarshal
 
     private T InvokeMutatingFromForeignThread<T>(Func<T> work, CancellationToken cancellationToken)
     {
-        var operation = mDispatcher.InvokeAsync(work, DispatcherPriority.Normal, cancellationToken);
+        DispatcherOperation<DispatchOutcome<T>> operation = Dispatch(work, cancellationToken);
         bool completed = operation.Task.Wait(mTimeout, cancellationToken);
         T result;
         if (completed)
         {
-            result = operation.Task.GetAwaiter().GetResult();
+            result = operation.Task.GetAwaiter().GetResult().GetValueOrRethrow();
         }
         else
         {
             // Deliberately do NOT Abort(): the mutation may already be mid-flight or applied on the
             // dispatcher thread, and aborting would not reverse it. Signal ActionPending so the caller
             // verifies the actual outcome instead of trusting a timeout that says nothing about state.
+            ObserveAbandoned(operation, AbandonedMutationContext);
             throw new SnoopMcpException(
                 ErrorCode.ActionPending,
                 $"Mutating action did not confirm within {mTimeout.TotalMilliseconds:F0}ms; it may have applied. Verify with waitForValue or captureWindow.");
@@ -163,7 +180,9 @@ public sealed class DispatcherMarshal
     /// for it to run. Intended for actions that spin a nested message loop on the dispatcher thread — such as
     /// opening a modal dialog — which would never return to a caller that awaited them, stalling the serial
     /// request pipe for as long as the loop runs. Because this method does not wait, it reports no result and
-    /// no failure; the caller must observe the effect separately (e.g. by polling for the new window).
+    /// no failure to the caller; an exception thrown by <paramref name="work"/> is traced and otherwise
+    /// swallowed, so it can neither fault the dispatcher operation nor reach the host's unhandled-exception
+    /// paths. The caller must observe the effect separately (e.g. by polling for the new window).
     /// </summary>
     /// <param name="work">The action to post to the dispatcher thread.</param>
     public void Post(Action work)
@@ -175,6 +194,48 @@ public sealed class DispatcherMarshal
             throw new InvalidOperationException("Dispatcher has been shut down.");
         }
 
-        _ = mDispatcher.InvokeAsync(work, DispatcherPriority.Normal);
+        _ = mDispatcher.InvokeAsync(() => RunPosted(work), DispatcherPriority.Normal);
+    }
+
+    private DispatcherOperation<DispatchOutcome<T>> Dispatch<T>(Func<T> work, CancellationToken cancellationToken)
+    {
+        return mDispatcher.InvokeAsync(
+            () => DispatchOutcome<T>.Capture(work),
+            DispatcherPriority.Normal,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Keeps an operation the caller has stopped waiting for observed: when it eventually completes,
+    /// a captured error is traced. The continuation cannot throw, so it can never itself become an
+    /// unobserved fault. A cancelled operation (aborted while still queued) has nothing to report.
+    /// </summary>
+    private static void ObserveAbandoned<T>(DispatcherOperation<DispatchOutcome<T>> operation, string context)
+    {
+        _ = operation.Task.ContinueWith(
+            task => TraceAbandonedError(task, context),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private static void TraceAbandonedError<T>(Task<DispatchOutcome<T>> task, string context)
+    {
+        if (task.Status == TaskStatus.RanToCompletion && task.Result.Error is { } error)
+        {
+            Trace.WriteLine($"SnoopMCP payload: {context}; the work later threw {error.GetType().FullName}: {error.Message}");
+        }
+    }
+
+    private static void RunPosted(Action work)
+    {
+        try
+        {
+            work();
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"SnoopMCP payload: posted action threw {ex.GetType().FullName}: {ex.Message}");
+        }
     }
 }

@@ -6,11 +6,13 @@
 namespace SnoopMCP.Payload.Tests;
 
 using System.Text.Json;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Interaction;
 using Payload;
 using Tools;
+using Protocol.Errors;
 using Protocol.Wire;
 using SnoopMCP.Protocol.Tools;
 using Xunit;
@@ -44,6 +46,24 @@ public sealed class AutomationPeerDriverTests
         PumpDispatcher();
 
         Assert.True(clicked);
+    }
+
+    [WpfFact]
+    public void Invoke_DisabledButton_ThrowsElementNotEnabled_AndDoesNotClick()
+    {
+        // WPF's ButtonAutomationPeer.Invoke() throws its own ElementNotEnabledException on a disabled
+        // button (Raygun group 290284826201). The driver must refuse first with a structured code the
+        // client can act on (enable the control, or wait), instead of letting WPF's exception escape.
+        bool clicked = false;
+        var button = new Button { IsEnabled = false };
+        button.Click += (_, _) => clicked = true;
+        var driver = new AutomationPeerDriver();
+
+        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(() => driver.Invoke(button, "Invoke"));
+        PumpDispatcher();
+
+        Assert.Equal(ErrorCode.ElementNotEnabled, ex.Code);
+        Assert.False(clicked);
     }
 
     [WpfFact]
@@ -86,6 +106,33 @@ public sealed class AutomationPeerDriverTests
         Assert.NotNull(response);
         Assert.True(response!.Dispatched);
         Assert.Null(response.Ok);
+    }
+
+    [WpfFact]
+    public void PeerInvoke_PostMode_OnDisabledButton_LeavesNoUnobservedTaskFault()
+    {
+        // Raygun group 290284826201 (five instances): ButtonAutomationPeer.Invoke() threw
+        // ElementNotEnabledException inside the fire-and-forget dispatcher delegate, and the faulted,
+        // never-observed DispatcherOperation Task reached the HOST application's crash reporter.
+        using var probe = new UnobservedFaultProbe(
+            static ex => ex is ElementNotEnabledException or SnoopMcpException);
+        var button = new Button { IsEnabled = false };
+        var registry = new ElementRegistry();
+        int id = registry.GetOrAssign(button);
+        var driver = new AutomationPeerDriver();
+        var marshal = new DispatcherMarshal(Dispatcher.CurrentDispatcher, TimeSpan.FromSeconds(2));
+        var handler = new PeerInvokeToolHandler(registry, driver, marshal);
+        JsonElement arguments = ToArguments(new PeerInvokeRequest(id, "Invoke", "post"));
+
+        JsonElement result = handler.ExecuteAsync(arguments, default).GetAwaiter().GetResult();
+        PumpDispatcher();
+        PeerInvokeResponse? response = result.Deserialize<PeerInvokeResponse>(WireSerializer.JsonOptions);
+
+        Assert.NotNull(response);
+        Assert.True(response!.Dispatched);
+        Assert.False(
+            probe.CollectAndCheckFired(),
+            "The posted peer action's fault reached TaskScheduler.UnobservedTaskException in the host process.");
     }
 
     private static JsonElement ToArguments(PeerInvokeRequest request)

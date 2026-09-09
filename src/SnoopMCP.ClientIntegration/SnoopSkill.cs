@@ -153,6 +153,10 @@ public static class SnoopSkill
         - Without `dispatch="post"` (the default is `dispatch="wait"`), a mutating call that times out on the
           dispatcher returns `ActionPending` — the action may already have applied before the wait gave up;
           verify with `waitForValue`/`captureWindow` before assuming failure or retrying.
+        - `ElementNotEnabled` means the control is disabled (`IsEnabled` false) and WPF refuses every action on
+          it. Do not retry the same call: find out what enables it (a selection, a valid input, a finished
+          task), satisfy that or `waitForValue` on `IsEnabled`, then drive it. In `dispatch="post"` mode this
+          error is never reported — the action silently does nothing — so check `IsEnabled` first when posting.
         - Driving/capturing an elevated (admin) app requires the SnoopMCP host to run elevated — enabling
           autostart registers an elevated logon task (one UAC). This is admin-only.
         - Element handles are short-lived; pass back the `element` reference you received. If it is stale,

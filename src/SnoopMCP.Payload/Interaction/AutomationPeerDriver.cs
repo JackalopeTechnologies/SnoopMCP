@@ -45,6 +45,17 @@ public sealed class AutomationPeerDriver
             throw new SnoopMcpException(ErrorCode.NotDrivable, "Element has no AutomationPeer.");
         }
 
+        // Every WPF pattern provider (Button, ToggleButton, ListBoxItem, Expander, ...) throws its own
+        // ElementNotEnabledException when the peer reports IsEnabled() false. Refuse first with a
+        // structured code so the client learns the element is merely disabled — a state it can wait
+        // for or change — rather than receiving an opaque WPF exception (Raygun group 290284826201).
+        if (!peer.IsEnabled())
+        {
+            throw new SnoopMcpException(
+                ErrorCode.ElementNotEnabled,
+                "Element is disabled (IsEnabled is false); enable it before driving it.");
+        }
+
         switch (NormalizePattern(pattern))
         {
             case PatternInvoke:

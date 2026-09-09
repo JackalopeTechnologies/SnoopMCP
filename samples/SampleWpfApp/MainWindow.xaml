@@ -44,6 +44,7 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!--
@@ -157,6 +158,42 @@
                        VerticalAlignment="Center"
                        AutomationProperties.AutomationId="ProbeStatus"
                        Text="{Binding ProbeStatus}" />
+        </StackPanel>
+
+        <!--
+            Raygun-handoff (2026-09-09) fixtures: every way a driven action can fail in-process. The
+            payload must report each as a structured tool error and never let it fault a dispatcher
+            operation; tests/SnoopMCP.IntegrationTests/UnobservedFaultE2ETests.cs drives them and
+            reads UnobservedTaskExceptionCount back as proof. The Border has no AutomationPeer, so it
+            is invisible to UIA and reachable only through the payload tier (findElements by
+            AutomationId, which reads the attached property directly).
+        -->
+        <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,12,0,0">
+            <Button x:Name="DisabledProbeButton"
+                    Content="Disabled Probe"
+                    IsEnabled="False"
+                    AutomationProperties.AutomationId="DisabledProbe" />
+            <Button x:Name="BlockedProbeButton"
+                    Content="Blocked Probe"
+                    Margin="8,0,0,0"
+                    AutomationProperties.AutomationId="BlockedProbe"
+                    Command="{Binding BlockedCommand}" />
+            <Button x:Name="SlowFailingProbeButton"
+                    Content="Slow Failing Probe"
+                    Margin="8,0,0,0"
+                    AutomationProperties.AutomationId="SlowFailingProbe"
+                    Command="{Binding SlowFailingCommand}" />
+            <Border x:Name="NoPeerProbe"
+                    Width="12" Height="12"
+                    Margin="8,0,0,0"
+                    Background="Gray"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="NoPeerProbe" />
+            <TextBlock Text="Unobserved faults:" VerticalAlignment="Center" Margin="16,0,8,0" />
+            <TextBlock x:Name="UnobservedFaultsText"
+                       VerticalAlignment="Center"
+                       AutomationProperties.AutomationId="UnobservedFaults"
+                       Text="{Binding UnobservedTaskExceptionCount}" />
         </StackPanel>
     </Grid>
 </Window>
