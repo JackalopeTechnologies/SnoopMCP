@@ -287,12 +287,13 @@ and it's **off by default**. Enable it from the tray menu — **"Allow app inter
 
 **Fire-and-forget dispatch.** `peerInvoke` and `executeCommand` accept an optional
 `dispatch="post"` for actions that open a modal dialog and would otherwise block the
-mutating wait indefinitely — it fires the action and returns immediately
-(`Dispatched: true`) without observing the outcome; verify separately with
-`waitForValue`/`captureWindow`. A failure inside a posted action (a disabled element, a
-`CanExecute` that returns false) is traced in the target process and never reported back,
-so check `IsEnabled` with `getDependencyProperty` first, or use the default mode when you
-need the error. Without it (the default `dispatch="wait"`), a mutating
+mutating wait indefinitely — it validates first on the UI thread (the element has a peer,
+is enabled, and supports the pattern; the command resolves and `CanExecute` is true),
+reporting any of those as a normal structured error, then fires the action and returns
+immediately (`Dispatched: true`) without observing its outcome; verify separately with
+`waitForValue`/`captureWindow`. Only a failure inside the action itself (an `Execute` that
+throws) goes unreported: it is traced in the target process and never faults anything
+there. Without it (the default `dispatch="wait"`), a mutating
 call that times out on the dispatcher returns `ActionPending` rather than a hard
 failure — the action may already have applied before the wait gave up; verify before
 assuming failure or retrying.

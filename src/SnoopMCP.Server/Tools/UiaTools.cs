@@ -175,7 +175,8 @@ public sealed class UiaTools
     /// <returns>An acknowledgement element.</returns>
     [McpServerTool, Description(
         "MUTATES the target application: invokes an element's action pattern " +
-        "(Invoke/SelectionItem/Toggle/ExpandCollapse). Requires the host interaction gate to be enabled.")]
+        "(Invoke/SelectionItem/Toggle/ExpandCollapse). Requires the host interaction gate to be enabled. " +
+        "A disabled element returns ElementNotEnabled: do not retry until it is enabled.")]
     public async Task<JsonElement> InvokeUia(
         UiaElementRef element, string? pattern = null, CancellationToken cancellationToken = default)
     {

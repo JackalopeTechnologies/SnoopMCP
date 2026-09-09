@@ -26,6 +26,24 @@ public sealed class AutomationPeerDriver
     /// <summary>Invokes the named pattern on the element's automation peer. Runs on the UI thread.</summary>
     /// <param name="element">The element to drive.</param>
     /// <param name="pattern">The peer pattern to invoke: Invoke | Toggle | SelectionItem | ExpandCollapse.</param>
+    public void Invoke(DependencyObject element, string pattern)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        ArgumentException.ThrowIfNullOrEmpty(pattern);
+        Prepare(element, pattern)();
+    }
+
+    /// <summary>
+    /// Validates that <paramref name="element"/> can be driven through <paramref name="pattern"/> and
+    /// returns the action that drives it, without running it. Every failure a client can act on is
+    /// raised here — no AutomationPeer (<see cref="ErrorCode.NotDrivable"/>), a disabled element
+    /// (<see cref="ErrorCode.ElementNotEnabled"/>), an unsupported or unknown pattern — so a
+    /// fire-and-forget caller can validate on the UI thread first and post only the action itself.
+    /// Runs on the UI thread.
+    /// </summary>
+    /// <param name="element">The element to drive.</param>
+    /// <param name="pattern">The peer pattern to invoke: Invoke | Toggle | SelectionItem | ExpandCollapse.</param>
+    /// <returns>The action that drives the pattern; run it on the UI thread.</returns>
     /// <remarks>
     /// CA1822 disabled: instance method by design so callers (e.g. <c>PeerInvokeToolHandler</c>) hold
     /// and inject an <see cref="AutomationPeerDriver"/> like the other driving-layer collaborators,
@@ -33,7 +51,7 @@ public sealed class AutomationPeerDriver
     /// (e.g. shared peer caching) in a follow-up phase without an API-shape change.
     /// </remarks>
 #pragma warning disable CA1822
-    public void Invoke(DependencyObject element, string pattern)
+    public Action Prepare(DependencyObject element, string pattern)
 #pragma warning restore CA1822
     {
         ArgumentNullException.ThrowIfNull(element);
@@ -56,23 +74,15 @@ public sealed class AutomationPeerDriver
                 "Element is disabled (IsEnabled is false); enable it before driving it.");
         }
 
-        switch (NormalizePattern(pattern))
+        Action fire = NormalizePattern(pattern) switch
         {
-            case PatternInvoke:
-                Get<IInvokeProvider>(peer, PatternInterface.Invoke).Invoke();
-                break;
-            case PatternToggle:
-                Get<IToggleProvider>(peer, PatternInterface.Toggle).Toggle();
-                break;
-            case PatternSelectionItem:
-                Get<ISelectionItemProvider>(peer, PatternInterface.SelectionItem).Select();
-                break;
-            case PatternExpandCollapse:
-                Get<IExpandCollapseProvider>(peer, PatternInterface.ExpandCollapse).Expand();
-                break;
-            default:
-                throw new SnoopMcpException(ErrorCode.InvalidArgument, $"Unknown peer pattern '{pattern}'.");
-        }
+            PatternInvoke => Get<IInvokeProvider>(peer, PatternInterface.Invoke).Invoke,
+            PatternToggle => Get<IToggleProvider>(peer, PatternInterface.Toggle).Toggle,
+            PatternSelectionItem => Get<ISelectionItemProvider>(peer, PatternInterface.SelectionItem).Select,
+            PatternExpandCollapse => Get<IExpandCollapseProvider>(peer, PatternInterface.ExpandCollapse).Expand,
+            _ => throw new SnoopMcpException(ErrorCode.InvalidArgument, $"Unknown peer pattern '{pattern}'.")
+        };
+        return fire;
     }
 
     /// <summary>

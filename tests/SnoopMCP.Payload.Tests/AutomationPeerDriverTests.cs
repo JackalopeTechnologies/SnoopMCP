@@ -109,11 +109,12 @@ public sealed class AutomationPeerDriverTests
     }
 
     [WpfFact]
-    public void PeerInvoke_PostMode_OnDisabledButton_LeavesNoUnobservedTaskFault()
+    public void PeerInvoke_PostMode_OnDisabledButton_ReportsElementNotEnabled_AndLeavesNoUnobservedTaskFault()
     {
-        // Raygun group 290284826201 (five instances): ButtonAutomationPeer.Invoke() threw
-        // ElementNotEnabledException inside the fire-and-forget dispatcher delegate, and the faulted,
-        // never-observed DispatcherOperation Task reached the HOST application's crash reporter.
+        // Raygun group 290284826201 (five instances): the same disabled button was posted four times
+        // in ten minutes because post mode answered Dispatched=true and swallowed the failure. Post
+        // mode now validates on the dispatcher BEFORE posting, so the client gets the structured code
+        // and nothing faults a dispatcher operation.
         using var probe = new UnobservedFaultProbe(
             static ex => ex is ElementNotEnabledException or SnoopMcpException);
         var button = new Button { IsEnabled = false };
@@ -124,15 +125,32 @@ public sealed class AutomationPeerDriverTests
         var handler = new PeerInvokeToolHandler(registry, driver, marshal);
         JsonElement arguments = ToArguments(new PeerInvokeRequest(id, "Invoke", "post"));
 
-        JsonElement result = handler.ExecuteAsync(arguments, default).GetAwaiter().GetResult();
+        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(
+            () => handler.ExecuteAsync(arguments, default).GetAwaiter().GetResult());
         PumpDispatcher();
-        PeerInvokeResponse? response = result.Deserialize<PeerInvokeResponse>(WireSerializer.JsonOptions);
 
-        Assert.NotNull(response);
-        Assert.True(response!.Dispatched);
+        Assert.Equal(ErrorCode.ElementNotEnabled, ex.Code);
         Assert.False(
             probe.CollectAndCheckFired(),
             "The posted peer action's fault reached TaskScheduler.UnobservedTaskException in the host process.");
+    }
+
+    [WpfFact]
+    public void PeerInvoke_PostMode_OnElementWithoutPeer_ReportsNotDrivable()
+    {
+        // Raygun group 291737304572: "Element has no AutomationPeer" is knowable before posting.
+        var border = new Border();
+        var registry = new ElementRegistry();
+        int id = registry.GetOrAssign(border);
+        var driver = new AutomationPeerDriver();
+        var marshal = new DispatcherMarshal(Dispatcher.CurrentDispatcher, TimeSpan.FromSeconds(2));
+        var handler = new PeerInvokeToolHandler(registry, driver, marshal);
+        JsonElement arguments = ToArguments(new PeerInvokeRequest(id, "Invoke", "post"));
+
+        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(
+            () => handler.ExecuteAsync(arguments, default).GetAwaiter().GetResult());
+
+        Assert.Equal(ErrorCode.NotDrivable, ex.Code);
     }
 
     private static JsonElement ToArguments(PeerInvokeRequest request)

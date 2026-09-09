@@ -33,6 +33,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RunProbeCommand = new RelayCommand(RunProbe);
         BlockedCommand = new RelayCommand(RunProbe, static () => false);
         SlowFailingCommand = new RelayCommand(RunSlowFailingProbe);
+        ThrowingCommand = new RelayCommand(ThrowFromExecute);
         ForceGcCommand = new RelayCommand(ForceGc);
         LeakUnobservedFaultCommand = new RelayCommand(LeakUnobservedFault);
 
@@ -81,6 +82,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Blocks the UI thread past the payload's dispatcher wait, then throws.</summary>
     public ICommand SlowFailingCommand { get; }
 
+    /// <summary>Passes <c>CanExecute</c>, then throws inside <c>Execute</c>.</summary>
+    public ICommand ThrowingCommand { get; }
+
     /// <summary>Runs the collection plus finalizer pass that raises unobserved task faults.</summary>
     public ICommand ForceGcCommand { get; }
 
@@ -102,6 +106,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         Thread.Sleep(smSlowProbeDelay);
         throw new InvalidOperationException("Slow probe failed after the dispatcher wait gave up.");
+    }
+
+    private static void ThrowFromExecute()
+    {
+        throw new InvalidOperationException("Throwing probe failed inside Execute.");
     }
 
     private static void ForceGc()

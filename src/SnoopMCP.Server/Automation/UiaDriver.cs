@@ -383,7 +383,12 @@ public sealed class UiaDriver : IUiaDriver
         }
         catch (ElementNotEnabledException ex)
         {
-            throw new SnoopMcpException(ErrorCode.NotDrivable, "UIA element is not enabled.", ex);
+            // Same contract as the payload tier's AutomationPeerDriver: disabled is a state the client
+            // can wait for or change, so it must not read as the terminal NotDrivable.
+            throw new SnoopMcpException(
+                ErrorCode.ElementNotEnabled,
+                "UIA element is disabled (IsEnabled is false); enable it before driving it.",
+                ex);
         }
         return result;
     }
