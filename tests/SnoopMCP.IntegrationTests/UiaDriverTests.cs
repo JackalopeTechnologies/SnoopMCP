@@ -8,6 +8,7 @@ namespace SnoopMCP.IntegrationTests;
 using System.Diagnostics;
 using System.Windows.Automation;
 using Host.Automation;
+using Protocol.Errors;
 using Xunit;
 
 /// <summary>
@@ -22,6 +23,7 @@ public sealed class UiaDriverTests : IDisposable
     private const string LocatorByAutomationId = "automationId";
     private const string AutomationIdProbeText = "ProbeText";
     private const string AutomationIdRunProbe = "RunProbe";
+    private const string AutomationIdDisabledProbe = "DisabledProbe";
     private const string AutomationIdProbeStatus = "ProbeStatus";
     private const string ProbeSetValue = "hello-uia";
     private const string ProbeStatusDone = "done";
@@ -111,6 +113,23 @@ public sealed class UiaDriverTests : IDisposable
         string status = await PollForNameAsync(
             driver, mApp.Id, AutomationIdProbeStatus, ProbeStatusDone, ProbeStatusPollWindowMs, ct);
         Assert.Equal(ProbeStatusDone, status);
+    }
+
+    [Fact]
+    public async Task Invoke_DisabledProbeButton_ThrowsElementNotEnabled()
+    {
+        // Same contract as the payload tier: a disabled element is a state the client can wait for or
+        // change, so it must surface as ElementNotEnabled, not as the terminal NotDrivable.
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        var driver = new UiaDriver(new ElementHandleCache());
+
+        IReadOnlyList<UiaElementInfo> found =
+            await driver.FindAsync(mApp.Id, LocatorByAutomationId, AutomationIdDisabledProbe, ct);
+        Assert.NotEmpty(found);
+
+        SnoopMcpException ex = await Assert.ThrowsAsync<SnoopMcpException>(
+            () => driver.InvokeAsync(found[0].Reference, null, ct));
+        Assert.Equal(ErrorCode.ElementNotEnabled, ex.Code);
     }
 
     /// <summary>Reads a live element's <see cref="ValuePattern"/> value, or empty when unsupported.</summary>

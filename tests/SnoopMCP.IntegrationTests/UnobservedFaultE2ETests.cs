@@ -23,8 +23,10 @@ using Xunit;
 /// as six crash groups in the HOST application's Raygun, tagged <c>UnobservedTaskException</c>,
 /// because each fault crossed the dispatcher boundary inside a <c>DispatcherOperation</c> whose Task
 /// nothing ever observed. This test spawns the real SampleWpfApp, injects the real payload, drives
-/// every one of those failure shapes (plus a deliberately slow action that faults after the wait gave
-/// up) in both dispatch modes, then forces a finalizer pass inside the target and reads back the count
+/// every one of those failure shapes (plus a command that throws inside Execute, and a deliberately
+/// slow action that faults after the wait gave up) in both dispatch modes — asserting that post mode
+/// reports the pre-checkable failures instead of swallowing them — then forces a finalizer pass
+/// inside the target and reads back the count
 /// of <see cref="TaskScheduler.UnobservedTaskException"/> events the target recorded. A positive
 /// control leaks a genuinely unobserved fault afterwards to prove the target's detector fires.
 /// Mirrors the launch fixture in <see cref="DrivingE2ETests"/>.
@@ -36,6 +38,7 @@ public sealed class UnobservedFaultE2ETests : IAsyncLifetime
     private const string BlockedProbeAutomationId = "BlockedProbe";
     private const string NoPeerProbeAutomationId = "NoPeerProbe";
     private const string SlowFailingProbeAutomationId = "SlowFailingProbe";
+    private const string ThrowingProbeAutomationId = "ThrowingProbe";
     private const string ForceGcCommandPath = "ForceGcCommand";
     private const string LeakUnobservedFaultCommandPath = "LeakUnobservedFaultCommand";
     private const string UnobservedCountPath = "UnobservedTaskExceptionCount";
@@ -113,22 +116,28 @@ public sealed class UnobservedFaultE2ETests : IAsyncLifetime
         int blockedId = await FindByAutomationIdAsync(rootId, BlockedProbeAutomationId, ct);
         int noPeerId = await FindByAutomationIdAsync(rootId, NoPeerProbeAutomationId, ct);
         int slowId = await FindByAutomationIdAsync(rootId, SlowFailingProbeAutomationId, ct);
+        int throwingId = await FindByAutomationIdAsync(rootId, ThrowingProbeAutomationId, ct);
 
-        // Raygun group 290284826201: a disabled button. Wait mode reports the structured code; post
-        // mode (the recorded path) fires and forgets, and the fault must stay inside the payload.
+        // Raygun group 290284826201: a disabled button. Both dispatch modes report the structured
+        // code: post mode (the recorded path) validates on the dispatcher before it posts anything.
         await AssertToolErrorAsync(ErrorCode.ElementNotEnabled, () => mTools.PeerInvoke(disabledId, InvokePattern, null, ct));
-        JsonElement posted = await mTools.PeerInvoke(disabledId, InvokePattern, PostDispatch, ct);
-        Assert.True(posted.GetProperty("dispatched").GetBoolean());
+        await AssertToolErrorAsync(ErrorCode.ElementNotEnabled, () => mTools.PeerInvoke(disabledId, InvokePattern, PostDispatch, ct));
 
         // Raygun group 290708134232: a command whose CanExecute returns false.
         await AssertToolErrorAsync(ErrorCode.CommandNotExecutable, () => mTools.ExecuteCommand(blockedId, null, null, null, ct));
-        posted = await mTools.ExecuteCommand(blockedId, null, null, PostDispatch, ct);
-        Assert.True(posted.GetProperty("dispatched").GetBoolean());
+        await AssertToolErrorAsync(ErrorCode.CommandNotExecutable, () => mTools.ExecuteCommand(blockedId, null, null, PostDispatch, ct));
 
         // Raygun group 291737304572: an element with no AutomationPeer.
         await AssertToolErrorAsync(ErrorCode.NotDrivable, () => mTools.PeerInvoke(noPeerId, InvokePattern, null, ct));
-        posted = await mTools.PeerInvoke(noPeerId, InvokePattern, PostDispatch, ct);
+        await AssertToolErrorAsync(ErrorCode.NotDrivable, () => mTools.PeerInvoke(noPeerId, InvokePattern, PostDispatch, ct));
+
+        // A command that passes CanExecute and throws inside Execute: the one failure post mode still
+        // cannot report. Wait mode surfaces it; post mode fires and forgets, and the fault must stay
+        // inside the payload.
+        await AssertToolErrorAsync(ErrorCode.Unknown, () => mTools.ExecuteCommand(throwingId, null, null, null, ct));
+        JsonElement posted = await mTools.ExecuteCommand(throwingId, null, null, PostDispatch, ct);
         Assert.True(posted.GetProperty("dispatched").GetBoolean());
+        Assert.True(posted.GetProperty("canExecute").GetBoolean());
 
         // The ActionPending path: the action outlives the dispatcher wait and THEN throws, after the
         // caller has already been told ActionPending and stopped waiting.

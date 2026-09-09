@@ -17,7 +17,9 @@ using Protocol.Wire;
 /// Wire handler for <c>executeCommand</c>: resolves and executes the <c>ICommand</c> bound to an
 /// element in-process. Supports two dispatch modes (see <see cref="ExecuteCommandRequest.Dispatch"/>):
 /// <c>"wait"</c> (default) awaits the execution via <see cref="DispatcherMarshal.InvokeMutating{T}"/>
-/// and reports the observed outcome; <c>"post"</c> fires the execution via
+/// and reports the observed outcome; <c>"post"</c> validates first via
+/// <see cref="CommandInvoker.Prepare"/> on the UI thread (so an unresolvable command or a false
+/// <c>CanExecute</c> still surfaces as a structured error), then fires the execution via
 /// <see cref="DispatcherMarshal.Post"/> and returns immediately without observing it — for commands
 /// that would otherwise block the mutating wait indefinitely (e.g. one that opens a modal dialog).
 /// </summary>
@@ -64,11 +66,18 @@ public sealed class ExecuteCommandToolHandler : IToolHandler
         bool isPost = string.Equals(request.Dispatch, DispatchPost, StringComparison.OrdinalIgnoreCase);
         if (isPost)
         {
-            // Fire-and-forget: the command may pump a nested message loop (e.g. a modal dialog) that
-            // would never return to a waiting caller. The command has not run by the time this returns,
-            // so Executed/CanExecute are null (not false) — verify the effect separately (e.g. waitForValue).
-            mMarshal.Post(() => mInvoker.Execute(element, request.Path, request.Parameter));
-            response = new ExecuteCommandResponse(Executed: null, CanExecute: null, Dispatched: true);
+            // Fire-and-forget applies to the EXECUTION only: it may pump a nested message loop (e.g. a
+            // modal dialog) that would never return to a waiting caller. Resolution and CanExecute are
+            // UI-thread queries, not mutations, so they run first as a bounded read-only dispatcher
+            // call and their failures reach the client as structured errors instead of vanishing
+            // behind Dispatched=true. CanExecute is therefore an observed fact (true) while Executed
+            // stays null: the command has not run by the time this returns — verify the effect
+            // separately (e.g. waitForValue).
+            Action fire = mMarshal.Invoke(
+                () => mInvoker.Prepare(element, request.Path, request.Parameter),
+                cancellationToken);
+            mMarshal.Post(fire);
+            response = new ExecuteCommandResponse(Executed: null, CanExecute: true, Dispatched: true);
         }
         else
         {

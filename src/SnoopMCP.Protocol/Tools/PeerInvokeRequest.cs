@@ -12,9 +12,10 @@ namespace SnoopMCP.Protocol.Tools;
 /// <param name="Pattern">The peer pattern to invoke: Invoke | Toggle | SelectionItem | ExpandCollapse.</param>
 /// <param name="Dispatch">
 /// Dispatch mode: <c>null</c> or <c>"wait"</c> (default) waits for the action to complete before
-/// returning; <c>"post"</c> fires-and-forgets and returns <c>Dispatched=true</c> immediately —
-/// verify the effect separately (e.g. via <c>waitForValue</c>). In <c>"post"</c> mode the action's
-/// outcome is not surfaced to the caller: a <c>CommandNotExecutable</c> (CanExecute==false) or any
-/// exception thrown by the posted work runs unobserved on the target's dispatcher and is not reported.
+/// returning; <c>"post"</c> validates on the UI thread first — no AutomationPeer
+/// (<c>NotDrivable</c>), disabled (<c>ElementNotEnabled</c>), unsupported pattern — reporting those as
+/// structured errors, then fires-and-forgets the action itself and returns <c>Dispatched=true</c>
+/// immediately. Verify the effect separately (e.g. via <c>waitForValue</c>): only an exception thrown
+/// by the posted action goes unreported (it is traced inside the target, never left unobserved).
 /// </param>
 public sealed record PeerInvokeRequest(int Id, string Pattern, string? Dispatch);

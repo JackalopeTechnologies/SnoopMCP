@@ -183,6 +183,11 @@
                     Margin="8,0,0,0"
                     AutomationProperties.AutomationId="SlowFailingProbe"
                     Command="{Binding SlowFailingCommand}" />
+            <Button x:Name="ThrowingProbeButton"
+                    Content="Throwing Probe"
+                    Margin="8,0,0,0"
+                    AutomationProperties.AutomationId="ThrowingProbe"
+                    Command="{Binding ThrowingCommand}" />
             <Border x:Name="NoPeerProbe"
                     Width="12" Height="12"
                     Margin="8,0,0,0"

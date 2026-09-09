@@ -186,8 +186,10 @@ public sealed class CommandInvokerTests
     }
 
     [WpfFact]
-    public void ExecuteCommand_PostMode_ReturnsImmediately_DispatchedTrue_ExecutedNull()
+    public void ExecuteCommand_PostMode_ReturnsImmediately_DispatchedTrue_CanExecuteTrue_ExecutedNull()
     {
+        // Post mode validates before posting, so CanExecute is an observed fact (true) while Executed
+        // stays null: the action itself has not run by the time the response is written.
         var cmd = new RelayTestCommand(_ => { }, _ => true);
         var button = new Button { Command = cmd };
         var registry = new ElementRegistry();
@@ -203,7 +205,64 @@ public sealed class CommandInvokerTests
         Assert.NotNull(response);
         Assert.True(response!.Dispatched);
         Assert.Null(response.Executed);
-        Assert.Null(response.CanExecute);
+        Assert.True(response.CanExecute);
+    }
+
+    [WpfFact]
+    public void ExecuteCommand_PostMode_CanExecuteFalse_ReportsCommandNotExecutable_AndDoesNotRun()
+    {
+        // Raygun group 290708134232: CanExecute is a dispatcher-thread query, not a mutation, so post
+        // mode can ask it before posting and refuse with the structured code instead of Dispatched=true.
+        var cmd = new RelayTestCommand(_ => throw new Xunit.Sdk.XunitException("should not run"), _ => false);
+        var button = new Button { Command = cmd };
+        var registry = new ElementRegistry();
+        int id = registry.GetOrAssign(button);
+        var invoker = new CommandInvoker();
+        var marshal = new DispatcherMarshal(Dispatcher.CurrentDispatcher, TimeSpan.FromSeconds(2));
+        var handler = new ExecuteCommandToolHandler(registry, invoker, marshal);
+        JsonElement arguments = ToArguments(new ExecuteCommandRequest(id, null, null, "post"));
+
+        SnoopMcpException ex = Assert.Throws<SnoopMcpException>(
+            () => handler.ExecuteAsync(arguments, default).GetAwaiter().GetResult());
+        PumpDispatcher();
+
+        Assert.Equal(ErrorCode.CommandNotExecutable, ex.Code);
+    }
+
+    [WpfFact]
+    public void ExecuteCommand_PostMode_ExecuteThrows_LeavesNoUnobservedTaskFault()
+    {
+        // Guard for the fire path that survives validation: a command that passes CanExecute and then
+        // throws inside Execute is the one failure post mode still cannot report. It must be traced
+        // inside the payload, never left as an unobserved dispatcher-operation fault.
+        string marker = $"execute-fault-{Guid.NewGuid():N}";
+        using var probe = UnobservedFaultProbe.ForMessage(marker);
+        var cmd = new RelayTestCommand(_ => throw new InvalidOperationException(marker), _ => true);
+        var button = new Button { Command = cmd };
+        var registry = new ElementRegistry();
+        int id = registry.GetOrAssign(button);
+        var invoker = new CommandInvoker();
+        var marshal = new DispatcherMarshal(Dispatcher.CurrentDispatcher, TimeSpan.FromSeconds(2));
+        var handler = new ExecuteCommandToolHandler(registry, invoker, marshal);
+        JsonElement arguments = ToArguments(new ExecuteCommandRequest(id, null, null, "post"));
+
+        JsonElement result = handler.ExecuteAsync(arguments, default).GetAwaiter().GetResult();
+        PumpDispatcher();
+        ExecuteCommandResponse? response = result.Deserialize<ExecuteCommandResponse>(WireSerializer.JsonOptions);
+
+        Assert.NotNull(response);
+        Assert.True(response!.Dispatched);
+        Assert.False(
+            probe.CollectAndCheckFired(),
+            "The posted command's fault reached TaskScheduler.UnobservedTaskException in the host process.");
+    }
+
+    /// <summary>Pumps the current dispatcher until everything queued at or above Input priority has run.</summary>
+    private static void PumpDispatcher()
+    {
+        var frame = new DispatcherFrame();
+        Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => frame.Continue = false));
+        Dispatcher.PushFrame(frame);
     }
 
     [WpfFact]

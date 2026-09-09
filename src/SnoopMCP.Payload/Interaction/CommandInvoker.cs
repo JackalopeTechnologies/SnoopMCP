@@ -34,6 +34,24 @@ public sealed class CommandInvoker
     /// (path-resolved commands have no bound parameter, so this is null unless supplied).
     /// </param>
     /// <returns>A response reporting the observed execution outcome.</returns>
+    public ExecuteCommandResponse Execute(DependencyObject element, string? path, string? parameter)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        Prepare(element, path, parameter)();
+        return new ExecuteCommandResponse(Executed: true, CanExecute: true, Dispatched: false);
+    }
+
+    /// <summary>
+    /// Resolves the command, gates on <see cref="ICommand.CanExecute"/>, and returns the action that
+    /// executes it, without running it. Every failure a client can act on is raised here — no command
+    /// or unresolvable path (<see cref="ErrorCode.NotDrivable"/>, <see cref="ErrorCode.BindingPathError"/>),
+    /// <c>CanExecute</c> false (<see cref="ErrorCode.CommandNotExecutable"/>) — so a fire-and-forget
+    /// caller can validate on the UI thread first and post only the execution itself. Runs on the UI thread.
+    /// </summary>
+    /// <param name="element">The element whose bound command is executed; see <see cref="Execute"/>.</param>
+    /// <param name="path">Optional dotted DataContext path to an <see cref="ICommand"/>; see <see cref="Execute"/>.</param>
+    /// <param name="parameter">Optional command parameter; see <see cref="Execute"/>.</param>
+    /// <returns>The action that executes the command; run it on the UI thread.</returns>
     /// <remarks>
     /// CA1822 disabled: instance method by design so callers (e.g. <c>ExecuteCommandToolHandler</c>)
     /// hold and inject a <see cref="CommandInvoker"/> like the other driving-layer collaborators,
@@ -41,7 +59,7 @@ public sealed class CommandInvoker
     /// follow-up phase without an API-shape change.
     /// </remarks>
 #pragma warning disable CA1822
-    public ExecuteCommandResponse Execute(DependencyObject element, string? path, string? parameter)
+    public Action Prepare(DependencyObject element, string? path, string? parameter)
 #pragma warning restore CA1822
     {
         ArgumentNullException.ThrowIfNull(element);
@@ -57,13 +75,14 @@ public sealed class CommandInvoker
         // whatever currently has keyboard focus, which is the common case for a driven (non-focused)
         // element.
         IInputElement? target = (element as ICommandSource)?.CommandTarget ?? element as IInputElement;
+        Action fire;
         if (command is RoutedCommand routed)
         {
             if (!routed.CanExecute(commandParameter, target))
             {
                 throw new SnoopMcpException(ErrorCode.CommandNotExecutable, "The routed command's CanExecute returned false.");
             }
-            routed.Execute(commandParameter, target);
+            fire = () => routed.Execute(commandParameter, target);
         }
         else
         {
@@ -71,9 +90,9 @@ public sealed class CommandInvoker
             {
                 throw new SnoopMcpException(ErrorCode.CommandNotExecutable, "The command's CanExecute returned false.");
             }
-            command.Execute(commandParameter);
+            fire = () => command.Execute(commandParameter);
         }
-        return new ExecuteCommandResponse(Executed: true, CanExecute: true, Dispatched: false);
+        return fire;
     }
 
     private static (ICommand Command, object? Parameter) Resolve(DependencyObject element, string? path)

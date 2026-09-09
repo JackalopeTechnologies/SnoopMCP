@@ -373,16 +373,17 @@ public sealed class McpTools
     /// <param name="id">The element id whose AutomationPeer is driven.</param>
     /// <param name="pattern">The peer pattern to invoke: Invoke | Toggle | SelectionItem | ExpandCollapse.</param>
     /// <param name="dispatch">
-    /// Dispatch mode: null/"wait" (default) waits; "post" fires-and-forgets. In "post" mode
-    /// CanExecute/errors are NOT surfaced — the caller must verify the effect separately (e.g. waitForValue).
+    /// Dispatch mode: null/"wait" (default) waits; "post" validates on the UI thread first (structured
+    /// errors still surface), then fires-and-forgets the action — the caller must verify its effect
+    /// separately (e.g. waitForValue).
     /// </param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description(
         "MUTATES the target: drive an element's AutomationPeer pattern in-process. Requires the " +
         "interaction gate. A disabled element returns ElementNotEnabled: do not retry until it is " +
-        "enabled. Optional dispatch='post' fires-and-forgets a dialog-opening action; in 'post' mode " +
-        "the outcome (including errors) is not surfaced — verify the effect separately.")]
+        "enabled. Optional dispatch='post' validates first, then fires-and-forgets a dialog-opening " +
+        "action; in 'post' mode only the action's own outcome is not surfaced — verify the effect separately.")]
     public Task<JsonElement> PeerInvoke(
         int id,
         string pattern,
@@ -399,15 +400,16 @@ public sealed class McpTools
     /// <param name="path">Optional dotted DataContext path to an ICommand; null uses the element's own Command.</param>
     /// <param name="parameter">Optional command parameter; null uses the element's CommandParameter.</param>
     /// <param name="dispatch">
-    /// Dispatch mode: null/"wait" (default) waits; "post" fires-and-forgets. In "post" mode
-    /// CanExecute/errors are NOT surfaced — the caller must verify the effect separately (e.g. waitForValue).
+    /// Dispatch mode: null/"wait" (default) waits; "post" validates on the UI thread first (structured
+    /// errors still surface), then fires-and-forgets the action — the caller must verify its effect
+    /// separately (e.g. waitForValue).
     /// </param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
     [McpServerTool, Description(
         "MUTATES the target: execute the ICommand bound to an element (CanExecute-gated). Requires the " +
-        "interaction gate. Optional dispatch='post' fires-and-forgets; in 'post' mode the outcome " +
-        "(including CanExecute==false or errors) is not surfaced — verify the effect separately.")]
+        "interaction gate. Optional dispatch='post' checks CanExecute first, then fires-and-forgets; in " +
+        "'post' mode only the execution's own outcome is not surfaced — verify the effect separately.")]
     public Task<JsonElement> ExecuteCommand(
         int id,
         string? path = null,

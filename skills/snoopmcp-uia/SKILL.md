@@ -45,16 +45,18 @@ finds elements a pruned peer hides from UIA entirely.
   **interaction gate**. If you get `InteractionDisabled`, ask the user to enable "Allow app interaction
   (driving)" in the SnoopMCP tray.
 - `peerInvoke`/`executeCommand` accept an optional `dispatch="post"` for actions that open a modal
-  dialog and would otherwise block the wait indefinitely — it fires the action and returns immediately
-  (`Dispatched: true`) without observing the outcome, i.e. `ActionDispatched`; verify the effect
-  separately with `waitForValue`/`captureWindow`.
+  dialog and would otherwise block the wait indefinitely — it validates first (peer present, enabled,
+  pattern supported; command resolves, `CanExecute` true) and reports those as normal errors, then fires
+  the action and returns immediately (`Dispatched: true`) without observing its outcome, i.e.
+  `ActionDispatched`; verify the effect separately with `waitForValue`/`captureWindow`. Only a failure
+  inside the action itself goes unreported.
 - Without `dispatch="post"` (the default is `dispatch="wait"`), a mutating call that times out on the
   dispatcher returns `ActionPending` — the action may already have applied before the wait gave up;
   verify with `waitForValue`/`captureWindow` before assuming failure or retrying.
 - `ElementNotEnabled` means the control is disabled (`IsEnabled` false) and WPF refuses every action on
   it. Do not retry the same call: find out what enables it (a selection, a valid input, a finished
-  task), satisfy that or `waitForValue` on `IsEnabled`, then drive it. In `dispatch="post"` mode this
-  error is never reported — the action silently does nothing — so check `IsEnabled` first when posting.
+  task), satisfy that or `waitForValue` on `IsEnabled`, then drive it. Both tiers (`invokeUia` and
+  `peerInvoke`) and both dispatch modes report it.
 - Driving/capturing an elevated (admin) app requires the SnoopMCP host to run elevated — enabling
   autostart registers an elevated logon task (one UAC). This is admin-only.
 - Element handles are short-lived; pass back the `element` reference you received. If it is stale,

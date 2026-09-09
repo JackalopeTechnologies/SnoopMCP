@@ -17,9 +17,11 @@ using Protocol.Wire;
 /// Wire handler for <c>peerInvoke</c>: drives the element's AutomationPeer pattern in-process.
 /// Supports two dispatch modes (see <see cref="PeerInvokeRequest.Dispatch"/>): <c>"wait"</c> (default)
 /// awaits the action via <see cref="DispatcherMarshal.InvokeMutating{T}"/> and reports the observed
-/// outcome; <c>"post"</c> fires the action via <see cref="DispatcherMarshal.Post"/> and returns
-/// immediately without observing it — for actions (e.g. those opening a modal dialog) that would
-/// otherwise block the mutating wait indefinitely.
+/// outcome; <c>"post"</c> validates first via <see cref="AutomationPeerDriver.Prepare"/> on the UI
+/// thread (so no-peer, disabled, and unsupported-pattern failures still surface as structured errors),
+/// then fires the action via <see cref="DispatcherMarshal.Post"/> and returns immediately without
+/// observing it — for actions (e.g. those opening a modal dialog) that would otherwise block the
+/// mutating wait indefinitely.
 /// </summary>
 public sealed class PeerInvokeToolHandler : IToolHandler
 {
@@ -64,10 +66,15 @@ public sealed class PeerInvokeToolHandler : IToolHandler
         bool isPost = string.Equals(request.Dispatch, DispatchPost, StringComparison.OrdinalIgnoreCase);
         if (isPost)
         {
-            // Fire-and-forget: the action may pump a nested message loop (e.g. a modal dialog) that
-            // would never return to a waiting caller. The action has not run by the time this returns,
-            // so Ok is null (not false) — verify the effect separately (e.g. waitForValue).
-            mMarshal.Post(() => mDriver.Invoke(element, request.Pattern));
+            // Fire-and-forget applies to the ACTION only: it may pump a nested message loop (e.g. a
+            // modal dialog) that would never return to a waiting caller. Validation — no peer, disabled,
+            // unsupported pattern — is a bounded read-only dispatcher call made first, so those failures
+            // reach the client as structured errors instead of vanishing behind Dispatched=true (the
+            // Raygun session of 2026-09-07 posted the same disabled button four times). The action has
+            // not run by the time this returns, so Ok is null (not false) — verify the effect
+            // separately (e.g. waitForValue).
+            Action fire = mMarshal.Invoke(() => mDriver.Prepare(element, request.Pattern), cancellationToken);
+            mMarshal.Post(fire);
             response = new PeerInvokeResponse(Ok: null, Dispatched: true);
         }
         else
