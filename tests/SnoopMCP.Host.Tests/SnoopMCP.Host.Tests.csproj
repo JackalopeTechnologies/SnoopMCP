@@ -12,6 +12,8 @@
         <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
+        <!-- The tray icon dependency permits 10.0.0; use the current drawing and system-event fixes. -->
+        <PackageReference Include="System.Drawing.Common" Version="10.0.13" PrivateAssets="all" />
     </ItemGroup>
 
     <ItemGroup>

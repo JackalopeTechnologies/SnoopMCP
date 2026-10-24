@@ -115,6 +115,19 @@ escapes. Test dependencies use xUnit 4.0.2, its Visual Studio runner 4.0.1, Micr
 existing `dotnet test` workflow; interactive tests remain serialized. WiX compiler, extensions, and
 installer-action packages remain at 5.0.2 by project decision; the newer WiX license was not accepted.
 
+The remaining test dependencies are serviced explicitly: Microsoft.Bcl.AsyncInterfaces 10.0.13
+across the test projects and System.Drawing.Common 10.0.13 (including SystemEvents 10.0.13) for tray
+tests. These private test references do not add dependencies to the injected payload.
+
+The external Snoop injector launcher has its own package overrides, leaving the standalone Snoop
+application and browser-demo package versions unchanged. Its build uses GitVersion.MsBuild 6.8.2,
+JetBrains.Annotations 2026.2.0, Microsoft.CodeAnalysis.CSharp/Analyzers 5.9.0, and StyleCop.Analyzers
+1.3.151-beta (continuing its existing prerelease track). Compatible transitive packages are also
+serviced, including immutable collections, reflection metadata, and encoding support at 10.0.13.
+The launcher uses [the .NET SDK's built-in Source Link support](https://github.com/dotnet/sourcelink#using-source-link-in-net-projects)
+instead of overriding it with the older package. Its .NET Framework 4.6.2 and .NET 6 target selection
+is preserved; changing build tools does not raise the target application's required framework.
+
 Protocol integration tests execute both discovery generations, list/read the canonical resources,
 check tool annotations, and prove that a disabled interaction gate rejects a tool call. These tests
 run an isolated HTTP host without attaching to a WPF application. The separate application tests
