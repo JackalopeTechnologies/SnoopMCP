@@ -1,12 +1,26 @@
 param(
     [Parameter(Mandatory)][string]$PackagePath,
-    [Parameter(Mandatory)][string]$DtfAssemblyPath
+    [Parameter(Mandatory)][string]$DtfAssemblyPath,
+    [string]$PublishDirectory
 )
 $ErrorActionPreference = 'Stop'
 Add-Type -Path $DtfAssemblyPath
 $database = [WixToolset.Dtf.WindowsInstaller.Database]::new(
     $PackagePath, [WixToolset.Dtf.WindowsInstaller.DatabaseOpenMode]::ReadOnly)
 try {
+    if ($PublishDirectory) {
+        $packageVersion = $database.ExecuteStringQuery('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductVersion''')[0]
+        foreach ($relativePath in @('SnoopMCP.Host.dll', 'SnoopMCP.Server.dll', 'SnoopMCP.Cli.dll',
+                'SnoopMCP.ClientIntegration.dll', 'payload/SnoopMCP.Payload.dll', 'samples/SampleWpfApp.dll')) {
+            $path = Join-Path $PublishDirectory $relativePath
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing packaged assembly: $path" }
+            $reportedVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($path).ProductVersion
+            if ($reportedVersion.Split('+')[0] -ne $packageVersion) {
+                throw "Package version $packageVersion does not match $relativePath version $reportedVersion"
+            }
+        }
+        Write-Host "Packaged application versions match installer version $packageVersion."
+    }
     $rows = $database.ExecuteQuery('SELECT `Action`, `Condition`, `Sequence` FROM `InstallExecuteSequence` ORDER BY `Sequence`')
     $actions = @{}
     for ($i = 0; $i -lt $rows.Count; $i += 3) {
