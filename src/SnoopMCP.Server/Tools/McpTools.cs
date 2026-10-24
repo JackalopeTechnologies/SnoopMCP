@@ -64,7 +64,7 @@ public sealed class McpTools
     /// </summary>
     /// <param name="cancellationToken">A token to observe while enumerating.</param>
     /// <returns>The set of candidate WPF processes with pid, name, window title, bitness, and attachability.</returns>
-    [McpServerTool, Description(
+    [McpServerTool(ReadOnly = true, Destructive = false), Description(
         "List running WPF processes that can be attached to (pid, name, window title, bitness).")]
     public static Task<JsonElement> ListWpfProcesses(CancellationToken cancellationToken)
     {
@@ -77,7 +77,7 @@ public sealed class McpTools
     /// <param name="pid">The target process id.</param>
     /// <param name="cancellationToken">A token to observe while attaching.</param>
     /// <returns>Session metadata describing the attached process.</returns>
-    [McpServerTool, Description(
+    [McpServerTool(ReadOnly = false, Destructive = true), Description(
         "Attach to a running WPF process by PID. Generates a pipe, injects the payload, opens the session.")]
     public async Task<JsonElement> Attach(int pid, CancellationToken cancellationToken)
     {
@@ -116,7 +116,7 @@ public sealed class McpTools
     /// <summary>Detaches from the current session.</summary>
     /// <param name="cancellationToken">A token to observe while detaching.</param>
     /// <returns>An acknowledgement element.</returns>
-    [McpServerTool, Description("Detach from the current session.")]
+    [McpServerTool(ReadOnly = false, Destructive = true), Description("Detach from the current session.")]
     public async Task<JsonElement> Detach(CancellationToken cancellationToken)
     {
         await mSession.CloseAsync().ConfigureAwait(false);
@@ -126,7 +126,7 @@ public sealed class McpTools
     /// <summary>Enumerates every active visual root in the target process.</summary>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Enumerate every active visual root (window, popup, etc.).")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Enumerate every active visual root (window, popup, etc.).")]
     public Task<JsonElement> ListVisualRoots(CancellationToken cancellationToken) =>
         Dispatch(ToolNames.ListVisualRoots, new ListVisualRootsRequest(), cancellationToken);
 
@@ -134,7 +134,7 @@ public sealed class McpTools
     /// <param name="id">The element id.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Describe an element by id.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Describe an element by id.")]
     public Task<JsonElement> DescribeElement(int id, CancellationToken cancellationToken) =>
         Dispatch(ToolNames.DescribeElement, new DescribeElementRequest(id), cancellationToken);
 
@@ -143,7 +143,7 @@ public sealed class McpTools
     /// <param name="tree">The tree to walk: <c>visual</c> or <c>logical</c>.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Enumerate visual or logical children.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Enumerate visual or logical children.")]
     public Task<JsonElement> GetChildren(int id, string tree, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(tree);
@@ -155,7 +155,7 @@ public sealed class McpTools
     /// <param name="tree">The tree to walk: <c>visual</c> or <c>logical</c>.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Get the visual or logical parent.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Get the visual or logical parent.")]
     public Task<JsonElement> GetParent(int id, string tree, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(tree);
@@ -166,7 +166,7 @@ public sealed class McpTools
     /// <param name="id">The element id.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Get the TemplatedParent if any.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Get the TemplatedParent if any.")]
     public Task<JsonElement> GetTemplatedParent(int id, CancellationToken cancellationToken) =>
         Dispatch(ToolNames.GetTemplatedParent, new GetTemplatedParentRequest(id), cancellationToken);
 
@@ -175,7 +175,7 @@ public sealed class McpTools
     /// <param name="predicate">The AND-combined predicate; every supplied field must match.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Find elements under id matching the AND-combined predicate.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Find elements under id matching the AND-combined predicate.")]
     public Task<JsonElement> FindElements(
         int id,
         ElementPredicateDto predicate,
@@ -194,7 +194,7 @@ public sealed class McpTools
     /// <param name="y">The element-relative Y coordinate in DIPs.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Hit test a point relative to id and return the deepest visual.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Hit test a point relative to id and return the deepest visual.")]
     public Task<JsonElement> HitTest(
         int id,
         double x,
@@ -207,7 +207,7 @@ public sealed class McpTools
     /// <param name="pathString">The canonical path string to resolve.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Resolve a canonical path string under id.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Resolve a canonical path string under id.")]
     public Task<JsonElement> ResolvePath(
         int id,
         string pathString,
@@ -224,7 +224,7 @@ public sealed class McpTools
     /// <param name="id">The element id.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Describe the CLR type shape of the DataContext.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Describe the CLR type shape of the DataContext.")]
     public Task<JsonElement> DescribeDataContext(int id, CancellationToken cancellationToken) =>
         Dispatch(ToolNames.DescribeDataContext, new DescribeDataContextRequest(id), cancellationToken);
 
@@ -233,7 +233,7 @@ public sealed class McpTools
     /// <param name="path">The dot-separated property path.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Read a dotted property path off the DataContext.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Read a dotted property path off the DataContext.")]
     public Task<JsonElement> ReadDataContextPath(int id, string path, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
@@ -247,7 +247,7 @@ public sealed class McpTools
     /// <param name="id">The element id.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("List dependency properties on an element.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("List dependency properties on an element.")]
     public Task<JsonElement> ListDependencyProperties(int id, CancellationToken cancellationToken) =>
         Dispatch(
             ToolNames.ListDependencyProperties,
@@ -259,7 +259,7 @@ public sealed class McpTools
     /// <param name="propertyName">The dependency property's registered name.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Get DP value and precedence trace.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Get DP value and precedence trace.")]
     public Task<JsonElement> GetDependencyProperty(
         int id,
         string propertyName,
@@ -276,7 +276,7 @@ public sealed class McpTools
     /// <param name="id">The element id.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Resolve the applied Style and its BasedOn chain.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Resolve the applied Style and its BasedOn chain.")]
     public Task<JsonElement> ResolveStyle(int id, CancellationToken cancellationToken) =>
         Dispatch(ToolNames.ResolveStyle, new ResolveStyleRequest(id), cancellationToken);
 
@@ -284,7 +284,7 @@ public sealed class McpTools
     /// <param name="id">The element id.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Resolve the applied ControlTemplate.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Resolve the applied ControlTemplate.")]
     public Task<JsonElement> ResolveTemplate(int id, CancellationToken cancellationToken) =>
         Dispatch(ToolNames.ResolveTemplate, new ResolveTemplateRequest(id), cancellationToken);
 
@@ -293,7 +293,7 @@ public sealed class McpTools
     /// <param name="propertyName">The dependency property's registered name carrying the binding.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Inspect the BindingExpression on a property.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Inspect the BindingExpression on a property.")]
     public Task<JsonElement> InspectBinding(
         int id,
         string propertyName,
@@ -311,7 +311,7 @@ public sealed class McpTools
     /// <param name="includeDescendants">When <c>true</c>, recurses through the visual subtree.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("List every BindingExpression on an element (and optionally its descendants).")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("List every BindingExpression on an element (and optionally its descendants).")]
     public Task<JsonElement> ListBindings(
         int id,
         bool includeDescendants,
@@ -325,7 +325,7 @@ public sealed class McpTools
     /// <param name="id">The element id.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description("Serialize an element to XAML reflecting its current live state.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Serialize an element to XAML reflecting its current live state.")]
     public Task<JsonElement> ExportXaml(int id, CancellationToken cancellationToken) =>
         Dispatch(ToolNames.ExportXaml, new ExportXamlRequest(id), cancellationToken);
 
@@ -333,7 +333,7 @@ public sealed class McpTools
     /// <param name="id">The element id.</param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description(
+    [McpServerTool(ReadOnly = true, Destructive = false), Description(
         "Bridge a Snoop element id to its UIA identity (AutomationId/Name/ClassName/ControlType). Read-only.")]
     public Task<JsonElement> GetAutomationPeerInfo(int id, CancellationToken cancellationToken) =>
         Dispatch(ToolNames.GetAutomationPeerInfo, new GetAutomationPeerInfoRequest(id), cancellationToken);
@@ -352,7 +352,7 @@ public sealed class McpTools
     /// derives that from the missing default, not from nullability), which previously forced callers to
     /// supply both halves of the pair — see issue #72.
     /// </remarks>
-    [McpServerTool, Description(
+    [McpServerTool(ReadOnly = true, Destructive = false), Description(
         "Poll a DP or DataContext path until it equals an expected value (ground-truth check). Read-only.")]
     public Task<JsonElement> WaitForValue(
         int id,
@@ -379,7 +379,7 @@ public sealed class McpTools
     /// </param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description(
+    [McpServerTool(ReadOnly = false, Destructive = true), Description(
         "MUTATES the target: drive an element's AutomationPeer pattern in-process. Requires the " +
         "interaction gate. A disabled element returns ElementNotEnabled: do not retry until it is " +
         "enabled. Optional dispatch='post' validates first, then fires-and-forgets a dialog-opening " +
@@ -406,7 +406,7 @@ public sealed class McpTools
     /// </param>
     /// <param name="cancellationToken">A token to observe while dispatching.</param>
     /// <returns>The payload's result element.</returns>
-    [McpServerTool, Description(
+    [McpServerTool(ReadOnly = false, Destructive = true), Description(
         "MUTATES the target: execute the ICommand bound to an element (CanExecute-gated). Requires the " +
         "interaction gate. Optional dispatch='post' checks CanExecute first, then fires-and-forgets; in " +
         "'post' mode only the execution's own outcome is not surfaced — verify the effect separately.")]

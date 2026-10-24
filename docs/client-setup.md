@@ -92,6 +92,34 @@ The interaction gate is independent of client permissions and remains under user
 Inspection, waits, and screenshots do not need it. Never enable it automatically or bypass it through
 another tool. An enabled gate is not blanket authorization to operate an application or hardware.
 
+## MCP discovery and package compatibility
+
+The server uses [ModelContextProtocol.AspNetCore 2.3.0](https://github.com/modelcontextprotocol/csharp-sdk/releases/tag/v2.3.0).
+It supports the newer `server/discover` exchange and retains older `initialize` clients. HTTP remains
+stateless; a new connection never implies ownership of the separate WPF inspection session.
+
+Connecting clients receive server instructions pointing to two read-only MCP resources:
+`snoopmcp://skills/snoopmcp-first` and `snoopmcp://skills/snoopmcp-uia`. These embed the same canonical
+files used by client installation. Resource-capable clients can list and read them even when they do
+not support local skill discovery. The immutable guidance carries a five-minute, private-cache hint
+for newer clients; live application inspection results are not cached by this change.
+
+Tool annotations identify inspection calls as read-only and conservatively mark attachment,
+detachment, and interaction as state-changing. These are descriptive hints. They do not grant client
+approval, transfer inspection-session ownership, or enable Snoop's interaction gate.
+
+The configuration writer uses [Tomlyn 2.10.1](https://xoofx.github.io/Tomlyn/docs/migration/), with
+explicit semantic validation before writes, comment preservation, and TOML 1.0-compatible control
+escapes. Test dependencies use xUnit 4.0.2, its Visual Studio runner 4.0.1, Microsoft.NET.Test.Sdk
+18.11.0, and Xunit.StaFact 4.0.24. The supported `xunit.v3.mtp-off` package retains this repository's
+existing `dotnet test` workflow; interactive tests remain serialized. WiX compiler, extensions, and
+installer-action packages remain at 5.0.2 by project decision; the newer WiX license was not accepted.
+
+Protocol integration tests execute both discovery generations, list/read the canonical resources,
+check tool annotations, and prove that a disabled interaction gate rejects a tool call. These tests
+run an isolated HTTP host without attaching to a WPF application. The separate application tests
+exercise the real WPF sample. Neither replaces installed Windows upgrade/recovery qualification.
+
 ## Find and recover Snoop
 
 Search Windows Start for **SnoopMCP - WPF inspection**. It starts the host through its existing

@@ -7,6 +7,8 @@ namespace SnoopMCP.ClientIntegration;
 
 using Tomlyn;
 using Tomlyn.Model;
+using Tomlyn.Parsing;
+using Tomlyn.Serialization;
 using Tomlyn.Syntax;
 
 /// <summary>
@@ -19,13 +21,16 @@ public abstract class TomlMcpServerWriter : IClientWriter
 {
     private const string ServersTableKey = "mcp_servers";
     private const string UrlKey = "url";
-    private const string ParseErrorFallback = "parse error";
     private const string SkillsRemoved = " Released owned skills; local edits and other clients' skills are retained.";
     private const string SkillsRemovalFailed = " Skill cleanup failed; files were preserved.";
 
     private readonly string mConfigPath;
     private readonly string mDetectionPath;
     private readonly string mSkillsDir;
+    private readonly TomlSerializerOptions mTomlOptions = new()
+    {
+        MetadataStore = new TomlMetadataStore()
+    };
 
     /// <summary>Initialises the writer against explicit paths (used by tests).</summary>
     /// <param name="configPath">Absolute path to the client's <c>config.toml</c>.</param>
@@ -158,29 +163,20 @@ public abstract class TomlMcpServerWriter : IClientWriter
         }
         else
         {
-            DocumentSyntax doc = Toml.Parse(File.ReadAllText(mConfigPath), mConfigPath);
-            if (doc.HasErrors)
+            try
+            {
+                string text = File.ReadAllText(mConfigPath);
+                // Deserialization alone accepts some scalar/table conflicts. Validate before any write.
+                SyntaxParser.ParseStrict(text, mConfigPath, validate: true);
+                root = TomlSerializer.Deserialize<TomlTable>(text, mTomlOptions)
+                    ?? throw new IOException("Configuration did not contain a TOML table.");
+                ok = true;
+            }
+            catch (TomlException ex)
             {
                 root = new TomlTable();
-                error = doc.Diagnostics.Count > 0 ? doc.Diagnostics[0].Message : ParseErrorFallback;
+                error = ex.Message;
                 ok = false;
-            }
-            else
-            {
-                // ToModel runs a second (model-build) pass that can throw even when parsing
-                // succeeded - e.g. a key defined both as a value and a table - so treat that as a
-                // clean failure rather than letting it escape the "never throws" contract.
-                try
-                {
-                    root = doc.ToModel();
-                    ok = true;
-                }
-                catch (TomlException ex)
-                {
-                    root = new TomlTable();
-                    error = ex.Message;
-                    ok = false;
-                }
             }
         }
         return ok;
@@ -207,6 +203,18 @@ public abstract class TomlMcpServerWriter : IClientWriter
 
     private void WriteAtomic(TomlTable root)
     {
-        AtomicFile.Write(mConfigPath, Toml.FromModel(root));
+        DocumentSyntax document = SyntaxParser.ParseStrict(TomlSerializer.Serialize(root, mTomlOptions));
+        // The model writer emits TOML 1.1 control escapes, and disabling them rejects valid values.
+        // The syntax writer uses TOML 1.0 Unicode escapes. Re-encode only affected string tokens,
+        // including quoted keys, leaving literal backslashes and comments alone.
+        foreach (StringValueSyntax scalar in document.Descendants().OfType<StringValueSyntax>())
+        {
+            if (scalar.Value is { } value && value.Any(char.IsControl) && scalar.Token is { } token)
+            {
+                token.Text = new StringValueSyntax(value).Token?.Text
+                    ?? throw new IOException("Unable to encode a configuration string.");
+            }
+        }
+        AtomicFile.Write(mConfigPath, document.ToString());
     }
 }

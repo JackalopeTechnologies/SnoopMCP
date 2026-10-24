@@ -20,14 +20,17 @@
          framework reference directly (FrameworkReference does not flow transitively). -->
     <ItemGroup>
         <FrameworkReference Include="Microsoft.AspNetCore.App" />
+        <Content Include="..\..\skills\**\SKILL.md" Link="skills\%(RecursiveDir)%(Filename)%(Extension)"
+                 CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <!-- Microsoft.Extensions.Logging.Abstractions (NullLogger, used by the E2E test) now comes from
          the Microsoft.AspNetCore.App framework reference above, so no explicit package is needed. -->
     <ItemGroup>
-        <PackageReference Include="xunit.v3" Version="3.2.2" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+        <!-- Keep the existing VSTest workflow on .NET 10; xUnit 4 otherwise defaults to a different runner. -->
+        <PackageReference Include="xunit.v3.mtp-off" Version="4.0.2" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     </ItemGroup>
 
     <ItemGroup>

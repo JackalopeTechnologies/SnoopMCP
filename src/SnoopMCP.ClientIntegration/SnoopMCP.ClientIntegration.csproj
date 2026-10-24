@@ -5,10 +5,9 @@
         <AssemblyName>SnoopMCP.ClientIntegration</AssemblyName>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
-    <!-- Pinned to the stable 0.x API (Toml.Parse / ToModel / FromModel + the syntax model). Tomlyn 2.x
-         is a serializer-focused rewrite that drops that model-round-trip surface this writer relies on. -->
+    <!-- Dynamic tables preserve user-owned configuration while the installer updates its server entry. -->
     <ItemGroup>
-        <PackageReference Include="Tomlyn" Version="0.17.0" />
+        <PackageReference Include="Tomlyn" Version="2.10.1" />
         <EmbeddedResource Include="..\..\skills\snoopmcp-first\SKILL.md" LogicalName="snoopmcp-first" />
         <EmbeddedResource Include="..\..\skills\snoopmcp-uia\SKILL.md" LogicalName="snoopmcp-uia" />
     </ItemGroup>
