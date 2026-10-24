@@ -43,6 +43,20 @@ public partial class App
     {
         base.OnStartup(e);
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+        if (Mutex.TryOpenExisting(SingleInstanceMutexName, out Mutex? existing))
+        {
+            existing.Dispose();
+            MessageBox.Show(AlreadyRunningMessage, AppTitle, MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown();
+        }
+        else
+        {
+            StartOrRelaunch(e);
+        }
+    }
+
+    private void StartOrRelaunch(StartupEventArgs e)
+    {
         // Relaunch before acquiring the single-instance mutex: the elevated child must be able to acquire it.
         bool relaunch = !ElevationInfo.IsElevated() && ElevationInfo.CanElevate()
             && AutostartTask.Exists() && AutostartTask.RunNow();
@@ -67,9 +81,7 @@ public partial class App
         }
     }
 
-    // Split out of OnStartup's else-branch so the elevated-relaunch guard above can skip it with a
-    // single boolean check instead of an early return (the repo's single-exit-point analyzer rule
-    // forbids a return statement inside an if in a void method).
+    // Called only by the instance that owns the single-instance handle.
     private void StartAtCurrentIntegrity(StartupEventArgs e)
     {
         mController = new ServerController(e.Args);

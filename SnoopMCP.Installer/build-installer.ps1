@@ -13,17 +13,24 @@ $cliProj    = Join-Path $root "src/SnoopMCP.Cli/SnoopMCP.Cli.csproj"
 $sampleProj = Join-Path $root "samples/SampleWpfApp/SampleWpfApp.csproj"
 $hostBin    = Join-Path $root "src/SnoopMCP.Host/bin/$Configuration/net10.0-windows"
 
-if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+if (Test-Path -LiteralPath $stage) {
+    $resolvedStage = (Resolve-Path -LiteralPath $stage).Path
+    $expectedStage = [IO.Path]::GetFullPath((Join-Path $here 'stage'))
+    if ($resolvedStage -ne $expectedStage -or (Get-Item -LiteralPath $stage).LinkType) {
+        throw "Refusing to remove unexpected installer staging directory: $resolvedStage"
+    }
+    Remove-Item -LiteralPath $resolvedStage -Recurse -Force
+}
 New-Item -ItemType Directory -Path $stage | Out-Null
 
 # Build the host first so its AfterBuild copy targets stage injector/ + payload/ into bin.
 # -nodeReuse:false: never adopt a persistent MSBuild node spawned by Visual Studio, whose
 # duplicate-cased PATH otherwise crashes the nested native (CL.exe) build.
-dotnet build $hostProj -c $Configuration -nodeReuse:false
+dotnet build $hostProj -c $Configuration -m:2 -nodeReuse:false
 if ($LASTEXITCODE -ne 0) { throw "Host build failed." }
 
 # Publish host (exe + framework-dependent deps) into the stage root.
-dotnet publish $hostProj -c $Configuration --no-build -o $stage
+dotnet publish $hostProj -c $Configuration --no-build -m:2 -nodeReuse:false -o $stage
 if ($LASTEXITCODE -ne 0) { throw "Host publish failed." }
 
 # injector/ + payload/ are loose staged folders that publish does not carry — copy them in.
@@ -36,11 +43,11 @@ if (-not (Get-ChildItem (Join-Path $stage "payload")  -File -Recurse -ErrorActio
 
 # Publish the CLI alongside the host. Safe in one dir: the host (net10.0-windows) and CLI
 # (net10.0) have disjoint app-dependency graphs, so no shared app DLL collides.
-dotnet publish $cliProj -c $Configuration -o $stage
+dotnet publish $cliProj -c $Configuration -m:2 -nodeReuse:false -o $stage
 if ($LASTEXITCODE -ne 0) { throw "CLI publish failed." }
 
 # Publish the sample app under samples/.
-dotnet publish $sampleProj -c $Configuration -o (Join-Path $stage "samples")
+dotnet publish $sampleProj -c $Configuration -m:2 -nodeReuse:false -o (Join-Path $stage "samples")
 if ($LASTEXITCODE -ne 0) { throw "Sample publish failed." }
 
 # Remove PDBs from stage — they are not shipped.

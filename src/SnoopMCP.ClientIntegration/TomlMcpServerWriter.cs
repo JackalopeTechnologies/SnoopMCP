@@ -10,7 +10,7 @@ using Tomlyn.Model;
 using Tomlyn.Syntax;
 
 /// <summary>
-/// Registers SnoopMCP in OpenAI Codex's <c>~/.codex/config.toml</c> under the
+/// Registers SnoopMCP in a coding client's TOML configuration under the
 /// <c>[mcp_servers.snoopmcp]</c> table as a Streamable-HTTP server (a <c>url</c> entry). The entry is
 /// added, updated, or removed in place via the TOML model, so every other table and key in the file
 /// survives. Writes are atomic (temp file then move).
@@ -28,8 +28,8 @@ public abstract class TomlMcpServerWriter : IClientWriter
     private readonly string mSkillsDir;
 
     /// <summary>Initialises the writer against explicit paths (used by tests).</summary>
-    /// <param name="configPath">Absolute path to Codex's <c>config.toml</c>.</param>
-    /// <param name="detectionPath">Directory whose existence means Codex is installed.</param>
+    /// <param name="configPath">Absolute path to the client's <c>config.toml</c>.</param>
+    /// <param name="detectionPath">Directory whose existence means the client is installed.</param>
     /// <param name="skillsDir">Skill discovery directory.</param>
     protected TomlMcpServerWriter(string configPath, string detectionPath, string skillsDir)
     {

@@ -59,7 +59,7 @@ public static class Program
             VerbUnregisterClients => Task.FromResult(UnregisterClients(args)),
             VerbInstallAutostart => Task.FromResult(InstallAutostart()),
             VerbUninstallAutostart => Task.FromResult(UninstallAutostart()),
-            VerbStatus => StatusAsync(),
+            VerbStatus => StatusAsync(args),
             VerbStart => Task.FromResult(Start()),
             VerbStop => Task.FromResult(Stop()),
             _ => Task.FromResult(PrintUsage())
@@ -67,9 +67,9 @@ public static class Program
         return await dispatched.ConfigureAwait(false);
     }
 
-    private static async Task<int> StatusAsync()
+    private static async Task<int> StatusAsync(string[] args)
     {
-        ClientRegistration.Status(SelectWriters([]), Console.Out);
+        ClientRegistration.Status(SelectWriters(args), Console.Out);
         Console.WriteLine(AutostartTask.Exists() ? MsgAutostartPresent : MsgAutostartAbsent);
         using var client = new HttpClient();
         bool healthy = await HostHealthProbe

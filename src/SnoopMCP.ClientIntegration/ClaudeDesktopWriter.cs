@@ -80,7 +80,11 @@ public sealed class ClaudeDesktopWriter : IClientWriter
         {
             JsonObject root = LoadOrCreateRoot();
             JsonObject servers = GetOrAddObject(root, ServersKey);
-            servers[endpoint.Name] = BuildBridgeEntry(endpoint);
+            JsonObject entry = GetOrAddObject(servers, endpoint.Name);
+            foreach ((string key, JsonNode? value) in BuildBridgeEntry(endpoint))
+            {
+                entry[key] = value?.DeepClone();
+            }
             WriteAtomic(root);
             string message = $"Registered '{endpoint.Name}' in {ClientName}.";
             if (!IsNpxOnPath())
@@ -110,6 +114,8 @@ public sealed class ClaudeDesktopWriter : IClientWriter
             {
                 JsonObject root = LoadRoot();
                 bool removed = root[ServersKey] is JsonObject servers
+                    && servers[McpEndpoint.Default.Name] is JsonObject entry
+                    && EntryMatches(entry)
                     && servers.Remove(McpEndpoint.Default.Name);
                 if (removed)
                 {
@@ -139,9 +145,7 @@ public sealed class ClaudeDesktopWriter : IClientWriter
                 JsonObject root = LoadRoot();
                 present = root[ServersKey] is JsonObject servers
                     && servers[McpEndpoint.Default.Name] is JsonObject entry
-                    && string.Equals((string?) entry[CommandKey], NpxCommand, StringComparison.Ordinal)
-                    && entry[ArgsKey] is JsonArray args
-                    && args.Any(a => string.Equals((string?) a, McpEndpoint.Default.Url, StringComparison.Ordinal));
+                    && EntryMatches(entry);
             }
             catch (JsonException)
             {
@@ -151,6 +155,13 @@ public sealed class ClaudeDesktopWriter : IClientWriter
         return new StatusResult(present, present
             ? $"{ClientName}: SnoopMCP is registered."
             : $"{ClientName}: SnoopMCP is not registered.");
+    }
+
+    private static bool EntryMatches(JsonObject entry)
+    {
+        return string.Equals((string?) entry[CommandKey], NpxCommand, StringComparison.Ordinal)
+            && entry[ArgsKey] is JsonArray args
+            && args.Any(a => string.Equals((string?) a, McpEndpoint.Default.Url, StringComparison.Ordinal));
     }
 
     private static JsonObject BuildBridgeEntry(McpEndpoint endpoint)
@@ -199,6 +210,10 @@ public sealed class ClaudeDesktopWriter : IClientWriter
         }
         else
         {
+            if (parent.ContainsKey(key))
+            {
+                throw new JsonException($"Expected object '{key}'; existing value was preserved.");
+            }
             child = new JsonObject();
             parent[key] = child;
         }

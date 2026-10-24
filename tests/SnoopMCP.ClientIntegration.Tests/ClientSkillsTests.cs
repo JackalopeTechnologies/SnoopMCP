@@ -75,4 +75,22 @@ public sealed class ClientSkillsTests : IDisposable
         Assert.Contains("https://other", text);
         Assert.Contains("dark", text);
     }
+
+    [Fact]
+    public void ClaudeDesktop_PreservesBridgeOptionsAndReplacementConnection()
+    {
+        Directory.CreateDirectory(mDir);
+        string config = Path.Combine(mDir, "desktop.json");
+        File.WriteAllText(config, """
+            {"mcpServers":{"snoopmcp":{"command":"npx","env":{"KEEP":"value"},"disabled":true}}}
+            """);
+        var writer = new ClaudeDesktopWriter(config, mDir);
+        Assert.True(writer.Register(McpEndpoint.Default).Success);
+        string text = File.ReadAllText(config);
+        Assert.Contains("KEEP", text);
+        Assert.Contains("\"disabled\": true", text);
+        File.WriteAllText(config, text.Replace(McpEndpoint.Default.Url, "https://replacement/mcp", StringComparison.Ordinal));
+        Assert.True(writer.Unregister().Success);
+        Assert.Contains("https://replacement/mcp", File.ReadAllText(config));
+    }
 }
