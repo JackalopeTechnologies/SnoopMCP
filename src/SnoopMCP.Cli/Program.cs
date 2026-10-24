@@ -28,6 +28,7 @@ public static class Program
     private const string FlagClaudeCode = "--claude-code";
     private const string FlagClaudeDesktop = "--claude-desktop";
     private const string FlagCodex = "--codex";
+    private const string FlagGrokBuild = "--grok-build";
     private const string FlagCopilotCli = "--copilot-cli";
     private const string FlagCursor = "--cursor";
     private const string FlagGemini = "--gemini-cli";
@@ -97,7 +98,7 @@ public static class Program
             "Usage: SnoopMCP.Cli <register-clients|unregister-clients|install-autostart|"
             + "uninstall-autostart|status|start|stop> [--claude-code] [--claude-desktop] "
             + "[--vscode] [--codex] [--copilot-cli] [--cursor] [--gemini-cli] [--windsurf] "
-            + "[--visual-studio] [--detected-only]");
+            + "[--visual-studio] [--grok-build] [--detected-only]");
         return ExitUsage;
     }
 
@@ -121,6 +122,7 @@ public static class Program
         (FlagClaudeDesktop, McpClient.ClaudeDesktop),
         (FlagVsCode, McpClient.VsCode),
         (FlagCodex, McpClient.Codex),
+        (FlagGrokBuild, McpClient.GrokBuild),
         (FlagCopilotCli, McpClient.CopilotCli),
         (FlagCursor, McpClient.Cursor),
         (FlagGemini, McpClient.GeminiCli),

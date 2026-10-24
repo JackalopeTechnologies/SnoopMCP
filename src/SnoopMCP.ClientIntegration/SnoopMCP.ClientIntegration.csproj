@@ -9,5 +9,7 @@
          is a serializer-focused rewrite that drops that model-round-trip surface this writer relies on. -->
     <ItemGroup>
         <PackageReference Include="Tomlyn" Version="0.17.0" />
+        <EmbeddedResource Include="..\..\skills\snoopmcp-first\SKILL.md" LogicalName="snoopmcp-first" />
+        <EmbeddedResource Include="..\..\skills\snoopmcp-uia\SKILL.md" LogicalName="snoopmcp-uia" />
     </ItemGroup>
 </Project>
