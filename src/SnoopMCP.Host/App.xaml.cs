@@ -6,6 +6,7 @@
 namespace SnoopMCP.Host;
 
 using System.Windows;
+using System.IO;
 using H.NotifyIcon;
 using Automation;
 using ClientIntegration;
@@ -26,48 +27,40 @@ public partial class App
     private const string TrayIconResourceKey = "TrayIcon";
     private const string AppTitle = "SnoopMCP";
     private const string AlreadyRunningMessage = "SnoopMCP is already running — check the system tray.";
+    private const string RunRecordName = "host-running.txt";
+    private const string RecoveryTitle = "SnoopMCP — WPF inspection restored";
+    private const string RecoveryMessage = "The previous run ended unexpectedly. Open SnoopMCP - diagnostic logs from Start for details. Refresh your coding assistant's connection if needed.";
 
     private static readonly TimeSpan smExitDisposeTimeout = TimeSpan.FromSeconds(5);
 
     private Mutex? mInstanceMutex;
     private ServerController? mController;
     private TaskbarIcon? mTrayIcon;
+    private HostRunRecord? mRunRecord;
 
     /// <inheritdoc />
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        mInstanceMutex = new Mutex(initiallyOwned: false, SingleInstanceMutexName, out bool createdNew);
-        if (!createdNew)
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+        // Relaunch before acquiring the single-instance mutex: the elevated child must be able to acquire it.
+        bool relaunch = !ElevationInfo.IsElevated() && ElevationInfo.CanElevate()
+            && AutostartTask.Exists() && AutostartTask.RunNow();
+        if (relaunch)
         {
-            // Without feedback a second launch just vanishes; tell the user where the running one is.
-            HostLog.Info("Another SnoopMCP instance is already running; exiting.");
-            MessageBox.Show(AlreadyRunningMessage, AppTitle, MessageBoxButton.OK, MessageBoxImage.Information);
+            HostLog.Info("Relaunching elevated via the autostart task.");
             Shutdown();
         }
         else
         {
-            bool relaunchingElevated = false;
-            if (!ElevationInfo.IsElevated() && AutostartTask.Exists() && ElevationInfo.CanElevate())
+            mInstanceMutex = new Mutex(initiallyOwned: false, SingleInstanceMutexName, out bool createdNew);
+            if (!createdNew)
             {
-                if (AutostartTask.RunNow())
-                {
-                    HostLog.Info("Relaunching elevated via the autostart task.");
-                    // Never ReleaseMutex: the mutex was created initiallyOwned:false, so releasing a
-                    // handle this instance never owned would throw. Dispose our handle and null the
-                    // field so OnExit's mInstanceMutex?.Dispose() cannot double-dispose it.
-                    mInstanceMutex?.Dispose();
-                    mInstanceMutex = null;
-                    Shutdown();
-                    relaunchingElevated = true;
-                }
-                else
-                {
-                    // RunNow failed (Task Scheduler could not trigger the elevated task): fall through and run at Medium integrity.
-                    HostLog.Info("Elevated relaunch could not be triggered; continuing at Medium integrity.");
-                }
+                HostLog.Info("Another SnoopMCP instance is already running; exiting.");
+                MessageBox.Show(AlreadyRunningMessage, AppTitle, MessageBoxButton.OK, MessageBoxImage.Information);
+                Shutdown();
             }
-            if (!relaunchingElevated)
+            else
             {
                 StartAtCurrentIntegrity(e);
             }
@@ -81,12 +74,13 @@ public partial class App
     {
         mController = new ServerController(e.Args);
         mTrayIcon = (TaskbarIcon?) FindResource(TrayIconResourceKey) ?? throw new InvalidOperationException("Tray icon resource not found.");
-        mTrayIcon.DataContext = new TrayViewModel(mController, Shutdown,
+        mTrayIcon.DataContext = new TrayViewModel(mController, ExitFromTray,
             (title, message) => mTrayIcon.ShowNotification(title, message),
             ShowOwnedDialog,
             InteractionGate.ForCurrentUser(),
             ElevationInfo.IsElevated());
         mTrayIcon.ForceCreate();
+        RecordStartup();
         SessionEnding += OnSessionEnding;
         _ = mController.StartAsync();
         HostLog.Info("SnoopMCP host started.");
@@ -94,7 +88,36 @@ public partial class App
 
     private void OnSessionEnding(object sender, SessionEndingCancelEventArgs e)
     {
+        HostLog.Info($"Windows session ending: {e.ReasonSessionEnding}.");
         Shutdown();
+    }
+
+    private void ExitFromTray()
+    {
+        HostLog.Info("Exit requested from the SnoopMCP tray menu.");
+        Shutdown();
+    }
+
+    private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        HostLog.Error($"Unhandled host exception; terminating={e.IsTerminating}.", e.ExceptionObject as Exception);
+    }
+
+    private void RecordStartup()
+    {
+        try
+        {
+            mRunRecord = new HostRunRecord(Path.Combine(HostLog.DirectoryPath, RunRecordName));
+            if (mRunRecord.Begin())
+            {
+                HostLog.Info("Previous host run ended without a clean shutdown. Cause unknown; check crash/task history.");
+                mTrayIcon?.ShowNotification(RecoveryTitle, RecoveryMessage);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            HostLog.Error("Could not record host startup.", ex);
+        }
     }
 
     // A tray app has no main window, so an ownerless MessageBox opens unactivated and the closing
@@ -131,10 +154,16 @@ public partial class App
         // dispose can never strand the single-instance mutex or skip WPF's own shutdown.
         try
         {
+            HostLog.Info($"Host shutdown: exit code {e.ApplicationExitCode}.");
             mTrayIcon?.Dispose();
-            if (mController is not null && !mController.DisposeAsync().AsTask().Wait(smExitDisposeTimeout))
+            bool disposed = mController is null || mController.DisposeAsync().AsTask().Wait(smExitDisposeTimeout);
+            if (!disposed)
             {
                 HostLog.Warn("Server dispose timed out on exit.");
+            }
+            if (disposed && e.ApplicationExitCode == 0)
+            {
+                mRunRecord?.Complete();
             }
         }
         catch (Exception ex)

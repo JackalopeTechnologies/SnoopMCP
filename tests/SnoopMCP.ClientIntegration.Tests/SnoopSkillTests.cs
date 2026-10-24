@@ -124,6 +124,19 @@ public sealed class SnoopSkillTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(mDir, SnoopSkill.FirstSkillName)));
     }
 
+    [Fact]
+    public async Task ConcurrentClients_DoNotLoseOwnership()
+    {
+        bool[] installed = await Task.WhenAll(
+            Task.Run(() => SnoopSkill.Install(mDir, "Codex")),
+            Task.Run(() => SnoopSkill.Install(mDir, "Cursor")));
+        Assert.All(installed, Assert.True);
+        Assert.True(SnoopSkill.Remove(mDir, "Codex"));
+        Assert.True(File.Exists(Path.Combine(mDir, SnoopSkill.FirstSkillName, "SKILL.md")));
+        Assert.True(SnoopSkill.Remove(mDir, "Cursor"));
+        Assert.False(Directory.Exists(Path.Combine(mDir, SnoopSkill.FirstSkillName)));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

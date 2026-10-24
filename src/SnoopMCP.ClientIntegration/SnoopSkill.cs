@@ -19,6 +19,8 @@ public static class SnoopSkill
     /// <summary>Directory used by clients for skill discovery.</summary>
     public const string SkillsDirectoryName = "skills";
     private const string AgentsDirectoryName = ".agents";
+    private const string MutexPrefix = "Local\\SnoopMCP.Skills.";
+    private static readonly TimeSpan smLockTimeout = TimeSpan.FromSeconds(10);
     private const string SkillFileName = "SKILL.md";
     private const string ReceiptFileName = ".snoopmcp-install.json";
     private const string DefaultOwner = "Claude Code";
@@ -51,6 +53,37 @@ public static class SnoopSkill
     }
 
     private static bool Apply(string skillsDir, Func<string, string, string, bool> action)
+    {
+        string lockName = MutexPrefix + Hash(Path.GetFullPath(skillsDir).ToUpperInvariant());
+        using var mutex = new Mutex(false, lockName);
+        bool acquired;
+        try
+        {
+            acquired = mutex.WaitOne(smLockTimeout);
+        }
+        catch (AbandonedMutexException)
+        {
+            acquired = true;
+        }
+        bool ok = false;
+        try
+        {
+            if (acquired)
+            {
+                ok = ApplyCore(skillsDir, action);
+            }
+        }
+        finally
+        {
+            if (acquired)
+            {
+                mutex.ReleaseMutex();
+            }
+        }
+        return ok;
+    }
+
+    private static bool ApplyCore(string skillsDir, Func<string, string, string, bool> action)
     {
         bool ok = true;
         foreach ((string name, string body) in Definitions)
@@ -159,8 +192,9 @@ public static class SnoopSkill
         string? current = Path.GetFullPath(path);
         while (current is not null)
         {
-            if ((File.Exists(current) || Directory.Exists(current))
-                && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+            if (new FileInfo(current).LinkTarget is not null
+                || ((File.Exists(current) || Directory.Exists(current))
+                    && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0))
             {
                 throw new IOException($"Linked skill path is not installer-owned: {current}");
             }

@@ -45,6 +45,7 @@ public static class Program
     private const string MsgHostNotReachable = "Host: not reachable.";
     private const string MsgHostStarted = "Host started.";
     private const string MsgHostStartFailed = "Host failed to start.";
+    private const string MsgHostStopFailed = "Could not stop the scheduled host. No processes were killed; retry with administrator rights.";
 
     /// <summary>Parses the verb and dispatches; returns the process exit code.</summary>
     /// <param name="args">Command-line arguments; <c>args[0]</c> is the verb.</param>
@@ -88,8 +89,8 @@ public static class Program
     private static int Stop()
     {
         int stopped = HostProcess.Stop();
-        Console.WriteLine($"Stopped {stopped} host process(es).");
-        return ExitOk;
+        Console.WriteLine(stopped >= 0 ? $"Stopped {stopped} remaining host process(es)." : MsgHostStopFailed);
+        return stopped >= 0 ? ExitOk : ExitFailure;
     }
 
     private static int PrintUsage()

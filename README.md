@@ -125,8 +125,10 @@ Download the latest `SnoopMCP-<version>.msi` from the
 (double-click, or `msiexec /i SnoopMCP-<version>.msi`).
 
 The per-user MSI installs SnoopMCP without administrator rights to `%LocalAppData%\SnoopMCP`, creates
-a logon autostart task (so the tray host starts at sign-in), and adds a "SnoopMCP Sample App"
-Start-menu shortcut. It launches the host immediately on a fresh install (the logon task starts it on
+a logon autostart task (so the tray host starts at sign-in), and adds Start-menu shortcuts for
+**SnoopMCP - WPF inspection**, **SnoopMCP - diagnostic logs**, and **SnoopMCP Sample App**.
+The task has no runtime limit, runs on battery power, and retries failed runs up to three times at
+one-minute intervals. An intentional Exit remains stopped. It launches the host immediately on a fresh install (the logon task starts it on
 later sign-ins). An upgrade or uninstall first terminates the running host (so the locked exe doesn't
 block file replacement).
 
@@ -160,14 +162,17 @@ After running the MSI on a test machine:
 4. The "SnoopMCP Sample App" Start-menu shortcut launches the sample.
 5. Register an agent from the tray **Install into ▸** menu (or `SnoopMCP.Cli register-clients`), then confirm that agent's config carries a `snoopmcp` entry — and nothing else was disturbed.
 6. An **upgrade** (install a higher `-Version` over the running install) succeeds without a locked-file error — the running host is terminated first.
-7. Uninstall (Apps & features, or `msiexec /x`) removes the task, any client entries SnoopMCP added, and the files — leaving other MCP servers intact.
+7. Uninstall removes the task, SnoopMCP connection entries and unedited installer-owned skills and
+   program files. Other servers, added/edited skill files, logs, and preferences remain.
 
 ## Using the tray app
 
 `SnoopMCP.Host` runs as a system-tray app. Left- or right-click the tray icon for the menu:
 
 - **Start MCP** / **Stop MCP** — start or stop the MCP server (it starts automatically when the host launches).
-- **Install into ▸** — register SnoopMCP with an AI agent. Pick a single agent (**Claude Code**, **Claude Desktop**, **VS Code**, **Codex**, **Copilot CLI**, **Cursor**, **Gemini CLI**, **Windsurf**, **Visual Studio 2022**) or **All detected agents**. A tray notification reports what was written.
+- **Install into ▸** — register SnoopMCP with an AI agent. Pick **Claude Code**, **Claude Desktop**,
+  **VS Code**, **Codex**, **Grok Build**, **Copilot CLI**, **Cursor**, **Gemini CLI**, **Windsurf**,
+  or **Visual Studio 2022**, or choose **All detected agents**. The result reports connection and skill setup.
 - **Uninstall from ▸** — remove SnoopMCP from a single agent or all detected agents.
 - **Status** — report SnoopMCP's registration state across every supported agent.
 - **Exit** — quit the host.
@@ -176,15 +181,18 @@ Registering writes the agent's MCP configuration so it can find the SnoopMCP end
 its own documented remote-server shape: streamable HTTP (`type: http`) for Claude Code, VS Code, Codex,
 Copilot CLI, Cursor, and Visual Studio 2022; `httpUrl` for Gemini CLI; `serverUrl` for Windsurf; and an
 `npx mcp-remote` stdio bridge for Claude Desktop (which has no native HTTP MCP transport — this
-requires [Node.js](https://nodejs.org) on `PATH`). For Claude Code, registration also pre-approves
-SnoopMCP's read-only tools (`permissions.allow`) and installs the `snoopmcp-first` skill. Restart the
-target agent after registering so it picks up the new config.
+requires [Node.js](https://nodejs.org) on `PATH`). Registration installs both canonical Snoop skills
+for supported coding clients, preserving existing permissions, server options, and unrelated skills.
+It does not grant whole-server approval or enable app interaction. Codex uses its documented
+`~/.agents/skills` discovery location without experimental flags. Refresh the target client's connection
+after registering; restart the client if the connection or new skills do not appear.
+See [client setup and recovery](docs/client-setup.md) for locations, verification, and safe recovery.
 
 The same registration is available from the command line via `SnoopMCP.Cli`:
 
 ```text
 SnoopMCP.Cli register-clients     # all agents; or target specific ones:
-SnoopMCP.Cli register-clients --claude-code --claude-desktop --vscode --codex --copilot-cli ^
+SnoopMCP.Cli register-clients --claude-code --claude-desktop --vscode --codex --grok-build --copilot-cli ^
                               --cursor --gemini-cli --windsurf --visual-studio
 SnoopMCP.Cli register-clients --detected-only   # only agents that are installed
 ```

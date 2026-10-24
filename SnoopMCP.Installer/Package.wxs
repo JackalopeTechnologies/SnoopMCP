@@ -44,19 +44,29 @@
                            Name="installed" Type="integer" Value="1" KeyPath="yes" />
         </Component>
 
+        <Component Id="HostShortcuts" Directory="AppShortcutFolder" Guid="*">
+            <Shortcut Id="HostStartMenuShortcut" Name="SnoopMCP - WPF inspection"
+                      Description="Start SnoopMCP so coding assistants can inspect WPF apps. Runs in the notification area."
+                      Target="[INSTALLFOLDER]SnoopMCP.Host.exe"
+                      WorkingDirectory="INSTALLFOLDER" />
+            <Shortcut Id="HostLogsShortcut" Name="SnoopMCP - diagnostic logs"
+                      Description="Open SnoopMCP startup, shutdown, crash, and server diagnostics."
+                      Target="[INSTALLFOLDER]logs" WorkingDirectory="INSTALLFOLDER" />
+            <RegistryValue Root="HKCU" Key="Software\JackalopeTechnologies\SnoopMCP"
+                           Name="HostShortcuts" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+
         <!-- Remember the install dir so RemoveFolderEx can resolve it during uninstall. -->
         <Property Id="INSTALLDIRSAVED">
             <RegistrySearch Id="FindInstallDir" Root="HKCU"
                             Key="Software\JackalopeTechnologies\SnoopMCP" Name="InstallDir" Type="directory" />
         </Property>
 
-        <!-- Remove the whole install folder on uninstall, including runtime-created files such as
-             logs\ that MSI never tracked (the install folder is %LOCALAPPDATA%\SnoopMCP). -->
+        <!-- Keep runtime logs, user preferences, and user-added files. MSI removes only its own files. -->
         <Component Id="CleanupInstallFolder" Directory="INSTALLFOLDER"
                    Guid="7C1A2B3D-4E5F-4061-8A9B-0C1D2E3F4A5B">
             <RegistryValue Root="HKCU" Key="Software\JackalopeTechnologies\SnoopMCP"
                            Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
-            <util:RemoveFolderEx On="uninstall" Property="INSTALLDIRSAVED" />
         </Component>
 
         <!-- Install: create the logon task. Agent registration is offered as an opt-in checkbox on the
@@ -81,6 +91,7 @@
         <Feature Id="Main" Title="SnoopMCP" Level="1">
             <ComponentGroupRef Id="PublishOutput" />
             <ComponentRef Id="SampleShortcut" />
+            <ComponentRef Id="HostShortcuts" />
             <ComponentRef Id="CleanupInstallFolder" />
         </Feature>
 
