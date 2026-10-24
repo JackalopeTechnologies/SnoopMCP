@@ -33,7 +33,7 @@ try {
         $actions[$rows[$i]] = @{ Condition = $rows[$i + 1]; Sequence = [int]$rows[$i + 2] }
     }
     $requiredOrder = @(
-        'PrepareUpgradeState', 'InstallInitialize', 'RollbackUpgradeState', 'RemoveExistingProducts',
+        'PrepareUpgradeState', 'InstallInitialize', 'RemoveExistingProducts',
         'InstallFiles', 'RestoreUpgradeState', 'CleanupUpgradeState', 'InstallFinalize'
     )
     $previous = -1
@@ -46,6 +46,19 @@ try {
     foreach ($name in @('UninstallAutostart', 'UnregisterClients')) {
         if ($actions[$name].Condition -notmatch 'NOT UPGRADINGPRODUCTCODE') {
             throw "Upgrade must not unregister client state: $name"
+        }
+    }
+    foreach ($entry in $actions.GetEnumerator()) {
+        if ($entry.Value.Sequence -gt $actions.InstallInitialize.Sequence -and
+            $entry.Value.Sequence -lt $actions.RemoveExistingProducts.Sequence) {
+            throw "RemoveExistingProducts must immediately follow InstallInitialize; found $($entry.Key)"
+        }
+    }
+    foreach ($exitAction in @{ RecoverFailedUpgrade = -3; RecoverCancelledUpgrade = -2 }.GetEnumerator()) {
+        if (-not $actions.ContainsKey($exitAction.Key) -or
+            $actions[$exitAction.Key].Sequence -ne $exitAction.Value -or
+            $actions[$exitAction.Key].Condition -ne 'RestoreUpgradeState') {
+            throw "Missing upgrade exit recovery: $($exitAction.Key)"
         }
     }
     $shortcuts = $database.ExecuteStringQuery('SELECT `Name` FROM `Shortcut`')

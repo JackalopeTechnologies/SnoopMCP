@@ -17,7 +17,6 @@ public static class UpgradeActions
     private const string SnapshotDirectory = "Snapshot";
     private const string BackupParent = "SnoopMCP.Upgrade";
     private const string RestoreAction = "RestoreUpgradeState";
-    private const string RollbackAction = "RollbackUpgradeState";
     private const string CleanupAction = "CleanupUpgradeState";
     private const string DirectoryQuery = "SELECT `Directory`, `Directory_Parent`, `DefaultDir` FROM `Directory`";
     private const string FileQuery = "SELECT `File`.`FileName`, `Component`.`Directory_` FROM `File`, `Component` WHERE `File`.`Component_` = `Component`.`Component`";
@@ -42,12 +41,20 @@ public static class UpgradeActions
         return Run(session, () => Snapshot(session).Restore());
     }
 
-    /// <summary>Restores the same snapshot after the old package has been rolled back.</summary>
+    /// <summary>Restores user files after failure or cancellation, including old-product removal failures.</summary>
     [CustomAction]
-    public static ActionResult RollbackUpgradeState(Session session)
+    public static ActionResult RestoreInterruptedUpgradeState(Session session)
     {
         session = session ?? throw new ArgumentNullException(nameof(session));
-        return Run(session, () => Snapshot(session).Restore());
+        return Run(session, () =>
+        {
+            string data = session[RestoreAction];
+            if (!string.IsNullOrEmpty(data))
+            {
+                var snapshot = new UpgradeSnapshot(new CustomActionData(data)[SnapshotDirectory]);
+                snapshot.Restore();
+            }
+        });
     }
 
     /// <summary>Deletes the backup only after the installation transaction commits successfully.</summary>
@@ -84,7 +91,6 @@ public static class UpgradeActions
             LegacyClientPaths.Skills(profile).Concat(new[] { installRoot }), packageFiles);
         var data = new CustomActionData { [SnapshotDirectory] = path };
         session[RestoreAction] = data.ToString();
-        session[RollbackAction] = data.ToString();
         session[CleanupAction] = data.ToString();
         session.Log("Preserved upgrade state at {0}. It will be retained if rollback is needed.", path);
     }
