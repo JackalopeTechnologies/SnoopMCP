@@ -11,6 +11,8 @@ $stage = Join-Path $here "stage"
 $hostProj   = Join-Path $root "src/SnoopMCP.Host/SnoopMCP.Host.csproj"
 $cliProj    = Join-Path $root "src/SnoopMCP.Cli/SnoopMCP.Cli.csproj"
 $sampleProj = Join-Path $root "samples/SampleWpfApp/SampleWpfApp.csproj"
+$actionsProj = Join-Path $root "src/SnoopMCP.InstallerActions/SnoopMCP.InstallerActions.csproj"
+$actionsDll = Join-Path $root "src/SnoopMCP.InstallerActions/bin/$Configuration/net472/SnoopMCP.InstallerActions.CA.dll"
 $hostBin    = Join-Path $root "src/SnoopMCP.Host/bin/$Configuration/net10.0-windows"
 
 if (Test-Path -LiteralPath $stage) {
@@ -54,10 +56,13 @@ if ($LASTEXITCODE -ne 0) { throw "Sample publish failed." }
 Get-ChildItem -Path $stage -Recurse -Filter "*.pdb" | Remove-Item -Force
 
 # Build the MSI.
+dotnet build $actionsProj -c $Configuration -f net472 -m:2 -nodeReuse:false
+if ($LASTEXITCODE -ne 0) { throw "Upgrade migration actions build failed." }
 $msi = Join-Path $here "SnoopMCP.msi"
 wix build (Join-Path $here "Package.wxs") `
     -d "Version=$Version" `
     -d "PublishDir=$stage" `
+    -d "UpgradeActions=$actionsDll" `
     -ext WixToolset.Util.wixext `
     -ext WixToolset.UI.wixext `
     -arch x64 `
@@ -65,5 +70,7 @@ wix build (Join-Path $here "Package.wxs") `
     -o "$msi"
 if ($LASTEXITCODE -ne 0) { throw "wix build failed." }
 if (-not (Test-Path $msi)) { throw "wix reported success but $msi was not produced." }
+& (Join-Path $here 'Test-Package.ps1') -PackagePath $msi `
+    -DtfAssemblyPath (Join-Path (Split-Path $actionsDll) 'WixToolset.Dtf.WindowsInstaller.dll')
 
 Write-Host "Built $msi (version $Version)."

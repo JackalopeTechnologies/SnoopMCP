@@ -56,6 +56,19 @@ The obsolete Codex flag is neither added nor changed if already present. Claude 
 are never edited, including approvals written by an older installer. Unregistration preserves a
 same-named connection whose URL has been replaced, and leaves the client configuration file in place.
 
+Older Windows packages run destructive cleanup even during an upgrade. The new package snapshots
+the affected client configuration and permission files, complete Claude skill folders, and non-package
+files in the installed application folder before removing the old version. It reads the old package's
+file inventory so old binaries are not restored over new ones. Files are restored after installation
+and on rollback. Future packages skip client unregistration during upgrades altogether.
+
+The transaction backup is private to the installing user under `%LOCALAPPDATA%/SnoopMCP.Upgrade`.
+A failed backup aborts before old-version removal. A successful commit removes only the backup's own
+files; rollback retains the backup for recovery. Linked paths abort migration rather than risk the
+legacy cleanup following them. Avoid editing client settings while a Windows installer upgrade is running.
+Package builds verify the actual backup/removal/restore action order. Tests simulate the old cleanup
+and rollback; these checks do not replace an installed Windows upgrade/uninstall qualification.
+
 ## Verify guidance separately from connection and inspection
 
 1. Confirm both skill files exist in the documented location. In Codex, look for `snoopmcp-first`

@@ -14,5 +14,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\SnoopMCP.ClientIntegration\SnoopMCP.ClientIntegration.csproj" />
+        <ProjectReference Include="..\..\src\SnoopMCP.InstallerActions\SnoopMCP.InstallerActions.csproj" />
     </ItemGroup>
 </Project>

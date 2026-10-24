@@ -9,7 +9,7 @@
              Scope="perUser">
 
         <MajorUpgrade DowngradeErrorMessage="A newer version of SnoopMCP is already installed."
-                      AllowSameVersionUpgrades="yes" />
+                      AllowSameVersionUpgrades="yes" Schedule="afterInstallInitialize" />
         <MediaTemplate EmbedCab="yes" />
 
         <!-- Terminate the running host before any file work so upgrade/uninstall don't hit a
@@ -56,7 +56,7 @@
                            Name="HostShortcuts" Type="integer" Value="1" KeyPath="yes" />
         </Component>
 
-        <!-- Remember the install dir so RemoveFolderEx can resolve it during uninstall. -->
+        <!-- Locate the previous installation so migration can preserve its non-package files. -->
         <Property Id="INSTALLDIRSAVED">
             <RegistrySearch Id="FindInstallDir" Root="HKCU"
                             Key="Software\JackalopeTechnologies\SnoopMCP" Name="InstallDir" Type="directory" />
@@ -68,6 +68,18 @@
             <RegistryValue Root="HKCU" Key="Software\JackalopeTechnologies\SnoopMCP"
                            Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
         </Component>
+
+        <!-- Legacy packages unregister clients and recursively remove runtime data during upgrade.
+             Snapshot before that cleanup. Restore on success and rollback, and delete only on commit. -->
+        <Binary Id="UpgradeActions" SourceFile="$(var.UpgradeActions)" />
+        <CustomAction Id="PrepareUpgradeState" BinaryRef="UpgradeActions" DllEntry="PrepareUpgradeState"
+                      Execute="immediate" Return="check" />
+        <CustomAction Id="RollbackUpgradeState" BinaryRef="UpgradeActions" DllEntry="RollbackUpgradeState"
+                      Execute="rollback" Return="check" Impersonate="yes" />
+        <CustomAction Id="RestoreUpgradeState" BinaryRef="UpgradeActions" DllEntry="RestoreUpgradeState"
+                      Execute="deferred" Return="check" Impersonate="yes" />
+        <CustomAction Id="CleanupUpgradeState" BinaryRef="UpgradeActions" DllEntry="CleanupUpgradeState"
+                      Execute="commit" Return="ignore" Impersonate="yes" />
 
         <!-- Install: create the logon task. Agent registration is offered as an opt-in checkbox on the
              finish page (see RegisterAgents below), so the installer never writes into a client's config
@@ -96,9 +108,13 @@
         </Feature>
 
         <InstallExecuteSequence>
+            <Custom Action="PrepareUpgradeState" Before="InstallInitialize" Condition="WIX_UPGRADE_DETECTED" />
+            <Custom Action="RollbackUpgradeState" Before="RemoveExistingProducts" Condition="WIX_UPGRADE_DETECTED" />
+            <Custom Action="RestoreUpgradeState" After="InstallFiles" Condition="WIX_UPGRADE_DETECTED" />
+            <Custom Action="CleanupUpgradeState" After="RestoreUpgradeState" Condition="WIX_UPGRADE_DETECTED" />
             <Custom Action="InstallAutostart" After="InstallFiles" Condition="NOT Installed OR REINSTALL" />
-            <Custom Action="UninstallAutostart" Before="UnregisterClients" Condition="REMOVE = &quot;ALL&quot;" />
-            <Custom Action="UnregisterClients" Before="RemoveFiles" Condition="REMOVE = &quot;ALL&quot;" />
+            <Custom Action="UninstallAutostart" Before="UnregisterClients" Condition="REMOVE = &quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+            <Custom Action="UnregisterClients" Before="RemoveFiles" Condition="REMOVE = &quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
         </InstallExecuteSequence>
 
         <ui:WixUI Id="WixUI_Minimal" />
