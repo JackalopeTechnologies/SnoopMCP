@@ -1,9 +1,15 @@
 param(
     [Parameter(Mandatory)][string]$PackagePath,
     [Parameter(Mandatory)][string]$DtfAssemblyPath,
-    [string]$PublishDirectory
+    [string]$PublishDirectory,
+    [string]$CustomActionConfigPath = (Join-Path $PSScriptRoot '../src/SnoopMCP.InstallerActions/CustomAction.config')
 )
 $ErrorActionPreference = 'Stop'
+[xml]$runtimeConfig = Get-Content -LiteralPath $CustomActionConfigPath -Raw
+if ($runtimeConfig.configuration.startup.useLegacyV2RuntimeActivationPolicy -ne 'true' -or
+    $runtimeConfig.configuration.startup.supportedRuntime.version -ne 'v4.0') {
+    throw 'Installer migration requires explicit CLR 4 selection and legacy runtime activation.'
+}
 Add-Type -Path $DtfAssemblyPath
 $database = [WixToolset.Dtf.WindowsInstaller.Database]::new(
     $PackagePath, [WixToolset.Dtf.WindowsInstaller.DatabaseOpenMode]::ReadOnly)
