@@ -1,0 +1,164 @@
+# Coding-client setup and recovery
+
+Use the installer finish-page registration option, the tray's **Install into** menu, or
+`SnoopMCP.Cli register-clients --detected-only`. Individual flags select specific clients; for example:
+
+```text
+SnoopMCP.Cli register-clients --codex --cursor --grok-build --gemini-cli
+```
+
+This configures clients already on this Windows computer. It does not install coding assistants or
+configure a remote worker to reach this computer. Snoop's endpoint remains local:
+`http://127.0.0.1:6300/mcp`.
+
+| Client | Connection configuration | Canonical skill discovery location |
+| --- | --- | --- |
+| Claude Code | `~/.claude.json` | `~/.claude/skills` |
+| Codex | `$CODEX_HOME/config.toml`, otherwise `~/.codex/config.toml` | `~/.agents/skills` |
+| Grok Build | `$GROK_HOME/config.toml`, otherwise `~/.grok/config.toml` | `~/.agents/skills` |
+| Cursor | `~/.cursor/mcp.json` | `~/.agents/skills` |
+| Google Gemini CLI | `~/.gemini/settings.json` | `~/.agents/skills` |
+| GitHub Copilot CLI | `$COPILOT_HOME/mcp-config.json`, otherwise `~/.copilot/mcp-config.json` | `~/.agents/skills` |
+| VS Code | `%APPDATA%/Code/User/mcp.json` | `~/.agents/skills` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` | `~/.codeium/windsurf/skills` |
+| Visual Studio 2022 | `~/.mcp.json` | Connection registration only |
+| Claude Desktop | `%APPDATA%/Claude/claude_desktop_config.json` | Connection registration only; requires Node.js for its existing bridge |
+
+`~` means the current user's home directory. The shared location is documented by
+[OpenAI](https://learn.chatgpt.com/docs/build-skills),
+[Cursor](https://cursor.com/docs/skills),
+[Google](https://geminicli.com/docs/cli/skills/),
+[GitHub](https://docs.github.com/en/copilot/concepts/customizations/agent-skills),
+[VS Code](https://code.visualstudio.com/docs/agent-customization/agent-skills), and
+[Grok Build](https://docs.x.ai/build/features/skills-plugins-marketplaces).
+[Grok's connection format](https://docs.x.ai/build/features/mcp-servers) and
+[Windsurf's skill directory](https://docs.windsurf.com/windsurf/cascade/skills) are also documented.
+Locations were checked on October 24, 2026. No older experimental Codex feature flag is needed.
+
+## Installation and ownership
+
+The application embeds `skills/snoopmcp-first/SKILL.md` and `skills/snoopmcp-uia/SKILL.md` directly
+when built. These repository files are the only maintained instruction bodies.
+
+Each managed skill has a `.snoopmcp-install.json` ownership record. Repeated registration upgrades
+unedited files and records which clients use the shared copy. Removing one client keeps the copy
+needed by the others. Upgrades record both content versions before replacement, allowing a retry
+after interruption. Concurrent registration is serialized for each skill root.
+
+Unmarked custom skills, edited managed skills, linked directories, unrelated files, and malformed
+ownership records are preserved. A conflict or write failure reports incomplete skill setup rather
+than silently claiming success. Exact known bodies from the earlier Claude installer can be adopted
+and upgraded; other unmarked files are left alone. Uninstall never recursively deletes a skill folder.
+
+Connection registration updates Snoop's URL and fills missing connection fields while retaining
+server options such as timeouts, tool filters, disabled state, headers, and approval preferences.
+The obsolete Codex flag is neither added nor changed if already present. Claude permission settings
+are never edited, including approvals written by an older installer. Unregistration preserves a
+same-named connection whose URL has been replaced, and leaves the client configuration file in place.
+
+Older Windows packages run destructive cleanup even during an upgrade. The new package snapshots
+the affected client configuration and permission files, complete Claude skill folders, and non-package
+files in the installed application folder before removing the old version. It reads the old package's
+file inventory so old binaries are not restored over new ones. Files are restored after installation
+and on rollback. Future packages skip client unregistration during upgrades altogether.
+
+The transaction backup is private to the installing user under `%LOCALAPPDATA%/SnoopMCP.Upgrade`.
+A failed backup aborts before old-version removal. A successful commit removes only the backup's own
+files; rollback retains the backup for recovery and restores the previous autostart task without
+starting it. A replacement task belonging to another executable is preserved. Linked paths abort migration rather than risk the
+legacy cleanup following them. Avoid editing client settings while a Windows installer upgrade is running.
+Package builds verify the actual backup/removal/restore action order. Tests simulate the old cleanup
+and rollback; these checks do not replace an installed Windows upgrade/uninstall qualification.
+
+## Verify guidance separately from connection and inspection
+
+1. Confirm both skill files exist in the documented location. In Codex, look for `snoopmcp-first`
+   and `snoopmcp-uia` in the skills selector, or invoke `$snoopmcp-first`. Codex normally detects
+   skill changes automatically; restart it if the changes do not appear. Preserve any deliberate
+   `[[skills.config]] enabled = false` preference.
+2. Check `/health`. Success proves host reachability, not client connection or tool discovery.
+   Check the client's Snoop connection, `/mcp` URL, enablement, allowed/disabled tool lists, and logs.
+   Refresh the connection after registration or host recovery; restart the client if necessary.
+   Grok offers `grok inspect` and `grok mcp doctor snoopmcp`; Gemini offers `gemini skills list --all`.
+3. Search the client's available tools for Snoop. Tool names may be snake_case and server-prefixed.
+   A successful `listWpfProcesses` call proves a callable connection; it is not a WPF inspection.
+4. Follow application instance rules and reuse the intended running app. Check session ownership
+   before attaching. The health response's `attached` flag does not identify the owner. Never detach
+   someone else's session or restart the host to take it over.
+5. Inspect live bindings, dependency properties, styles, templates, and DataContext with Snoop.
+   Capture a screenshot to verify appearance. General application tools remain useful where suitable.
+   Report the executed inspection separately from file/configuration checks.
+
+The interaction gate is independent of client permissions and remains under user control.
+Inspection, waits, and screenshots do not need it. Never enable it automatically or bypass it through
+another tool. An enabled gate is not blanket authorization to operate an application or hardware.
+
+## MCP discovery and package compatibility
+
+The server uses [ModelContextProtocol.AspNetCore 2.3.0](https://github.com/modelcontextprotocol/csharp-sdk/releases/tag/v2.3.0).
+It supports the newer `server/discover` exchange and retains older `initialize` clients. HTTP remains
+stateless; a new connection never implies ownership of the separate WPF inspection session.
+
+Connecting clients receive server instructions pointing to two read-only MCP resources:
+`snoopmcp://skills/snoopmcp-first` and `snoopmcp://skills/snoopmcp-uia`. These embed the same canonical
+files used by client installation. Resource-capable clients can list and read them even when they do
+not support local skill discovery. The immutable guidance carries a five-minute, private-cache hint
+for newer clients; live application inspection results are not cached by this change.
+
+Tool annotations identify inspection calls as read-only and conservatively mark attachment,
+detachment, and interaction as state-changing. These are descriptive hints. They do not grant client
+approval, transfer inspection-session ownership, or enable Snoop's interaction gate.
+
+The configuration writer uses [Tomlyn 2.10.1](https://xoofx.github.io/Tomlyn/docs/migration/), with
+explicit semantic validation before writes, comment preservation, and TOML 1.0-compatible control
+escapes. Test dependencies use xUnit 4.0.2, its Visual Studio runner 4.0.1, Microsoft.NET.Test.Sdk
+18.11.0, and Xunit.StaFact 4.0.24. The supported `xunit.v3.mtp-off` package retains this repository's
+existing `dotnet test` workflow; interactive tests remain serialized. WiX compiler, extensions, and
+installer-action packages remain at 5.0.2 by project decision; the newer WiX license was not accepted.
+
+The remaining test dependencies are serviced explicitly: Microsoft.Bcl.AsyncInterfaces 10.0.13
+across the test projects and System.Drawing.Common 10.0.13 (including SystemEvents 10.0.13) for tray
+tests. These private test references do not add dependencies to the injected payload.
+
+The external Snoop injector launcher has its own package overrides, leaving the standalone Snoop
+application and browser-demo package versions unchanged. Its build uses GitVersion.MsBuild 6.8.2,
+JetBrains.Annotations 2026.2.0, Microsoft.CodeAnalysis.CSharp/Analyzers 5.9.0, and StyleCop.Analyzers
+1.3.151-beta (continuing its existing prerelease track). Compatible transitive packages are also
+serviced, including immutable collections, reflection metadata, and encoding support at 10.0.13.
+The launcher uses [the .NET SDK's built-in Source Link support](https://github.com/dotnet/sourcelink#using-source-link-in-net-projects)
+instead of overriding it with the older package. Its .NET Framework 4.6.2 and .NET 6 target selection
+is preserved; changing build tools does not raise the target application's required framework.
+
+Protocol integration tests execute both discovery generations, list/read the canonical resources,
+check tool annotations, and prove that a disabled interaction gate rejects a tool call. These tests
+run an isolated HTTP host without attaching to a WPF application. The separate application tests
+exercise the real WPF sample. Neither replaces installed Windows upgrade/recovery qualification.
+
+## Find and recover Snoop
+
+Search Windows Start for **SnoopMCP - WPF inspection**. It starts the host through its existing
+elevated-task path when available. The host runs in the notification area; the tray menu contains
+connection setup, status, and Exit. **SnoopMCP - diagnostic logs** opens the log directory.
+
+The startup task explicitly permits unlimited runtime and battery operation. It runs the windowless
+`SnoopMCP.Recovery` launcher, which watches only the host process it starts. A nonzero host exit is
+retried up to three times at one-minute intervals; `logs/recovery.log` records each attempt and when
+the limit is reached. The launcher does not attach to a WPF target or change interaction permissions.
+An intentional tray Exit stops both processes. `SnoopMCP.Cli stop` ends the scheduled launcher before
+terminating remaining host instances and clears the unexpected-exit marker. Administrator approval
+for autostart registration is unchanged. A launcher or operating-system failure is outside this
+host-process recovery mechanism; Windows Start remains the manual recovery entry point.
+
+The scheduler's `RestartOnFailure` setting alone did not restart a terminated host in installed
+qualification. Microsoft's [scheduler protocol](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-tsch/2ff4aa5a-7bc4-449f-bbb1-27475645867f)
+describes retries of startup conditions/actions. The launcher therefore owns the process-crash retry
+budget, and the task has no additional retry policy that could multiply it.
+
+The host logs tray exits, Windows session shutdown, and fatal exceptions. An interrupted-run marker
+allows the next launch to report an unclean stop, including forced termination where no exception
+could be logged. The message does not invent a cause: consult `logs/host.log`, server logs, and Windows
+task/crash history. Logs and interaction preferences survive uninstall and reinstall.
+
+Installing/upgrading replaces the startup task with the new definition. To repair an existing task
+without replacing or stopping the host, use the updated installed `SnoopMCP.Cli install-autostart`.
+Keep the host's installed path; a build-output command should not repoint the task to temporary binaries.

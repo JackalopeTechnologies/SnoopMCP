@@ -7,21 +7,38 @@ description: Use when inspecting, diagnosing, or debugging a running WPF applica
 
 SnoopMCP injects a payload into a running .NET (x64) WPF process and answers questions about its
 live state: the visual and logical trees, dependency-property values with their precedence, bindings,
-styles, templates, and DataContext. Every tool in this skill is read-only and ungated — call them
-freely while diagnosing.
+styles, templates, and DataContext. Use Snoop for these WPF internals; general app tools remain
+useful for navigation, other application types, and screenshots. A screenshot verifies appearance;
+it cannot establish a binding's source, a property's precedence, or the live DataContext.
 
-Driving the app (click, set a value, wait, capture the window) is a separate, mutating tool family
-behind the host's interaction gate, which is **off by default** — the user enables it from the
-SnoopMCP tray menu ("Allow app interaction (driving)"). See the **snoopmcp-uia** skill.
+Inspection, waiting, and screenshots are read-only and ungated. Clicking and setting values mutate
+the target and require the host's interaction gate. Never enable it automatically or bypass it with
+another tool. See the **snoopmcp-uia** skill.
 
 ## Workflow
 
-1. `listWpfProcesses()` — pick the target by pid, window title, and bitness. Host-side; no session yet.
-2. `attach(pid)` — required before every tool below. Its response already carries the live visual
-   roots; use those ids rather than guessing, or reusing ids from an earlier session. Only one session
-   exists at a time: `attach` fails outright while another is open, so `detach()` first.
-3. Inspect (below).
-4. `detach()` when done.
+1. Read the application's instance/launch rules. Enumerate existing processes with
+   `listWpfProcesses()` and identify the requested instance by pid, title, and bitness. Reuse it;
+   do not launch a duplicate or restart it just to obtain tools.
+2. Check `http://127.0.0.1:6300/health`. Its `attached` flag does not identify the session's owner.
+   Attach only when no session is open, or reuse a session you opened in this task. Never detach
+   someone else's session. If ownership is unknown or `attach` reports an open session, stop and
+   coordinate with the user; do not recover by detaching or restarting the host.
+3. `attach(pid)` opens the inspection session and returns live visual roots. Use those ids rather
+   than guessing or reusing ids from an earlier session. Inspect with the tools below.
+4. Use `captureWindow(pid)` or an appropriate screenshot tool to verify the actual appearance.
+   Report what was inspected and what the screenshot shows separately from file/configuration checks.
+5. `detach()` only the session you opened, when your inspection is finished.
+
+## Connection diagnosis
+
+Tool names here use the server's spelling; clients may expose snake_case names with a server prefix.
+Search the client's available tools for SnoopMCP before concluding they are absent. A healthy `/health`
+response proves the host is reachable, not that the client completed connection and tool discovery.
+If tools are missing, check the configured `/mcp` URL, server enablement, tool filters, and client
+connection logs. Refresh the client's connection or restart the client after configuration changes.
+Do not change permissions, remove filters, or assume the client prefers another tool. When the host
+is stopped, use the installed SnoopMCP launcher or `SnoopMCP.Cli start`; do not kill a running host.
 
 ## Quick reference
 
@@ -71,4 +88,4 @@ and `suppressPath` to keep large result sets bounded and readable.
 - Start the SnoopMCP host (tray app) first. Endpoint: http://127.0.0.1:6300/mcp.
 - Calls run on the target's dispatcher with a 5s timeout. `DispatcherTimeout` means the app's UI thread
   was busy or blocked, not that the call was wrong: let the app settle and retry the same call once. If
-  it repeats, the UI thread is genuinely stuck — that is the bug to chase, not the tool call.
+  it repeats, investigate the busy or blocked UI thread; the timeout alone does not prove a deadlock.

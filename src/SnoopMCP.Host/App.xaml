@@ -27,6 +27,8 @@
                           CommandParameter="{x:Static ci:McpClient.VsCode}" />
                 <MenuItem Header="Codex" Command="{Binding InstallCommand}"
                           CommandParameter="{x:Static ci:McpClient.Codex}" />
+                <MenuItem Header="Grok Build" Command="{Binding InstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.GrokBuild}" />
                 <MenuItem Header="Copilot CLI" Command="{Binding InstallCommand}"
                           CommandParameter="{x:Static ci:McpClient.CopilotCli}" />
                 <MenuItem Header="Cursor" Command="{Binding InstallCommand}"
@@ -50,6 +52,8 @@
                           CommandParameter="{x:Static ci:McpClient.VsCode}" />
                 <MenuItem Header="Codex" Command="{Binding UninstallCommand}"
                           CommandParameter="{x:Static ci:McpClient.Codex}" />
+                <MenuItem Header="Grok Build" Command="{Binding UninstallCommand}"
+                          CommandParameter="{x:Static ci:McpClient.GrokBuild}" />
                 <MenuItem Header="Copilot CLI" Command="{Binding UninstallCommand}"
                           CommandParameter="{x:Static ci:McpClient.CopilotCli}" />
                 <MenuItem Header="Cursor" Command="{Binding UninstallCommand}"

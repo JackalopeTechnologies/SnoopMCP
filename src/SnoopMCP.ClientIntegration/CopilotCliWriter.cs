@@ -27,8 +27,10 @@ public sealed class CopilotCliWriter : JsonMcpServerWriter
     /// <summary>Initialises the writer against explicit paths (used by tests).</summary>
     /// <param name="configPath">Absolute path to Copilot CLI's <c>mcp-config.json</c>.</param>
     /// <param name="detectionPath">Directory whose existence means Copilot CLI is installed.</param>
-    public CopilotCliWriter(string configPath, string detectionPath)
-        : base(configPath, ServersKey, detectionPath, serverType: HttpType)
+    /// <param name="skillsDir">Skill discovery directory.</param>
+    public CopilotCliWriter(string configPath, string detectionPath, string? skillsDir = null)
+        : base(configPath, ServersKey, detectionPath, serverType: HttpType,
+            skillsDir: skillsDir ?? Path.Combine(detectionPath, SnoopSkill.SkillsDirectoryName))
     {
     }
 
@@ -44,7 +46,7 @@ public sealed class CopilotCliWriter : JsonMcpServerWriter
         string home = Environment.GetEnvironmentVariable(CopilotHomeEnvVar) is { Length: > 0 } copilotHome
             ? copilotHome
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), CopilotDirName);
-        return new CopilotCliWriter(Path.Combine(home, ConfigFileName), home);
+        return new CopilotCliWriter(Path.Combine(home, ConfigFileName), home, SnoopSkill.SharedUserDirectory);
     }
 
     /// <inheritdoc />

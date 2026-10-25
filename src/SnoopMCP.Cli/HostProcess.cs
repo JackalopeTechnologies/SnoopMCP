@@ -54,6 +54,21 @@ public static class HostProcess
     /// <summary>Stops any running host instances. Returns the count stopped.</summary>
     public static int Stop()
     {
+        // An explicit user stop must not look like a crash to the scheduler's recovery policy.
+        bool taskStopped = !AutostartTask.Exists() || AutostartTask.StopNow();
+        int stopped = -1;
+        if (taskStopped)
+        {
+            stopped = StopRemainingProcesses();
+            // Task termination cannot run WPF's OnExit. Record the explicit stop only after
+            // every host has exited so the next manual start does not claim there was a crash.
+            HostRunRecord.ForCurrentUser().Complete();
+        }
+        return stopped;
+    }
+
+    private static int StopRemainingProcesses()
+    {
         Process[] running = Process.GetProcessesByName(HostProcessName);
         int stopped = 0;
         foreach (Process process in running)

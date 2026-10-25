@@ -55,7 +55,7 @@ public sealed class UiaTools
     /// <param name="depth">The maximum depth to walk, at least 1.</param>
     /// <param name="cancellationToken">A token to observe while walking.</param>
     /// <returns>The discovered elements.</returns>
-    [McpServerTool, Description("Walk the UIA tree of a WPF process (by pid) to a bounded depth. Read-only.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Walk the UIA tree of a WPF process (by pid) to a bounded depth. Read-only.")]
     public async Task<JsonElement> GetUiaTree(
         int pid, int depth, UiaElementRef? fromElement = null, CancellationToken cancellationToken = default)
     {
@@ -84,7 +84,7 @@ public sealed class UiaTools
     /// <param name="value">The locator value to match.</param>
     /// <param name="cancellationToken">A token to observe while searching.</param>
     /// <returns>The matching elements.</returns>
-    [McpServerTool, Description(
+    [McpServerTool(ReadOnly = true, Destructive = false), Description(
         "Find UIA elements under a WPF process by locator (automationId|name|helpText|controlType). Read-only.")]
     public async Task<JsonElement> FindUiaElement(int pid, string by, string value, CancellationToken cancellationToken)
     {
@@ -113,7 +113,7 @@ public sealed class UiaTools
     /// <param name="pid">The target process id.</param>
     /// <param name="cancellationToken">A token to observe before capturing.</param>
     /// <returns>A tool result whose content is a single PNG image block.</returns>
-    [McpServerTool, Description("Capture a WPF window (by pid) as a PNG image, even if occluded. Read-only.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Capture a WPF window (by pid) as a PNG image, even if occluded. Read-only.")]
     public Task<CallToolResult> CaptureWindow(int pid, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -143,7 +143,7 @@ public sealed class UiaTools
     /// <param name="timeoutMs">The maximum time to wait, in milliseconds.</param>
     /// <param name="cancellationToken">A token to observe while polling.</param>
     /// <returns>The matching element.</returns>
-    [McpServerTool, Description("Poll until a UIA element matches the locator or the timeout elapses. Read-only.")]
+    [McpServerTool(ReadOnly = true, Destructive = false), Description("Poll until a UIA element matches the locator or the timeout elapses. Read-only.")]
     public async Task<JsonElement> WaitForUia(
         int pid, string by, string value, int timeoutMs, CancellationToken cancellationToken)
     {
@@ -173,7 +173,7 @@ public sealed class UiaTools
     /// <param name="pattern">The pattern to use (Invoke/SelectionItem/Toggle/ExpandCollapse), or null to auto-select.</param>
     /// <param name="cancellationToken">A token to observe while invoking.</param>
     /// <returns>An acknowledgement element.</returns>
-    [McpServerTool, Description(
+    [McpServerTool(ReadOnly = false, Destructive = true), Description(
         "MUTATES the target application: invokes an element's action pattern " +
         "(Invoke/SelectionItem/Toggle/ExpandCollapse). Requires the host interaction gate to be enabled. " +
         "A disabled element returns ElementNotEnabled: do not retry until it is enabled.")]
@@ -205,7 +205,7 @@ public sealed class UiaTools
     /// <param name="value">The new value.</param>
     /// <param name="cancellationToken">A token to observe while setting.</param>
     /// <returns>An acknowledgement element.</returns>
-    [McpServerTool, Description(
+    [McpServerTool(ReadOnly = false, Destructive = true), Description(
         "MUTATES the target application: sets an element's value via ValuePattern. " +
         "Requires the host interaction gate to be enabled.")]
     public async Task<JsonElement> SetUiaValue(UiaElementRef element, string value, CancellationToken cancellationToken)

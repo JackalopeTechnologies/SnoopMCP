@@ -1,0 +1,74 @@
+param(
+    [Parameter(Mandatory)][string]$PackagePath,
+    [Parameter(Mandatory)][string]$DtfAssemblyPath,
+    [string]$PublishDirectory,
+    [string]$CustomActionConfigPath = (Join-Path $PSScriptRoot '../src/SnoopMCP.InstallerActions/CustomAction.config')
+)
+$ErrorActionPreference = 'Stop'
+[xml]$runtimeConfig = Get-Content -LiteralPath $CustomActionConfigPath -Raw
+if ($runtimeConfig.configuration.startup.useLegacyV2RuntimeActivationPolicy -ne 'true' -or
+    $runtimeConfig.configuration.startup.supportedRuntime.version -ne 'v4.0') {
+    throw 'Installer migration requires explicit CLR 4 selection and legacy runtime activation.'
+}
+Add-Type -Path $DtfAssemblyPath
+$database = [WixToolset.Dtf.WindowsInstaller.Database]::new(
+    $PackagePath, [WixToolset.Dtf.WindowsInstaller.DatabaseOpenMode]::ReadOnly)
+try {
+    if ($database.ExecuteStringQuery('SELECT `Value` FROM `Property` WHERE `Property` = ''REINSTALLMODE''')[0] -ne 'amus') {
+        throw 'Package-owned injector binaries must be installed even when an older build reports a higher file version.'
+    }
+    if ($PublishDirectory) {
+        $packageVersion = $database.ExecuteStringQuery('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductVersion''')[0]
+        foreach ($relativePath in @('SnoopMCP.Host.dll', 'SnoopMCP.Server.dll', 'SnoopMCP.Cli.dll', 'SnoopMCP.Recovery.dll',
+                'SnoopMCP.ClientIntegration.dll', 'payload/SnoopMCP.Payload.dll', 'samples/SampleWpfApp.dll')) {
+            $path = Join-Path $PublishDirectory $relativePath
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing packaged assembly: $path" }
+            $reportedVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($path).ProductVersion
+            if ($reportedVersion.Split('+')[0] -ne $packageVersion) {
+                throw "Package version $packageVersion does not match $relativePath version $reportedVersion"
+            }
+        }
+        Write-Host "Packaged application versions match installer version $packageVersion."
+    }
+    $rows = $database.ExecuteQuery('SELECT `Action`, `Condition`, `Sequence` FROM `InstallExecuteSequence` ORDER BY `Sequence`')
+    $actions = @{}
+    for ($i = 0; $i -lt $rows.Count; $i += 3) {
+        $actions[$rows[$i]] = @{ Condition = $rows[$i + 1]; Sequence = [int]$rows[$i + 2] }
+    }
+    $requiredOrder = @(
+        'PrepareUpgradeState', 'InstallInitialize', 'RemoveExistingProducts',
+        'InstallFiles', 'RestoreUpgradeState', 'CleanupUpgradeState', 'InstallFinalize'
+    )
+    $previous = -1
+    foreach ($name in $requiredOrder) {
+        if (-not $actions.ContainsKey($name)) { throw "Missing installer action: $name" }
+        $current = $actions[$name].Sequence
+        if ($current -le $previous) { throw "Unsafe installer ordering at $name ($current <= $previous)" }
+        $previous = $current
+    }
+    foreach ($name in @('UninstallAutostart', 'UnregisterClients')) {
+        if ($actions[$name].Condition -notmatch 'NOT UPGRADINGPRODUCTCODE') {
+            throw "Upgrade must not unregister client state: $name"
+        }
+    }
+    foreach ($entry in $actions.GetEnumerator()) {
+        if ($entry.Value.Sequence -gt $actions.InstallInitialize.Sequence -and
+            $entry.Value.Sequence -lt $actions.RemoveExistingProducts.Sequence) {
+            throw "RemoveExistingProducts must immediately follow InstallInitialize; found $($entry.Key)"
+        }
+    }
+    foreach ($exitAction in @{ RecoverFailedUpgrade = -3; RecoverCancelledUpgrade = -2 }.GetEnumerator()) {
+        if (-not $actions.ContainsKey($exitAction.Key) -or
+            $actions[$exitAction.Key].Sequence -ne $exitAction.Value -or
+            $actions[$exitAction.Key].Condition -ne 'RestoreUpgradeState') {
+            throw "Missing upgrade exit recovery: $($exitAction.Key)"
+        }
+    }
+    $shortcuts = $database.ExecuteStringQuery('SELECT `Name` FROM `Shortcut`')
+    if (-not ($shortcuts -match 'WPF inspection')) { throw 'Host shortcut missing' }
+    if (-not ($shortcuts -match 'diagnostic logs')) { throw 'Logs shortcut missing' }
+    if ($database.Tables.Contains('Wix4RemoveFolderEx')) { throw 'Recursive runtime-data cleanup is prohibited' }
+    Write-Host 'Installer preservation order, cleanup guards, and recovery shortcuts verified.'
+} finally {
+    $database.Dispose()
+}

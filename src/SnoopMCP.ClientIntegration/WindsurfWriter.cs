@@ -21,8 +21,10 @@ public sealed class WindsurfWriter : JsonMcpServerWriter
     /// <summary>Initialises the writer against explicit paths (used by tests).</summary>
     /// <param name="configPath">Absolute path to Windsurf's <c>mcp_config.json</c>.</param>
     /// <param name="detectionPath">Directory whose existence means Windsurf is installed.</param>
-    public WindsurfWriter(string configPath, string detectionPath)
-        : base(configPath, ServersKey, detectionPath, urlKey: ServerUrlKey, emitType: false)
+    /// <param name="skillsDir">Skill discovery directory.</param>
+    public WindsurfWriter(string configPath, string detectionPath, string? skillsDir = null)
+        : base(configPath, ServersKey, detectionPath, urlKey: ServerUrlKey, emitType: false,
+            skillsDir: skillsDir ?? Path.Combine(detectionPath, SnoopSkill.SkillsDirectoryName))
     {
     }
 

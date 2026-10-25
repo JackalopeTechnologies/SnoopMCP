@@ -28,6 +28,7 @@ public static class Program
     private const string FlagClaudeCode = "--claude-code";
     private const string FlagClaudeDesktop = "--claude-desktop";
     private const string FlagCodex = "--codex";
+    private const string FlagGrokBuild = "--grok-build";
     private const string FlagCopilotCli = "--copilot-cli";
     private const string FlagCursor = "--cursor";
     private const string FlagGemini = "--gemini-cli";
@@ -44,6 +45,7 @@ public static class Program
     private const string MsgHostNotReachable = "Host: not reachable.";
     private const string MsgHostStarted = "Host started.";
     private const string MsgHostStartFailed = "Host failed to start.";
+    private const string MsgHostStopFailed = "Could not stop the scheduled host. No processes were killed; retry with administrator rights.";
 
     /// <summary>Parses the verb and dispatches; returns the process exit code.</summary>
     /// <param name="args">Command-line arguments; <c>args[0]</c> is the verb.</param>
@@ -57,7 +59,7 @@ public static class Program
             VerbUnregisterClients => Task.FromResult(UnregisterClients(args)),
             VerbInstallAutostart => Task.FromResult(InstallAutostart()),
             VerbUninstallAutostart => Task.FromResult(UninstallAutostart()),
-            VerbStatus => StatusAsync(),
+            VerbStatus => StatusAsync(args),
             VerbStart => Task.FromResult(Start()),
             VerbStop => Task.FromResult(Stop()),
             _ => Task.FromResult(PrintUsage())
@@ -65,9 +67,9 @@ public static class Program
         return await dispatched.ConfigureAwait(false);
     }
 
-    private static async Task<int> StatusAsync()
+    private static async Task<int> StatusAsync(string[] args)
     {
-        ClientRegistration.Status(SelectWriters([]), Console.Out);
+        ClientRegistration.Status(SelectWriters(args), Console.Out);
         Console.WriteLine(AutostartTask.Exists() ? MsgAutostartPresent : MsgAutostartAbsent);
         using var client = new HttpClient();
         bool healthy = await HostHealthProbe
@@ -87,8 +89,8 @@ public static class Program
     private static int Stop()
     {
         int stopped = HostProcess.Stop();
-        Console.WriteLine($"Stopped {stopped} host process(es).");
-        return ExitOk;
+        Console.WriteLine(stopped >= 0 ? $"Stopped {stopped} remaining host process(es)." : MsgHostStopFailed);
+        return stopped >= 0 ? ExitOk : ExitFailure;
     }
 
     private static int PrintUsage()
@@ -97,7 +99,7 @@ public static class Program
             "Usage: SnoopMCP.Cli <register-clients|unregister-clients|install-autostart|"
             + "uninstall-autostart|status|start|stop> [--claude-code] [--claude-desktop] "
             + "[--vscode] [--codex] [--copilot-cli] [--cursor] [--gemini-cli] [--windsurf] "
-            + "[--visual-studio] [--detected-only]");
+            + "[--visual-studio] [--grok-build] [--detected-only]");
         return ExitUsage;
     }
 
@@ -121,6 +123,7 @@ public static class Program
         (FlagClaudeDesktop, McpClient.ClaudeDesktop),
         (FlagVsCode, McpClient.VsCode),
         (FlagCodex, McpClient.Codex),
+        (FlagGrokBuild, McpClient.GrokBuild),
         (FlagCopilotCli, McpClient.CopilotCli),
         (FlagCursor, McpClient.Cursor),
         (FlagGemini, McpClient.GeminiCli),

@@ -25,10 +25,10 @@ public sealed class ProgramArgsTests
     }
 
     [Fact]
-    public void SelectClients_NoFlags_ReturnsAllNine()
+    public void SelectClients_NoFlags_ReturnsAllSupportedClients()
     {
         IReadOnlyList<McpClient> clients = Program.SelectClients([]);
-        Assert.Equal(9, clients.Count);
+        Assert.Equal(Enum.GetValues<McpClient>().Length, clients.Count);
     }
 
     [Fact]
@@ -54,5 +54,12 @@ public sealed class ProgramArgsTests
         IReadOnlyList<McpClient> clients = Program.SelectClients(["--visual-studio"]);
         Assert.Single(clients);
         Assert.Equal(McpClient.VisualStudio2022, clients[0]);
+    }
+
+    [Fact]
+    public void SelectClients_GrokBuildFlag_SelectsGrok()
+    {
+        IReadOnlyList<McpClient> clients = Program.SelectClients(["--grok-build"]);
+        Assert.Equal(McpClient.GrokBuild, Assert.Single(clients));
     }
 }

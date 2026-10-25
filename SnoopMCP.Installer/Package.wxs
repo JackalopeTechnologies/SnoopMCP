@@ -9,16 +9,21 @@
              Scope="perUser">
 
         <MajorUpgrade DowngradeErrorMessage="A newer version of SnoopMCP is already installed."
-                      AllowSameVersionUpgrades="yes" />
+                      AllowSameVersionUpgrades="yes" Schedule="afterInstallInitialize" />
         <MediaTemplate EmbedCab="yes" />
 
         <!-- Terminate the running host before any file work so upgrade/uninstall don't hit a
              locked SnoopMCP.Host.exe (the logon task keeps it running between installs). The host
              is windowless, so a hard terminate is required. -->
+        <util:CloseApplication Id="CloseRecovery" Target="SnoopMCP.Recovery.exe"
+                               TerminateProcess="0" RebootPrompt="no" Sequence="1" />
         <util:CloseApplication Id="CloseHost" Target="SnoopMCP.Host.exe"
-                               TerminateProcess="0" RebootPrompt="no" />
+                               TerminateProcess="0" RebootPrompt="no" Sequence="2" />
 
         <Property Id="MsiLogging" Value="voicewarmupx!" />
+        <!-- Injector builds can have independent GitVersion values. Install the selected package's
+             owned binaries even when the prior injector reported a higher file version. -->
+        <Property Id="REINSTALLMODE" Value="amus" />
 
         <StandardDirectory Id="LocalAppDataFolder">
             <Directory Id="INSTALLFOLDER" Name="SnoopMCP" />
@@ -44,20 +49,44 @@
                            Name="installed" Type="integer" Value="1" KeyPath="yes" />
         </Component>
 
-        <!-- Remember the install dir so RemoveFolderEx can resolve it during uninstall. -->
+        <Component Id="HostShortcuts" Directory="AppShortcutFolder" Guid="*">
+            <Shortcut Id="HostStartMenuShortcut" Name="SnoopMCP - WPF inspection"
+                      Description="Start SnoopMCP so coding assistants can inspect WPF apps. Runs in the notification area."
+                      Target="[INSTALLFOLDER]SnoopMCP.Host.exe"
+                      WorkingDirectory="INSTALLFOLDER" />
+            <Shortcut Id="HostLogsShortcut" Name="SnoopMCP - diagnostic logs"
+                      Description="Open SnoopMCP startup, shutdown, crash, and server diagnostics."
+                      Target="[INSTALLFOLDER]logs" WorkingDirectory="INSTALLFOLDER" />
+            <RegistryValue Root="HKCU" Key="Software\JackalopeTechnologies\SnoopMCP"
+                           Name="HostShortcuts" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+
+        <!-- Locate the previous installation so migration can preserve its non-package files. -->
         <Property Id="INSTALLDIRSAVED">
             <RegistrySearch Id="FindInstallDir" Root="HKCU"
                             Key="Software\JackalopeTechnologies\SnoopMCP" Name="InstallDir" Type="directory" />
         </Property>
 
-        <!-- Remove the whole install folder on uninstall, including runtime-created files such as
-             logs\ that MSI never tracked (the install folder is %LOCALAPPDATA%\SnoopMCP). -->
+        <!-- Keep runtime logs, user preferences, and user-added files. MSI removes only its own files. -->
         <Component Id="CleanupInstallFolder" Directory="INSTALLFOLDER"
                    Guid="7C1A2B3D-4E5F-4061-8A9B-0C1D2E3F4A5B">
             <RegistryValue Root="HKCU" Key="Software\JackalopeTechnologies\SnoopMCP"
                            Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
-            <util:RemoveFolderEx On="uninstall" Property="INSTALLDIRSAVED" />
         </Component>
+
+        <!-- Legacy packages unregister clients and recursively remove runtime data during upgrade.
+             Snapshot before that cleanup. Restore on success and rollback, and delete only on commit. -->
+        <Binary Id="UpgradeActions" SourceFile="$(var.UpgradeActions)" />
+        <CustomAction Id="PrepareUpgradeState" BinaryRef="UpgradeActions" DllEntry="PrepareUpgradeState"
+                      Execute="immediate" Return="check" />
+        <CustomAction Id="RecoverFailedUpgrade" BinaryRef="UpgradeActions" DllEntry="RestoreInterruptedUpgradeState"
+                      Execute="immediate" Return="check" />
+        <CustomAction Id="RecoverCancelledUpgrade" BinaryRef="UpgradeActions" DllEntry="RestoreInterruptedUpgradeState"
+                      Execute="immediate" Return="check" />
+        <CustomAction Id="RestoreUpgradeState" BinaryRef="UpgradeActions" DllEntry="RestoreUpgradeState"
+                      Execute="deferred" Return="check" Impersonate="yes" />
+        <CustomAction Id="CleanupUpgradeState" BinaryRef="UpgradeActions" DllEntry="CleanupUpgradeState"
+                      Execute="commit" Return="ignore" Impersonate="yes" />
 
         <!-- Install: create the logon task. Agent registration is offered as an opt-in checkbox on the
              finish page (see RegisterAgents below), so the installer never writes into a client's config
@@ -81,13 +110,21 @@
         <Feature Id="Main" Title="SnoopMCP" Level="1">
             <ComponentGroupRef Id="PublishOutput" />
             <ComponentRef Id="SampleShortcut" />
+            <ComponentRef Id="HostShortcuts" />
             <ComponentRef Id="CleanupInstallFolder" />
         </Feature>
 
         <InstallExecuteSequence>
+            <Custom Action="PrepareUpgradeState" Before="InstallInitialize" Condition="WIX_UPGRADE_DETECTED" />
+            <!-- No script-generating action may precede RemoveExistingProducts after InstallInitialize.
+                 Exit recovery also covers a failure during old-product removal, after MSI rollback. -->
+            <Custom Action="RecoverFailedUpgrade" OnExit="error" Condition="RestoreUpgradeState" />
+            <Custom Action="RecoverCancelledUpgrade" OnExit="cancel" Condition="RestoreUpgradeState" />
+            <Custom Action="RestoreUpgradeState" After="InstallFiles" Condition="WIX_UPGRADE_DETECTED" />
+            <Custom Action="CleanupUpgradeState" After="RestoreUpgradeState" Condition="WIX_UPGRADE_DETECTED" />
             <Custom Action="InstallAutostart" After="InstallFiles" Condition="NOT Installed OR REINSTALL" />
-            <Custom Action="UninstallAutostart" Before="UnregisterClients" Condition="REMOVE = &quot;ALL&quot;" />
-            <Custom Action="UnregisterClients" Before="RemoveFiles" Condition="REMOVE = &quot;ALL&quot;" />
+            <Custom Action="UninstallAutostart" Before="UnregisterClients" Condition="REMOVE = &quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+            <Custom Action="UnregisterClients" Before="RemoveFiles" Condition="REMOVE = &quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
         </InstallExecuteSequence>
 
         <ui:WixUI Id="WixUI_Minimal" />
