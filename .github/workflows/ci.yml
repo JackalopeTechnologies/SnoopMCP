@@ -41,9 +41,46 @@ jobs:
         # -nodeReuse:false: never adopt a persistent MSBuild node whose duplicate-cased PATH
         # otherwise crashes the nested native (CL.exe) build. TreatWarningsAsErrors is on via
         # Directory.Build.props.
-        run: dotnet build SnoopMCP.sln -nodeReuse:false
+        run: dotnet build SnoopMCP.sln -m:2 -nodeReuse:false
 
       - name: Test
         # Excludes the injection end-to-end test, which needs a live GUI target + injection and is
         # not reliable on a CI runner.
-        run: dotnet test SnoopMCP.sln --no-build -c Debug --filter "FullyQualifiedName!~EndToEndTests"
+        run: dotnet test SnoopMCP.sln --no-build -c Debug -m:2 --filter "FullyQualifiedName!~EndToEndTests" -- xUnit.MaxParallelThreads=4
+
+  installer-qualification:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          lfs: true
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Prepare installer tools
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          if ($LASTEXITCODE -ne 0) { throw 'WiX installation failed.' }
+          wix extension add -g WixToolset.Util.wixext/5.0.2
+          if ($LASTEXITCODE -ne 0) { throw 'WiX Util extension installation failed.' }
+          wix extension add -g WixToolset.UI.wixext/5.0.2
+          if ($LASTEXITCODE -ne 0) { throw 'WiX UI extension installation failed.' }
+      - name: Build candidate MSI
+        shell: pwsh
+        env:
+          DisableGitVersionTask: 'true'
+        run: ./SnoopMCP.Installer/build-installer.ps1 -Version 1.4.3 -Configuration Release
+      - name: Verify installed scheduled host
+        shell: pwsh
+        run: ./SnoopMCP.Installer/Test-InstalledHost.ps1 -PackagePath ./SnoopMCP.Installer/SnoopMCP.msi -EvidenceDirectory ./artifacts/installer-qualification
+      - name: Retain qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: installer-qualification
+          path: artifacts/installer-qualification
+          if-no-files-found: error
