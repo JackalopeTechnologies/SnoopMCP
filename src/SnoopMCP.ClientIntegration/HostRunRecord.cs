@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 // Licensed under the MIT License. See LICENSE in the repository root.
 
-namespace SnoopMCP.Host;
+namespace SnoopMCP.ClientIntegration;
 
 using System.Globalization;
 using System.IO;
@@ -11,7 +11,15 @@ using System.IO;
 /// <summary>Distinguishes a clean host exit from termination that could not run shutdown logging.</summary>
 public sealed class HostRunRecord
 {
+    private const string AppFolderName = "SnoopMCP";
+    private const string LogsFolderName = "logs";
+    private const string RunRecordName = "host-running.txt";
     private readonly string mPath;
+
+    /// <summary>The lifecycle record shared by the tray host and explicit CLI stop.</summary>
+    public static HostRunRecord ForCurrentUser() => new(Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        AppFolderName, LogsFolderName, RunRecordName));
 
     /// <summary>Creates a lifecycle record at an explicit path.</summary>
     public HostRunRecord(string path)

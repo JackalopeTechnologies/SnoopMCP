@@ -13,6 +13,7 @@ $repository = Split-Path $PSScriptRoot
 $installedRoot = Join-Path $env:LOCALAPPDATA 'SnoopMCP'
 $profileRoot = [Environment]::GetFolderPath('UserProfile')
 $roamingRoot = [Environment]::GetFolderPath('ApplicationData')
+$shortcutRoot = Join-Path ([Environment]::GetFolderPath('Programs')) 'SnoopMCP'
 $cli = Join-Path $installedRoot 'SnoopMCP.Cli.exe'
 $jsonFiles = @('.claude.json','.cursor/mcp.json','.gemini/settings.json','.copilot/mcp-config.json',
     '.codeium/windsurf/mcp_config.json','.mcp.json') | ForEach-Object { Join-Path $profileRoot $_ }
@@ -21,7 +22,7 @@ $tomlFiles = @('.codex/config.toml','.grok/config.toml') | ForEach-Object { Join
 $permissionPath = Join-Path $profileRoot '.claude/settings.json'
 $skillRoots = @('.claude/skills','.agents/skills','.codeium/windsurf/skills') | ForEach-Object { Join-Path $profileRoot $_ }
 $ownedFiles = @($jsonFiles) + @($tomlFiles) + @($permissionPath)
-$ownedDirectories = @($installedRoot)
+$ownedDirectories = @($installedRoot,$shortcutRoot)
 foreach ($root in $skillRoots) {
     $ownedDirectories += @('snoopmcp-first','snoopmcp-uia','qualification-unrelated') | ForEach-Object { Join-Path $root $_ }
 }
@@ -127,6 +128,7 @@ function Customize-InstalledState {
     Write-Fixture (Join-Path $installedRoot 'interaction-gate.json') '{"Enabled":false}'
     Write-Fixture (Join-Path $installedRoot 'personal.txt') 'Non-package runtime-folder file.'
     Write-Fixture (Join-Path $installedRoot 'logs/personal-history.log') 'Historical diagnostics.'
+    Write-Fixture (Join-Path $shortcutRoot 'personal.txt') 'Personal Start menu note.'
 }
 function Reset-OwnedFixtures {
     foreach ($path in $ownedFiles) { if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force } }
@@ -155,8 +157,11 @@ function New-FaultPackage([string]$source, [string]$target, [string]$entryPoint,
         $sequence += $(if ($anchor -eq 'InstallFinalize') { -1 } else { 1 })
         $db.Execute("INSERT INTO ``CustomAction`` (``Action``, ``Type``, ``Source``, ``Target``) VALUES ('QualificationFault', $type, 'QualificationFaults', '$entryPoint')")
         $db.Execute("INSERT INTO ``InstallExecuteSequence`` (``Action``, ``Condition``, ``Sequence``) VALUES ('QualificationFault', '$condition', $sequence)")
-        $db.SummaryInfo.RevisionNumber = '{' + [Guid]::NewGuid().ToString().ToUpperInvariant() + '}'
-        $db.SummaryInfo.Persist()
+        $summary = $db.SummaryInfo
+        try {
+            $summary.RevisionNumber = '{' + [Guid]::NewGuid().ToString().ToUpperInvariant() + '}'
+            $summary.Persist()
+        } finally { $summary.Dispose() }
         $db.Commit()
     } finally { $db.Dispose() }
 }
@@ -191,6 +196,9 @@ public static class QualificationFaults
     Invoke-Registration
     Assert-Preferences
     Assert-CanonicalSkills
+    foreach ($name in @('SnoopMCP - WPF inspection','SnoopMCP - diagnostic logs','SnoopMCP Sample App')) {
+        Assert-True (Test-Path (Join-Path $shortcutRoot ($name + '.lnk'))) "Missing Start menu entry: $name"
+    }
     $registered = Get-StateHashes
     Invoke-Registration
     Assert-Hashes $registered
@@ -206,6 +214,8 @@ public static class QualificationFaults
     Assert-Preferences
     Assert-True (-not (Test-Path (Join-Path $installedRoot 'SnoopMCP.Host.exe'))) 'Owned executable survived uninstall.'
     Assert-True (-not (Get-ScheduledTask -TaskName 'SnoopMCP Host' -ErrorAction SilentlyContinue)) 'Owned task survived uninstall.'
+    Assert-True (@(Get-ChildItem $shortcutRoot -Filter '*.lnk').Count -eq 0) 'Owned Start menu shortcuts survived uninstall.'
+    Assert-True ([IO.File]::ReadAllText((Join-Path $shortcutRoot 'personal.txt')) -eq 'Personal Start menu note.') 'Personal Start menu content was deleted.'
     foreach ($root in $skillRoots) {
         Assert-True ([IO.File]::ReadAllText((Join-Path $root 'snoopmcp-first/SKILL.md')) -eq 'User-edited Snoop inspection guidance.') 'Edited skill was deleted.'
         Assert-True (-not (Test-Path (Join-Path $root 'snoopmcp-uia/SKILL.md'))) 'Owned unedited skill survived uninstall.'

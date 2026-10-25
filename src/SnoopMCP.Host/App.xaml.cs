@@ -27,7 +27,6 @@ public partial class App
     private const string TrayIconResourceKey = "TrayIcon";
     private const string AppTitle = "SnoopMCP";
     private const string AlreadyRunningMessage = "SnoopMCP is already running — check the system tray.";
-    private const string RunRecordName = "host-running.txt";
     private const string RecoveryTitle = "SnoopMCP — WPF inspection restored";
     private const string RecoveryMessage = "The previous run ended unexpectedly. Open SnoopMCP - diagnostic logs from Start for details. Refresh your coding assistant's connection if needed.";
 
@@ -119,7 +118,7 @@ public partial class App
     {
         try
         {
-            mRunRecord = new HostRunRecord(Path.Combine(HostLog.DirectoryPath, RunRecordName));
+            mRunRecord = HostRunRecord.ForCurrentUser();
             if (mRunRecord.Begin())
             {
                 HostLog.Info("Previous host run ended without a clean shutdown. Cause unknown; check crash/task history.");

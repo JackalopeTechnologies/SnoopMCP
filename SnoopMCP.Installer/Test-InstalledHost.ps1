@@ -88,6 +88,7 @@ try {
     & $cli stop
     if ($LASTEXITCODE -ne 0) { throw 'Installed CLI could not stop its scheduled host.' }
     Assert-StaysStopped 'CLI stop'
+    if (Test-Path (Join-Path $installedRoot 'logs/host-running.txt')) { throw 'An intentional CLI stop left a false crash marker.' }
 
     # Test-only runtime hook invokes the installed tray's actual ExitCommand on its WPF dispatcher.
     # It changes no task settings, server code, interaction permission, or inspection session.

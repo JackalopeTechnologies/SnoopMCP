@@ -5,7 +5,7 @@
 
 namespace SnoopMCP.Host.Tests;
 
-using Host;
+using ClientIntegration;
 using Xunit;
 
 public sealed class HostRunRecordTests : IDisposable

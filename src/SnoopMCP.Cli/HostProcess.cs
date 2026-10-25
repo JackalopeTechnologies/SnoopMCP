@@ -60,6 +60,9 @@ public static class HostProcess
         if (taskStopped)
         {
             stopped = StopRemainingProcesses();
+            // Task termination cannot run WPF's OnExit. Record the explicit stop only after
+            // every host has exited so the next manual start does not claim there was a crash.
+            HostRunRecord.ForCurrentUser().Complete();
         }
         return stopped;
     }
