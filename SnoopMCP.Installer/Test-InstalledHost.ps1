@@ -26,11 +26,15 @@ function Wait-Healthy([int]$previousId = 0) {
     while ([DateTime]::UtcNow -lt $deadline) {
         $hostProcess = Get-Process -Name SnoopMCP.Host -ErrorAction SilentlyContinue
         if ($hostProcess -and $hostProcess.Id -ne $previousId) {
+            $health = $null
             try {
                 $health = Invoke-RestMethod 'http://127.0.0.1:6300/health' -TimeoutSec 2
+            } catch { }
+            if ($health) {
                 if ($health.attached -or $health.interactionEnabled) { throw 'Qualification requires an unattached host with interaction disabled.' }
+                $null = $hostProcess.Handle
                 return @{ Health=$health; Process=$hostProcess }
-            } catch [System.Net.Http.HttpRequestException] { }
+            }
         }
         Start-Sleep -Milliseconds 500
     }
@@ -160,7 +164,9 @@ public static class StartupHook
     $result.Error = $_.Exception.Message
     throw
 } finally {
-    Get-ScheduledTaskInfo -TaskName 'SnoopMCP Host' -ErrorAction SilentlyContinue | ConvertTo-Json | Set-Content (Join-Path $EvidenceDirectory 'final-task.json')
+    Get-ScheduledTaskInfo -TaskName 'SnoopMCP Host' -ErrorAction SilentlyContinue |
+        Select-Object TaskName,LastRunTime,LastTaskResult,NumberOfMissedRuns |
+        ConvertTo-Json | Set-Content (Join-Path $EvidenceDirectory 'final-task.json')
     $events | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $EvidenceDirectory 'host-events.json')
     Get-ChildItem $installedRoot -Filter 'qualification-exit.*' -ErrorAction SilentlyContinue | Copy-Item -Destination $EvidenceDirectory
     if (Test-Path (Join-Path $installedRoot 'logs')) {

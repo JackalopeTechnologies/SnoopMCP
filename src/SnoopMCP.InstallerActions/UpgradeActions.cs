@@ -7,8 +7,14 @@ namespace SnoopMCP.InstallerActions;
 
 using System.IO;
 using WixToolset.Dtf.WindowsInstaller;
+#if NET
+using System.Runtime.Versioning;
+#endif
 
 /// <summary>Installer transaction hooks protecting files from the legacy uninstaller.</summary>
+#if NET
+[SupportedOSPlatform("windows")]
+#endif
 public static class UpgradeActions
 {
     private const string RelatedProducts = "WIX_UPGRADE_DETECTED";
@@ -21,6 +27,7 @@ public static class UpgradeActions
     private const string DirectoryQuery = "SELECT `Directory`, `Directory_Parent`, `DefaultDir` FROM `Directory`";
     private const string FileQuery = "SELECT `File`.`FileName`, `Component`.`Directory_` FROM `File`, `Component` WHERE `File`.`Component_` = `Component`.`Component`";
     private const string RootDirectoryName = ".";
+    private const string HostExecutableName = "SnoopMCP.Host.exe";
     private static readonly char[] smProductSeparator = [';'];
     private static readonly char[] smSourceSeparator = [':'];
     private static readonly char[] smLongNameSeparator = ['|'];
@@ -51,8 +58,10 @@ public static class UpgradeActions
             string data = session[RestoreAction];
             if (!string.IsNullOrEmpty(data))
             {
-                var snapshot = new UpgradeSnapshot(new CustomActionData(data)[SnapshotDirectory]);
+                string path = new CustomActionData(data)[SnapshotDirectory];
+                var snapshot = new UpgradeSnapshot(path);
                 snapshot.Restore();
+                new UpgradeTaskSnapshot(path).Restore(InstallerTaskStore.Read, InstallerTaskStore.Write, InstallerTaskStore.Remove);
             }
         });
     }
@@ -62,7 +71,11 @@ public static class UpgradeActions
     public static ActionResult CleanupUpgradeState(Session session)
     {
         session = session ?? throw new ArgumentNullException(nameof(session));
-        return Run(session, () => Snapshot(session).Delete());
+        return Run(session, () =>
+        {
+            new UpgradeTaskSnapshot(session.CustomActionData[SnapshotDirectory]).Delete();
+            Snapshot(session).Delete();
+        });
     }
 
     private static UpgradeSnapshot Snapshot(Session session)
@@ -89,6 +102,7 @@ public static class UpgradeActions
         var snapshot = new UpgradeSnapshot(path);
         snapshot.Capture(LegacyClientPaths.Configurations(profile, roaming),
             LegacyClientPaths.Skills(profile).Concat(new[] { installRoot }), packageFiles);
+        new UpgradeTaskSnapshot(path).Capture(Path.Combine(installRoot, HostExecutableName), InstallerTaskStore.Read);
         var data = new CustomActionData { [SnapshotDirectory] = path };
         session[RestoreAction] = data.ToString();
         session[CleanupAction] = data.ToString();

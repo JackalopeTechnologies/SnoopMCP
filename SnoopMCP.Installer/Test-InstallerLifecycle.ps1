@@ -246,6 +246,7 @@ public static class QualificationFaults
         Invoke-Msi $oldPackage '/i' "$scenario-old-install" | Out-Null
         Invoke-Registration
         Customize-InstalledState
+        Set-ScheduledTask -TaskName 'SnoopMCP Host' -Description 'Qualification legacy task settings.' | Out-Null
         $before = Get-StateHashes
         $oldBinary = (Get-FileHash (Join-Path $installedRoot 'SnoopMCP.Server.dll')).Hash
         if ($scenario -eq 'upgrade') {
@@ -262,6 +263,7 @@ public static class QualificationFaults
             Assert-Hashes $before
             Assert-True ((Get-FileHash (Join-Path $installedRoot 'SnoopMCP.Server.dll')).Hash -eq $oldBinary) 'Rollback did not restore old application binaries.'
             Assert-True ([bool](Get-ScheduledTask -TaskName 'SnoopMCP Host' -ErrorAction SilentlyContinue)) 'Rollback did not restore the previous autostart task.'
+            Assert-True ((Get-ScheduledTask -TaskName 'SnoopMCP Host').Description -eq 'Qualification legacy task settings.') 'Rollback did not preserve previous task settings.'
             $backupRoot = Join-Path $env:LOCALAPPDATA 'SnoopMCP.Upgrade'
             Assert-True (@(Get-ChildItem $backupRoot -Filter 'manifest.xml' -File -Recurse).Count -gt 0) 'Interrupted upgrade did not retain a recovery snapshot.'
             $logText = Get-Content (Join-Path $EvidenceDirectory "$scenario.msi.log") -Raw
