@@ -29,6 +29,7 @@ internal static class InstallerTaskStore
     private const string TaskName = "SnoopMCP Host";
     private const int NotFound = unchecked((int) 0x80070002);
     private const int CreateOrUpdate = 6;
+    private const int IgnoreRegistrationTriggers = 0x20;
     private const int InteractiveToken = 3;
 
     internal static string? Read()
@@ -62,7 +63,7 @@ internal static class InstallerTaskStore
     internal static void Write(string xml)
     {
         xml = xml ?? throw new ArgumentNullException(nameof(xml));
-        WithFolder(folder => Release(Invoke(folder, RegisterMethod, TaskName, xml, CreateOrUpdate,
+        WithFolder(folder => Release(Invoke(folder, RegisterMethod, TaskName, xml, CreateOrUpdate | IgnoreRegistrationTriggers,
             null, null, InteractiveToken, null)));
     }
 

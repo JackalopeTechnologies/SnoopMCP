@@ -20,17 +20,21 @@ public sealed class UpgradeTaskSnapshotTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
-    public void Rollback_RestoresExactPriorTaskWithoutStartingIt()
+    [Theory]
+    [InlineData("SnoopMCP.Host.exe")]
+    [InlineData("SnoopMCP.Recovery.exe")]
+    public void Rollback_RestoresExactPriorTaskWithoutStartingIt(string taskExecutable)
     {
+        ArgumentException.ThrowIfNullOrEmpty(taskExecutable);
         string host = Path.Combine(mRoot, "SnoopMCP.Host.exe");
-        string original = TaskXml(host, enabled: false);
+        string target = Path.Combine(mRoot, taskExecutable);
+        string original = TaskXml(target, enabled: false);
         var backup = new UpgradeTaskSnapshot(mRoot);
         backup.Capture(host, () => original);
         string? current = null;
         backup.Restore(() => current, xml => current = xml, () => throw new InvalidOperationException());
         Assert.Equal(original, current);
-        current = TaskXml(host, enabled: true);
+        current = TaskXml(target, enabled: true);
         backup.Restore(() => current, xml => current = xml, () => throw new InvalidOperationException());
         Assert.Equal(original, current);
         Assert.True(File.Exists(Path.Combine(mRoot, "autostart.xml")));
