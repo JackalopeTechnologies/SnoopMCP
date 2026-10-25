@@ -45,7 +45,12 @@ function Wait-Healthy([int]$previousId = 0) {
 function Assert-StaysStopped([string]$reason) {
     $deadline = [DateTime]::UtcNow.AddSeconds(80)
     while ([DateTime]::UtcNow -lt $deadline) {
-        if (Get-Process -Name SnoopMCP.Host -ErrorAction SilentlyContinue) { throw "$reason unexpectedly restarted the host." }
+        $remaining = @(Get-Process -Name SnoopMCP.Host -ErrorAction SilentlyContinue)
+        if ($remaining.Count -gt 0) {
+            $events.Add(@{ Event='Unexpected host'; Reason=$reason; Time=[DateTime]::UtcNow;
+                Processes=@($remaining | Select-Object Id,HasExited,StartTime) })
+            throw "$reason unexpectedly restarted the host."
+        }
         Start-Sleep -Seconds 1
     }
     if (Get-Process -Name SnoopMCP.Recovery -ErrorAction SilentlyContinue) { throw "$reason left its recovery launcher running." }
@@ -82,6 +87,7 @@ try {
         Stop-Process -Id $previousId -Force
         $running.Process.WaitForExit()
         $events.Add(@{ Event='Crash'; Attempt=$attempt; Process=$previousId; Time=[DateTime]::UtcNow })
+        $running.Process.Dispose()
         if ($attempt -le 3) {
             $running = Wait-Healthy $previousId
             $events.Add(@{ Event='Recovered'; Attempt=$attempt; Process=$running.Process.Id; Time=[DateTime]::UtcNow })
@@ -95,6 +101,8 @@ try {
     $running = Wait-Healthy
     & $cli stop
     if ($LASTEXITCODE -ne 0) { throw 'Installed CLI could not stop its scheduled host.' }
+    if (-not $running.Process.HasExited) { throw 'CLI stop returned before the original host exited.' }
+    $running.Process.Dispose()
     Assert-StaysStopped 'CLI stop'
     if (Test-Path (Join-Path $installedRoot 'logs/host-running.txt')) { throw 'An intentional CLI stop left a false crash marker.' }
 
@@ -155,6 +163,7 @@ public static class StartupHook
     if ($running.Process.ExitCode -ne 0 -or -not (Test-Path (Join-Path $installedRoot 'qualification-exit.executed')) -or
         (Test-Path (Join-Path $installedRoot 'qualification-exit.error')) -or
         (Test-Path (Join-Path $installedRoot 'logs/host-running.txt'))) { throw 'Tray Exit did not complete a clean shutdown.' }
+    $running.Process.Dispose()
     Assert-StaysStopped 'Tray Exit command'
     [IO.File]::WriteAllBytes($runtimePath,$originalRuntime)
     $taskResult = (Get-ScheduledTaskInfo -TaskName 'SnoopMCP Host').LastTaskResult
