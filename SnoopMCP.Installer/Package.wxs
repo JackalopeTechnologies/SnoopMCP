@@ -21,6 +21,9 @@
                                TerminateProcess="0" RebootPrompt="no" Sequence="2" />
 
         <Property Id="MsiLogging" Value="voicewarmupx!" />
+        <!-- Injector builds can have independent GitVersion values. Install the selected package's
+             owned binaries even when the prior injector reported a higher file version. -->
+        <Property Id="REINSTALLMODE" Value="amus" />
 
         <StandardDirectory Id="LocalAppDataFolder">
             <Directory Id="INSTALLFOLDER" Name="SnoopMCP" />

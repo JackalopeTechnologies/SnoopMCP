@@ -14,6 +14,9 @@ Add-Type -Path $DtfAssemblyPath
 $database = [WixToolset.Dtf.WindowsInstaller.Database]::new(
     $PackagePath, [WixToolset.Dtf.WindowsInstaller.DatabaseOpenMode]::ReadOnly)
 try {
+    if ($database.ExecuteStringQuery('SELECT `Value` FROM `Property` WHERE `Property` = ''REINSTALLMODE''')[0] -ne 'amus') {
+        throw 'Package-owned injector binaries must be installed even when an older build reports a higher file version.'
+    }
     if ($PublishDirectory) {
         $packageVersion = $database.ExecuteStringQuery('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductVersion''')[0]
         foreach ($relativePath in @('SnoopMCP.Host.dll', 'SnoopMCP.Server.dll', 'SnoopMCP.Cli.dll', 'SnoopMCP.Recovery.dll',
