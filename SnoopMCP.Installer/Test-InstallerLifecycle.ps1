@@ -168,6 +168,12 @@ function New-FaultPackage([string]$source, [string]$target, [string]$entryPoint,
 try {
     $dtf = Join-Path $repository 'src/SnoopMCP.InstallerActions/bin/Release/net472/WixToolset.Dtf.WindowsInstaller.dll'
     Add-Type -Path $dtf
+    $candidate = [WixToolset.Dtf.WindowsInstaller.Database]::new($PackagePath,[WixToolset.Dtf.WindowsInstaller.DatabaseOpenMode]::ReadOnly)
+    try {
+        @{ SourceCommit=(git -C $repository rev-parse HEAD); PackageSha256=(Get-FileHash -LiteralPath $PackagePath).Hash;
+           Version=$candidate.ExecuteStringQuery('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductVersion''')[0] } |
+            ConvertTo-Json | Set-Content (Join-Path $EvidenceDirectory 'candidate.json')
+    } finally { $candidate.Dispose() }
     $legacy = Join-Path $EvidenceDirectory 'SnoopMCP-1.4.2.msi'
     Invoke-WebRequest 'https://github.com/JackalopeTechnologies/SnoopMCP/releases/download/v1.4.2/SnoopMCP-1.4.2.msi' -OutFile $legacy
     Assert-True ((Get-FileHash $legacy).Hash -eq '4776DF42B57E8003E85CEC058335B09B76C5CDF8A3D366AC2868F4AC01470C0A') 'Published legacy installer hash mismatch.'
@@ -213,6 +219,7 @@ public static class QualificationFaults
     Invoke-Msi $PackagePath '/x' 'owned-uninstall' | Out-Null
     Assert-Preferences
     Assert-True (-not (Test-Path (Join-Path $installedRoot 'SnoopMCP.Host.exe'))) 'Owned executable survived uninstall.'
+    Assert-True (-not (Test-Path (Join-Path $installedRoot 'SnoopMCP.Recovery.exe'))) 'Owned recovery launcher survived uninstall.'
     Assert-True (-not (Get-ScheduledTask -TaskName 'SnoopMCP Host' -ErrorAction SilentlyContinue)) 'Owned task survived uninstall.'
     Assert-True (@(Get-ChildItem $shortcutRoot -Filter '*.lnk').Count -eq 0) 'Owned Start menu shortcuts survived uninstall.'
     Assert-True ([IO.File]::ReadAllText((Join-Path $shortcutRoot 'personal.txt')) -eq 'Personal Start menu note.') 'Personal Start menu content was deleted.'

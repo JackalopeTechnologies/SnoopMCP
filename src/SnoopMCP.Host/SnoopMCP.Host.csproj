@@ -9,6 +9,7 @@
         <ApplicationIcon>Images\icon.ico</ApplicationIcon>
         <InjectorStageDir>$(MSBuildThisFileDirectory)..\SnoopMCP.Injection\bin\$(Configuration)\net10.0-windows\injector\</InjectorStageDir>
         <PayloadOutputDir>$(MSBuildThisFileDirectory)..\SnoopMCP.Payload\bin\$(Configuration)\net10.0-windows\</PayloadOutputDir>
+        <RecoveryOutputDir>$(MSBuildThisFileDirectory)..\SnoopMCP.Recovery\bin\$(Configuration)\net10.0\</RecoveryOutputDir>
     </PropertyGroup>
 
     <ItemGroup>
@@ -34,6 +35,7 @@
     <ItemGroup>
         <ProjectReference Include="..\SnoopMCP.Server\SnoopMCP.Server.csproj" />
         <ProjectReference Include="..\SnoopMCP.ClientIntegration\SnoopMCP.ClientIntegration.csproj" />
+        <ProjectReference Include="..\SnoopMCP.Recovery\SnoopMCP.Recovery.csproj" ReferenceOutputAssembly="false" />
         <ProjectReference Include="..\SnoopMCP.Injection\SnoopMCP.Injection.csproj">
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
@@ -51,6 +53,14 @@
         <Copy SourceFiles="@(InjectorBinary)"
               DestinationFiles="@(InjectorBinary->'$(OutDir)injector\%(RecursiveDir)%(Filename)%(Extension)')"
               SkipUnchangedFiles="true" />
+    </Target>
+
+    <Target Name="CopyRecoveryBinaries" AfterTargets="Build">
+        <ItemGroup>
+            <RecoveryBinary Include="$(RecoveryOutputDir)SnoopMCP.Recovery.*" />
+        </ItemGroup>
+        <Error Condition="!Exists('$(RecoveryOutputDir)SnoopMCP.Recovery.exe')" Text="Recovery launcher was not built." />
+        <Copy SourceFiles="@(RecoveryBinary)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     </Target>
 
     <Target Name="CopyPayloadBinaries" AfterTargets="Build">

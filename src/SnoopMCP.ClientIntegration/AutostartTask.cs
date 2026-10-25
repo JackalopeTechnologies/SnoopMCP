@@ -29,6 +29,7 @@ public static class AutostartTask
     private const string ForceSwitch = "/F";
     private const string RunSwitch = "/Run";
     private const string EndSwitch = "/End";
+    private const string RecoveryExecutableName = "SnoopMCP.Recovery.exe";
 
     /// <summary>Builds the arguments that import the explicit logon and recovery task definition.</summary>
     /// <param name="xmlPath">Absolute path to the task XML file.</param>
@@ -38,13 +39,14 @@ public static class AutostartTask
         return [CreateSwitch, TaskNameSwitch, TaskName, XmlSwitch, xmlPath, ForceSwitch];
     }
 
-    /// <summary>Creates an interactive per-user task with unlimited runtime and three failure restarts.</summary>
+    /// <summary>Creates an interactive per-user task with unlimited runtime and an owned-process recovery launcher.</summary>
     /// <param name="hostExePath">Absolute executable path; XML characters are escaped.</param>
     /// <param name="userId">The installing user's Windows security identifier.</param>
     public static string BuildTaskXml(string hostExePath, string userId)
     {
         ArgumentException.ThrowIfNullOrEmpty(hostExePath);
         ArgumentException.ThrowIfNullOrEmpty(userId);
+        string recoveryPath = Path.Combine(Path.GetDirectoryName(hostExePath) ?? throw new ArgumentException("Host directory is required.", nameof(hostExePath)), RecoveryExecutableName);
         return $"""
             <?xml version="1.0" encoding="UTF-16"?>
             <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -59,9 +61,8 @@ public static class AutostartTask
                 <AllowStartOnDemand>true</AllowStartOnDemand>
                 <Enabled>true</Enabled>
                 <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
-                <RestartOnFailure><Interval>PT1M</Interval><Count>3</Count></RestartOnFailure>
               </Settings>
-              <Actions Context="User"><Exec><Command>{SecurityElement.Escape(hostExePath)}</Command></Exec></Actions>
+              <Actions Context="User"><Exec><Command>{SecurityElement.Escape(recoveryPath)}</Command></Exec></Actions>
             </Task>
             """;
     }

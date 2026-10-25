@@ -15,8 +15,10 @@
         <!-- Terminate the running host before any file work so upgrade/uninstall don't hit a
              locked SnoopMCP.Host.exe (the logon task keeps it running between installs). The host
              is windowless, so a hard terminate is required. -->
+        <util:CloseApplication Id="CloseRecovery" Target="SnoopMCP.Recovery.exe"
+                               TerminateProcess="0" RebootPrompt="no" Sequence="1" />
         <util:CloseApplication Id="CloseHost" Target="SnoopMCP.Host.exe"
-                               TerminateProcess="0" RebootPrompt="no" />
+                               TerminateProcess="0" RebootPrompt="no" Sequence="2" />
 
         <Property Id="MsiLogging" Value="voicewarmupx!" />
 

@@ -20,6 +20,8 @@ $PackagePath = (Resolve-Path -LiteralPath $PackagePath).Path
 New-Item -ItemType Directory -Path $EvidenceDirectory -Force | Out-Null
 $EvidenceDirectory = (Resolve-Path -LiteralPath $EvidenceDirectory).Path
 $result = [ordered]@{ Machine=$env:COMPUTERNAME; User=$identity.Name; Interactive=[Environment]::UserInteractive; Success=$false }
+$result.SourceCommit = (git -C (Split-Path $PSScriptRoot) rev-parse HEAD)
+$result.PackageSha256 = (Get-FileHash -LiteralPath $PackagePath).Hash
 $events = [Collections.Generic.List[object]]::new()
 function Wait-Healthy([int]$previousId = 0) {
     $deadline = [DateTime]::UtcNow.AddSeconds(95)
@@ -46,6 +48,7 @@ function Assert-StaysStopped([string]$reason) {
         if (Get-Process -Name SnoopMCP.Host -ErrorAction SilentlyContinue) { throw "$reason unexpectedly restarted the host." }
         Start-Sleep -Seconds 1
     }
+    if (Get-Process -Name SnoopMCP.Recovery -ErrorAction SilentlyContinue) { throw "$reason left its recovery launcher running." }
     $events.Add(@{ Event=$reason; StayedStoppedSeconds=80; Time=[DateTime]::UtcNow })
 }
 function Invoke-Msi([string]$operation, [string]$name) {
@@ -58,9 +61,9 @@ function Invoke-Msi([string]$operation, [string]$name) {
 try {
     Invoke-Msi '/i' 'fresh-install'
     $task = Get-ScheduledTask -TaskName 'SnoopMCP Host'
-    if ($task.Actions.Execute -ne (Join-Path $installedRoot 'SnoopMCP.Host.exe') -or
-        $task.Settings.ExecutionTimeLimit -ne 'PT0S' -or $task.Settings.RestartCount -ne 3 -or
-        $task.Settings.RestartInterval -ne 'PT1M' -or $task.Settings.StopIfGoingOnBatteries -or
+    if ($task.Actions.Execute -ne (Join-Path $installedRoot 'SnoopMCP.Recovery.exe') -or
+        $task.Settings.ExecutionTimeLimit -ne 'PT0S' -or $task.Settings.RestartCount -ne 0 -or
+        $task.Settings.StopIfGoingOnBatteries -or
         $task.Settings.DisallowStartIfOnBatteries) { throw 'Installed task does not have the required recovery settings.' }
     Export-ScheduledTask -TaskName 'SnoopMCP Host' | Set-Content (Join-Path $EvidenceDirectory 'installed-task.xml')
     $cli = Join-Path $installedRoot 'SnoopMCP.Cli.exe'
@@ -86,6 +89,7 @@ try {
     }
     $logText = (Get-ChildItem (Join-Path $installedRoot 'logs') -Filter '*.log' | Get-Content -Raw) -join "`n"
     if (-not $logText.Contains('Previous host run ended without a clean shutdown')) { throw 'Crash recovery did not record useful diagnostics.' }
+    if (-not $logText.Contains('restart limit reached')) { throw 'Recovery did not explain that its retry limit was reached.' }
     & $cli start
     if ($LASTEXITCODE -ne 0) { throw 'CLI start after the retry limit failed.' }
     $running = Wait-Healthy
@@ -158,6 +162,7 @@ public static class StartupHook
     $result.TrayExitTaskResult = $taskResult
     Invoke-Msi '/x' 'fresh-uninstall'
     if (Test-Path (Join-Path $installedRoot 'SnoopMCP.Host.exe')) { throw 'Uninstall left the owned host executable.' }
+    if (Test-Path (Join-Path $installedRoot 'SnoopMCP.Recovery.exe')) { throw 'Uninstall left the owned recovery launcher.' }
     if (Get-ScheduledTask -TaskName 'SnoopMCP Host' -ErrorAction SilentlyContinue) { throw 'Uninstall left the owned scheduled task.' }
     $result.Success = $true
 } catch {

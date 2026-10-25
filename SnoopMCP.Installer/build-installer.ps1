@@ -10,6 +10,7 @@ $stage = Join-Path $here "stage"
 
 $hostProj   = Join-Path $root "src/SnoopMCP.Host/SnoopMCP.Host.csproj"
 $cliProj    = Join-Path $root "src/SnoopMCP.Cli/SnoopMCP.Cli.csproj"
+$recoveryProj = Join-Path $root "src/SnoopMCP.Recovery/SnoopMCP.Recovery.csproj"
 $sampleProj = Join-Path $root "samples/SampleWpfApp/SampleWpfApp.csproj"
 $actionsProj = Join-Path $root "src/SnoopMCP.InstallerActions/SnoopMCP.InstallerActions.csproj"
 $actionsDll = Join-Path $root "src/SnoopMCP.InstallerActions/bin/$Configuration/net472/SnoopMCP.InstallerActions.CA.dll"
@@ -47,6 +48,8 @@ if (-not (Get-ChildItem (Join-Path $stage "payload")  -File -Recurse -ErrorActio
 # (net10.0) have disjoint app-dependency graphs, so no shared app DLL collides.
 dotnet publish $cliProj -c $Configuration -p:Version=$Version -m:2 -nodeReuse:false -o $stage
 if ($LASTEXITCODE -ne 0) { throw "CLI publish failed." }
+dotnet publish $recoveryProj -c $Configuration -p:Version=$Version -m:2 -nodeReuse:false -o $stage
+if ($LASTEXITCODE -ne 0) { throw "Recovery launcher publish failed." }
 
 # Publish the sample app under samples/.
 dotnet publish $sampleProj -c $Configuration -p:Version=$Version -m:2 -nodeReuse:false -o (Join-Path $stage "samples")

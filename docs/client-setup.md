@@ -64,7 +64,8 @@ and on rollback. Future packages skip client unregistration during upgrades alto
 
 The transaction backup is private to the installing user under `%LOCALAPPDATA%/SnoopMCP.Upgrade`.
 A failed backup aborts before old-version removal. A successful commit removes only the backup's own
-files; rollback retains the backup for recovery. Linked paths abort migration rather than risk the
+files; rollback retains the backup for recovery and restores the previous autostart task without
+starting it. A replacement task belonging to another executable is preserved. Linked paths abort migration rather than risk the
 legacy cleanup following them. Avoid editing client settings while a Windows installer upgrade is running.
 Package builds verify the actual backup/removal/restore action order. Tests simulate the old cleanup
 and rollback; these checks do not replace an installed Windows upgrade/uninstall qualification.
@@ -139,11 +140,19 @@ Search Windows Start for **SnoopMCP - WPF inspection**. It starts the host throu
 elevated-task path when available. The host runs in the notification area; the tray menu contains
 connection setup, status, and Exit. **SnoopMCP - diagnostic logs** opens the log directory.
 
-The startup task explicitly permits unlimited runtime and battery operation. A failed scheduled run
-is retried up to three times at one-minute intervals. This is bounded crash recovery, not a promise
-to survive every operating-system failure or a manual termination. An intentional tray Exit stays
-stopped; `SnoopMCP.Cli stop` ends the scheduled task before terminating remaining instances to avoid
-an unwanted restart. Autostart registration may require Windows administrator approval as before.
+The startup task explicitly permits unlimited runtime and battery operation. It runs the windowless
+`SnoopMCP.Recovery` launcher, which watches only the host process it starts. A nonzero host exit is
+retried up to three times at one-minute intervals; `logs/recovery.log` records each attempt and when
+the limit is reached. The launcher does not attach to a WPF target or change interaction permissions.
+An intentional tray Exit stops both processes. `SnoopMCP.Cli stop` ends the scheduled launcher before
+terminating remaining host instances and clears the unexpected-exit marker. Administrator approval
+for autostart registration is unchanged. A launcher or operating-system failure is outside this
+host-process recovery mechanism; Windows Start remains the manual recovery entry point.
+
+The scheduler's `RestartOnFailure` setting alone did not restart a terminated host in installed
+qualification. Microsoft's [scheduler protocol](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-tsch/2ff4aa5a-7bc4-449f-bbb1-27475645867f)
+describes retries of startup conditions/actions. The launcher therefore owns the process-crash retry
+budget, and the task has no additional retry policy that could multiply it.
 
 The host logs tray exits, Windows session shutdown, and fatal exceptions. An interrupted-run marker
 allows the next launch to report an unclean stop, including forced termination where no exception

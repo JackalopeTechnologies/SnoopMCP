@@ -16,7 +16,7 @@ $database = [WixToolset.Dtf.WindowsInstaller.Database]::new(
 try {
     if ($PublishDirectory) {
         $packageVersion = $database.ExecuteStringQuery('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductVersion''')[0]
-        foreach ($relativePath in @('SnoopMCP.Host.dll', 'SnoopMCP.Server.dll', 'SnoopMCP.Cli.dll',
+        foreach ($relativePath in @('SnoopMCP.Host.dll', 'SnoopMCP.Server.dll', 'SnoopMCP.Cli.dll', 'SnoopMCP.Recovery.dll',
                 'SnoopMCP.ClientIntegration.dll', 'payload/SnoopMCP.Payload.dll', 'samples/SampleWpfApp.dll')) {
             $path = Join-Path $PublishDirectory $relativePath
             if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing packaged assembly: $path" }

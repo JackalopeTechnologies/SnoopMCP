@@ -43,13 +43,13 @@ internal static class InstallerTaskStore
                 result = task.GetType().InvokeMember(XmlProperty, BindingFlags.GetProperty, null, task, null,
                     CultureInfo.InvariantCulture) as string ?? throw new InvalidOperationException("Task Scheduler returned no task definition.");
             }
-            catch (TargetInvocationException ex) when (ex.InnerException is COMException com && com.HResult == NotFound)
+            catch (TargetInvocationException ex) when (ex.InnerException?.HResult == NotFound)
             {
                 // Only an explicitly missing task is safe to treat as absent.
             }
-            catch (COMException ex) when (ex.HResult == NotFound)
+            catch (Exception ex) when (ex.HResult == NotFound)
             {
-                // COM dispatch can report the same missing-task error without a reflection wrapper.
+                // CLR versions map missing COM tasks to either COMException or FileNotFoundException.
             }
             finally
             {

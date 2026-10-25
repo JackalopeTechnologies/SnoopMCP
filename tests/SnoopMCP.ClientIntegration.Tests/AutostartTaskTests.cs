@@ -56,7 +56,7 @@ public sealed class AutostartTaskTests
         const string UserId = "S-1-5-21-123";
         XDocument xml = XDocument.Parse(AutostartTask.BuildTaskXml(Exe, UserId));
         XNamespace ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
-        Assert.Equal(Exe, xml.Descendants(ns + "Command").Single().Value);
+        Assert.Equal(@"E:\Apps & Tools\SnoopMCP.Recovery.exe", xml.Descendants(ns + "Command").Single().Value);
         Assert.All(xml.Descendants(ns + "UserId"), id => Assert.Equal(UserId, id.Value));
         Assert.Equal("InteractiveToken", xml.Descendants(ns + "LogonType").Single().Value);
         Assert.Equal("HighestAvailable", xml.Descendants(ns + "RunLevel").Single().Value);
@@ -64,7 +64,7 @@ public sealed class AutostartTaskTests
         Assert.Equal("false", xml.Descendants(ns + "StopIfGoingOnBatteries").Single().Value);
         Assert.Equal("false", xml.Descendants(ns + "DisallowStartIfOnBatteries").Single().Value);
         Assert.Equal("IgnoreNew", xml.Descendants(ns + "MultipleInstancesPolicy").Single().Value);
-        Assert.Equal("3", xml.Descendants(ns + "Count").Single().Value);
-        Assert.Equal("PT1M", xml.Descendants(ns + "Interval").Single().Value);
+        // The launcher owns the retry budget; the scheduler must not multiply it.
+        Assert.Empty(xml.Descendants(ns + "RestartOnFailure"));
     }
 }

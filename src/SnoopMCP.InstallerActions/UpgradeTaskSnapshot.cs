@@ -18,6 +18,7 @@ public sealed class UpgradeTaskSnapshot
     private const string ActionsElement = "Actions";
     private const string ExecElement = "Exec";
     private const string CommandElement = "Command";
+    private const string RecoveryExecutableName = "SnoopMCP.Recovery.exe";
     private readonly string mPath;
 
     /// <summary>Uses the same unique directory as the installer's file snapshot.</summary>
@@ -81,7 +82,10 @@ public sealed class UpgradeTaskSnapshot
             XElement[] actions = task.Elements(ns + ActionsElement).Elements().ToArray();
             string? command = actions.Length == 1 && actions[0].Name == ns + ExecElement
                 ? (string?) actions[0].Element(ns + CommandElement) : null;
-            if (command is null || !string.Equals(Path.GetFullPath(command.Trim('"')), Path.GetFullPath(host), StringComparison.OrdinalIgnoreCase))
+            string recovery = Path.Combine(Path.GetDirectoryName(host) ?? string.Empty, RecoveryExecutableName);
+            string? target = command is null ? null : Path.GetFullPath(command.Trim('"'));
+            if (target is null || (!string.Equals(target, Path.GetFullPath(host), StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(target, Path.GetFullPath(recovery), StringComparison.OrdinalIgnoreCase)))
             {
                 throw new IOException("The SnoopMCP autostart name belongs to another task; it has not been changed.");
             }
