@@ -51,6 +51,10 @@ jobs:
   installer-qualification:
     runs-on: windows-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [lifecycle, host]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -75,12 +79,17 @@ jobs:
           DisableGitVersionTask: 'true'
         run: ./SnoopMCP.Installer/build-installer.ps1 -Version 1.4.3 -Configuration Release
       - name: Verify installed scheduled host
+        if: matrix.check == 'host'
         shell: pwsh
         run: ./SnoopMCP.Installer/Test-InstalledHost.ps1 -PackagePath ./SnoopMCP.Installer/SnoopMCP.msi -EvidenceDirectory ./artifacts/installer-qualification
+      - name: Verify installer lifecycle and interrupted upgrades
+        if: matrix.check == 'lifecycle'
+        shell: pwsh
+        run: ./SnoopMCP.Installer/Test-InstallerLifecycle.ps1 -PackagePath ./SnoopMCP.Installer/SnoopMCP.msi -EvidenceDirectory ./artifacts/installer-qualification
       - name: Retain qualification evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: installer-qualification
+          name: installer-qualification-${{ matrix.check }}
           path: artifacts/installer-qualification
           if-no-files-found: error
