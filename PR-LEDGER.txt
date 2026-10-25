@@ -1,3 +1,0 @@
-# Qualification required before a pull request or release.
-[codex/client-guidance-recovery] Qualify the built Windows installer in an isolated Windows user: fresh install, customized 1.4.2 upgrade, rollback, repeated install, and uninstall; verify client settings, permissions, skill edits/support files, logs, interaction preferences, and Start menu entries survive as designed.
-[codex/client-guidance-recovery] Qualify scheduled crash recovery with the new installed host: bounded restarts, intentional Exit/stop remaining stopped, and recovery diagnostics; never disturb another inspection session or enable interaction for this check.
