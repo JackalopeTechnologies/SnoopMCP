@@ -97,7 +97,7 @@ try {
     # Test-only runtime hook invokes the installed tray's actual ExitCommand on its WPF dispatcher.
     # It changes no task settings, server code, interaction permission, or inspection session.
     # This verifies command execution and shutdown, not a physical tray-menu click or appearance.
-    $hookRoot = Join-Path $EvidenceDirectory 'tray-exit-hook'
+    $hookRoot = Join-Path $env:RUNNER_TEMP ('snoop-tray-exit-' + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $hookRoot | Out-Null
     @'
 <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><Nullable>enable</Nullable></PropertyGroup></Project>
@@ -136,7 +136,7 @@ public static class StartupHook
     }
 }
 '@ | Set-Content (Join-Path $hookRoot 'StartupHook.cs')
-    dotnet build (Join-Path $hookRoot 'TrayExitHook.csproj') -c Release -m:2 -nodeReuse:false -p:ImportDirectoryBuildProps=false -p:ImportDirectoryBuildTargets=false
+    dotnet build (Join-Path $hookRoot 'TrayExitHook.csproj') -c Release -m:2 -nodeReuse:false
     if ($LASTEXITCODE -ne 0) { throw 'Tray command test hook build failed.' }
     $runtimePath = Join-Path $installedRoot 'SnoopMCP.Host.runtimeconfig.json'
     $originalRuntime = [IO.File]::ReadAllBytes($runtimePath)
@@ -164,6 +164,9 @@ public static class StartupHook
     $result.Error = $_.Exception.Message
     throw
 } finally {
+    if ($hookRoot -and (Test-Path $hookRoot)) {
+        Copy-Item -LiteralPath $hookRoot -Destination (Join-Path $EvidenceDirectory 'tray-exit-hook') -Recurse
+    }
     Get-ScheduledTaskInfo -TaskName 'SnoopMCP Host' -ErrorAction SilentlyContinue |
         Select-Object TaskName,LastRunTime,LastTaskResult,NumberOfMissedRuns |
         ConvertTo-Json | Set-Content (Join-Path $EvidenceDirectory 'final-task.json')

@@ -246,7 +246,10 @@ public static class QualificationFaults
         Invoke-Msi $oldPackage '/i' "$scenario-old-install" | Out-Null
         Invoke-Registration
         Customize-InstalledState
-        Set-ScheduledTask -TaskName 'SnoopMCP Host' -Description 'Qualification legacy task settings.' | Out-Null
+        $legacyTask = Get-ScheduledTask -TaskName 'SnoopMCP Host'
+        $legacyTask.Description = 'Qualification legacy task settings.'
+        Set-ScheduledTask -InputObject $legacyTask | Out-Null
+        Assert-True ((Get-ScheduledTask -TaskName 'SnoopMCP Host').Description -eq $legacyTask.Description) 'Task customization fixture was not applied.'
         $before = Get-StateHashes
         $oldBinary = (Get-FileHash (Join-Path $installedRoot 'SnoopMCP.Server.dll')).Hash
         if ($scenario -eq 'upgrade') {
