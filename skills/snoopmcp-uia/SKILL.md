@@ -39,11 +39,19 @@ finds elements a pruned peer hides from UIA entirely.
 
 ## Rules
 
+- Follow the application's instance rules and reuse the intended running instance; do not launch
+  duplicates or restart it for inspection. Before using the payload tier, follow snoopmcp-first's
+  session ownership checks. Never detach another caller's session or restart Snoop to take it over.
+- Use `captureWindow(pid)` or an appropriate screenshot tool to verify appearance after changes.
+  Binding, dependency-property, style, template, and DataContext questions require the live inspection
+  tools in snoopmcp-first. General app tools remain useful where appropriate; do not use them to bypass
+  a disabled Snoop interaction gate or the application's safety rules.
 - Never ask SnoopMCP to synthesize mouse/keyboard input — there is no such tool by design. If a control
   is `NotDrivable`, tell the user and ask them to act, or try the payload tier.
 - Mutating tools (`invokeUia`, `setUiaValue`, `peerInvoke`, `executeCommand`) require the host
   **interaction gate**. If you get `InteractionDisabled`, ask the user to enable "Allow app interaction
-  (driving)" in the SnoopMCP tray.
+  (driving)" in the SnoopMCP tray. Never enable it automatically. Screenshots, inspection, and waits
+  do not require the gate. An enabled gate does not authorize actions beyond the user's task.
 - `peerInvoke`/`executeCommand` accept an optional `dispatch="post"` for actions that open a modal
   dialog and would otherwise block the wait indefinitely — it validates first (peer present, enabled,
   pattern supported; command resolves, `CanExecute` true) and reports those as normal errors, then fires

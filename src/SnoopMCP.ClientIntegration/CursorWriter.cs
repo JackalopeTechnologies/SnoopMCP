@@ -19,8 +19,10 @@ public sealed class CursorWriter : JsonMcpServerWriter
     /// <summary>Initialises the writer against explicit paths (used by tests).</summary>
     /// <param name="configPath">Absolute path to Cursor's <c>mcp.json</c>.</param>
     /// <param name="detectionPath">Directory whose existence means Cursor is installed.</param>
-    public CursorWriter(string configPath, string detectionPath)
-        : base(configPath, ServersKey, detectionPath, emitType: false)
+    /// <param name="skillsDir">Skill discovery directory.</param>
+    public CursorWriter(string configPath, string detectionPath, string? skillsDir = null)
+        : base(configPath, ServersKey, detectionPath, emitType: false,
+            skillsDir: skillsDir ?? Path.Combine(detectionPath, SnoopSkill.SkillsDirectoryName))
     {
     }
 
@@ -32,6 +34,6 @@ public sealed class CursorWriter : JsonMcpServerWriter
     {
         string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string dir = Path.Combine(profile, CursorDirName);
-        return new CursorWriter(Path.Combine(dir, ConfigFileName), dir);
+        return new CursorWriter(Path.Combine(dir, ConfigFileName), dir, SnoopSkill.SharedUserDirectory);
     }
 }

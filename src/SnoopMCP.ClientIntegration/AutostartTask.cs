@@ -7,6 +7,9 @@ namespace SnoopMCP.ClientIntegration;
 
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Security;
+using System.Security.Principal;
+using System.Text;
 
 /// <summary>
 /// Manages the per-user logon scheduled task that launches the SnoopMCP host. Wraps
@@ -21,24 +24,47 @@ public static class AutostartTask
     private const string DeleteSwitch = "/Delete";
     private const string QuerySwitch = "/Query";
     private const string TaskNameSwitch = "/TN";
-    private const string ScheduleSwitch = "/SC";
-    private const string OnLogon = "ONLOGON";
-    private const string RunLevelSwitch = "/RL";
-    private const string Highest = "HIGHEST";
-    private const string TaskRunSwitch = "/TR";
+    private const string XmlSwitch = "/XML";
+    private const string XmlSuffix = ".xml";
     private const string ForceSwitch = "/F";
     private const string RunSwitch = "/Run";
+    private const string EndSwitch = "/End";
+    private const string RecoveryExecutableName = "SnoopMCP.Recovery.exe";
 
-    /// <summary>Builds the <c>schtasks</c> arguments that create the logon task for the host exe.</summary>
-    /// <param name="hostExePath">Absolute path to <c>SnoopMCP.Host.exe</c>.</param>
-    public static IReadOnlyList<string> BuildCreateArguments(string hostExePath)
+    /// <summary>Builds the arguments that import the explicit logon and recovery task definition.</summary>
+    /// <param name="xmlPath">Absolute path to the task XML file.</param>
+    public static IReadOnlyList<string> BuildCreateArguments(string xmlPath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(xmlPath);
+        return [CreateSwitch, TaskNameSwitch, TaskName, XmlSwitch, xmlPath, ForceSwitch];
+    }
+
+    /// <summary>Creates an interactive per-user task with unlimited runtime and an owned-process recovery launcher.</summary>
+    /// <param name="hostExePath">Absolute executable path; XML characters are escaped.</param>
+    /// <param name="userId">The installing user's Windows security identifier.</param>
+    public static string BuildTaskXml(string hostExePath, string userId)
     {
         ArgumentException.ThrowIfNullOrEmpty(hostExePath);
-        return
-        [
-            CreateSwitch, TaskNameSwitch, TaskName, ScheduleSwitch, OnLogon,
-            RunLevelSwitch, Highest, TaskRunSwitch, hostExePath, ForceSwitch
-        ];
+        ArgumentException.ThrowIfNullOrEmpty(userId);
+        string recoveryPath = Path.Combine(Path.GetDirectoryName(hostExePath) ?? throw new ArgumentException("Host directory is required.", nameof(hostExePath)), RecoveryExecutableName);
+        return $"""
+            <?xml version="1.0" encoding="UTF-16"?>
+            <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+              <RegistrationInfo><Description>SnoopMCP WPF inspection for coding assistants. Restarts after failure; Exit stays stopped.</Description></RegistrationInfo>
+              <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>{SecurityElement.Escape(userId)}</UserId></LogonTrigger></Triggers>
+              <Principals><Principal id="User"><UserId>{SecurityElement.Escape(userId)}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>HighestAvailable</RunLevel></Principal></Principals>
+              <Settings>
+                <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+                <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+                <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+                <StartWhenAvailable>true</StartWhenAvailable>
+                <AllowStartOnDemand>true</AllowStartOnDemand>
+                <Enabled>true</Enabled>
+                <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+              </Settings>
+              <Actions Context="User"><Exec><Command>{SecurityElement.Escape(recoveryPath)}</Command></Exec></Actions>
+            </Task>
+            """;
     }
 
     /// <summary>Builds the <c>schtasks</c> arguments that delete the logon task.</summary>
@@ -59,6 +85,9 @@ public static class AutostartTask
         return [RunSwitch, TaskNameSwitch, TaskName];
     }
 
+    /// <summary>Stops the scheduled run intentionally, preventing failure-restart recovery.</summary>
+    public static bool StopNow() => Run([EndSwitch, TaskNameSwitch, TaskName]) == 0;
+
     /// <summary>
     /// Creates (or replaces) the elevated logon task. Registering a /RL HIGHEST task requires an
     /// elevated caller, so this relaunches schtasks with the "runas" verb, producing one UAC prompt.
@@ -68,7 +97,25 @@ public static class AutostartTask
     public static bool Create(string hostExePath)
     {
         ArgumentException.ThrowIfNullOrEmpty(hostExePath);
-        return RunElevated(BuildCreateArguments(hostExePath));
+        bool created = false;
+        if (OperatingSystem.IsWindows())
+        {
+            using WindowsIdentity identity = WindowsIdentity.GetCurrent();
+            if (identity.User is { } user)
+            {
+                string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + XmlSuffix);
+                try
+                {
+                    File.WriteAllText(path, BuildTaskXml(hostExePath, user.Value), Encoding.Unicode);
+                    created = RunElevated(BuildCreateArguments(path));
+                }
+                finally
+                {
+                    File.Delete(path);
+                }
+            }
+        }
+        return created;
     }
 
     /// <summary>Removes the logon task. Returns true on success or if it did not exist.</summary>

@@ -76,23 +76,19 @@ public sealed class SessionManagerTests
     [Fact]
     public async Task OpenAsync_TwiceWithoutClose_Throws()
     {
-        await using var manager = CreateManager();
+        CancellationToken ct = TestContext.Current.CancellationToken;
         string pipeName = SessionManager.AllocatePipeName();
+        await using var server = new NamedPipeServerStream(
+            pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+        await using var manager = CreateManager();
 
-        var serverTask = Task.Run(async () =>
-        {
-            await using var server = new NamedPipeServerStream(
-                pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-            await server.WaitForConnectionAsync();
-            await Task.Delay(200);
-        });
-
-        await manager.OpenAsync(pipeName, default);
+        Task connection = server.WaitForConnectionAsync(ct);
+        await manager.OpenAsync(pipeName, ct);
+        await connection;
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => manager.OpenAsync(pipeName, default));
+            () => manager.OpenAsync(pipeName, ct));
 
         await manager.CloseAsync();
-        await serverTask;
     }
 }

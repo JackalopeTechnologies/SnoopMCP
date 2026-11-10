@@ -29,6 +29,11 @@
     -->
     <Import Project="..\Directory.Build.props" />
 
+    <ItemGroup>
+        <!-- xUnit's shared library permits an older minimum; keep the test runtime on current servicing. -->
+        <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.13" PrivateAssets="all" />
+    </ItemGroup>
+
     <PropertyGroup>
         <NoWarn>$(NoWarn);CA1707;STY0006;STY0008;NUM0002;STY0002;xUnit1051;CA1848</NoWarn>
     </PropertyGroup>

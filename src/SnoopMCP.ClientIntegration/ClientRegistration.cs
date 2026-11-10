@@ -25,6 +25,7 @@ public static class ClientRegistration
             McpClient.ClaudeDesktop => ClaudeDesktopWriter.ForCurrentUser(),
             McpClient.VsCode => VsCodeMcpWriter.ForCurrentUser(),
             McpClient.Codex => CodexWriter.ForCurrentUser(),
+            McpClient.GrokBuild => GrokBuildWriter.ForCurrentUser(),
             McpClient.CopilotCli => CopilotCliWriter.ForCurrentUser(),
             McpClient.Cursor => CursorWriter.ForCurrentUser(),
             McpClient.GeminiCli => GeminiCliWriter.ForCurrentUser(),

@@ -5,198 +5,96 @@
 
 namespace SnoopMCP.ClientIntegration;
 
-/// <summary>
-/// Installs (and removes) the SnoopMCP skills into a Claude Code skills directory
-/// (<c>~/.claude/skills/&lt;name&gt;/SKILL.md</c>). Each embedded body is kept in sync with the
-/// corresponding <c>skills/&lt;name&gt;/SKILL.md</c> file in the repo.
-/// </summary>
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+
+/// <summary>Installs canonical skills, retaining local edits and other clients' registrations.</summary>
 public static class SnoopSkill
 {
-    /// <summary>The inspection skill's directory name (becomes the Claude Code skill command).</summary>
+    /// <summary>The inspection skill's directory name.</summary>
     public const string FirstSkillName = "snoopmcp-first";
-
-    /// <summary>The driving/UIA skill's directory name (becomes the Claude Code skill command).</summary>
+    /// <summary>The interaction and screenshot skill's directory name.</summary>
     public const string UiaSkillName = "snoopmcp-uia";
-
+    /// <summary>Directory used by clients for skill discovery.</summary>
+    public const string SkillsDirectoryName = "skills";
+    private const string AgentsDirectoryName = ".agents";
+    private const string MutexPrefix = "Local\\SnoopMCP.Skills.";
+    private static readonly TimeSpan smLockTimeout = TimeSpan.FromSeconds(10);
     private const string SkillFileName = "SKILL.md";
+    private const string ReceiptFileName = ".snoopmcp-install.json";
+    private const string DefaultOwner = "Claude Code";
+    // Fingerprints of unmarked bodies shipped before ownership records were introduced.
+    private const string LegacyFirstHash = "3ED324B20219F98933F1B8991B4116D52433AB5E6749120B186374D2709F0B58";
+    private const string LegacyUiaHash = "5D330C30220E7E7399485C77029BFDA02AF55FCC63247867DE3CCD1CC6679C67";
 
-    private const string FirstSkillBody =
-        """
-        ---
-        name: snoopmcp-first
-        description: Use when inspecting, diagnosing, or debugging a running WPF application's live visual tree, dependency properties, data bindings, styles, templates, or DataContext via SnoopMCP — a control renders blank, wrong-sized, or wrong-styled; a binding silently fails; the DataContext isn't what you expect; you need a template part or a property's effective value. For clicking, typing, waiting, or screenshotting the app, use snoopmcp-uia instead.
-        ---
-
-        # SnoopMCP — live WPF inspection
-
-        SnoopMCP injects a payload into a running .NET (x64) WPF process and answers questions about its
-        live state: the visual and logical trees, dependency-property values with their precedence, bindings,
-        styles, templates, and DataContext. Every tool in this skill is read-only and ungated — call them
-        freely while diagnosing.
-
-        Driving the app (click, set a value, wait, capture the window) is a separate, mutating tool family
-        behind the host's interaction gate, which is **off by default** — the user enables it from the
-        SnoopMCP tray menu ("Allow app interaction (driving)"). See the **snoopmcp-uia** skill.
-
-        ## Workflow
-
-        1. `listWpfProcesses()` — pick the target by pid, window title, and bitness. Host-side; no session yet.
-        2. `attach(pid)` — required before every tool below. Its response already carries the live visual
-           roots; use those ids rather than guessing, or reusing ids from an earlier session. Only one session
-           exists at a time: `attach` fails outright while another is open, so `detach()` first.
-        3. Inspect (below).
-        4. `detach()` when done.
-
-        ## Quick reference
-
-        | To find out | Call |
-        |---|---|
-        | What windows/popups exist | `listVisualRoots()` |
-        | Which element is *that* one | `findElements(id, predicate)` when you know a name/type; `hitTest(id, x, y)` when you only have a location; `resolvePath(id, path)` to re-resolve a path string from an earlier `describeElement` |
-        | What a node is | `describeElement(id)` |
-        | Tree shape | `getChildren(id, tree)`, `getParent(id, tree)`, `getTemplatedParent(id)` |
-        | Why a property holds this value | `getDependencyProperty(id, name)` — value **and** precedence trace; `listDependencyProperties(id)` |
-        | Why a binding shows nothing | `inspectBinding(id, propName)` for one binding; `listBindings(id, includeDescendants)` to audit a subtree |
-        | What the data actually is | `describeDataContext(id)`, `readDataContextPath(id, path)` |
-        | Why it looks like that | `resolveStyle(id)`, `resolveTemplate(id)` |
-        | Full live snapshot | `exportXaml(id)` |
-
-        Property names are the plain DP name — `Text`, `Visibility`, `Background`. `listDependencyProperties`
-        gives the exact spellings available on an element.
-
-        `findElements` predicate fields, all optional and AND-combined: `type` (case-sensitive substring of
-        the full type name), `name` (exact `x:Name`), `automationId` (exact), `textContains` (case-insensitive,
-        against capped visible text), `propertyEquals` (stringified DP comparison), and the nested predicates
-        `hasAncestor`, `hasDescendant`, `inTemplateOf`. For bulk text searches, also `leafOnly`, `maxResults`,
-        and `suppressPath` to keep large result sets bounded and readable.
-
-        ## Common mistakes
-
-        - **Carrying element ids across sessions.** Ids are per-session. If the target exits, the session goes
-          with it (`SessionLost`) — `attach` the new pid and re-resolve. Within a live session, an id whose
-          element has been garbage-collected returns `ElementExpired` — re-resolve from
-          `listVisualRoots`/`findElements`. Worse, a live-looking id can silently describe a different row: a
-          virtualizing panel recycles the *same* container for a different data item as it scrolls — same id,
-          no error, no `ElementExpired`. If you're holding ids across calls that might span a scroll or data
-          change, re-`describeElement` and compare `dataContextHashCode` against the value you saw before; a
-          changed value means this id now names different data.
-        - **Blaming the binding first.** For a wrong value, read the precedence trace from
-          `getDependencyProperty` — a local value, style trigger, or animation may be beating the binding.
-        - **Trusting `exportXaml` for binding shape.** It serializes evaluated values, not `{Binding}` markup;
-          use `listBindings` when the question is about the binding itself.
-        - **Over-trusting predicates.** `textContains` searches only ~200 chars of visible text, and
-          `propertyEquals` does not handle attached properties.
-        - **Waiting on `recentTraceLines`.** `inspectBinding` always returns it empty today.
-
-        ## Environment
-
-        - One target at a time; x64 WPF on .NET 10+; the host must run at the **same elevation** as the target
-          (`AccessDenied` otherwise).
-        - Start the SnoopMCP host (tray app) first. Endpoint: http://127.0.0.1:6300/mcp.
-        - Calls run on the target's dispatcher with a 5s timeout. `DispatcherTimeout` means the app's UI thread
-          was busy or blocked, not that the call was wrong: let the app settle and retry the same call once. If
-          it repeats, the UI thread is genuinely stuck — that is the bug to chase, not the tool call.
-        """;
-
-    private const string UiaSkillBody =
-        """
-        ---
-        name: snoopmcp-uia
-        description: Use when driving or automating a running WPF application hands-free — clicking, selecting, setting values, navigating, waiting, or screenshotting — via SnoopMCP's UI Automation tools. Complements snoopmcp-first (inspection); this skill is for INTERACTION and background capture, never synthesized mouse/keyboard input.
-        ---
-
-        # SnoopMCP — driving a live WPF app (UI Automation)
-
-        SnoopMCP can drive a running WPF app through UI Automation without touching the mouse or stealing
-        focus, and capture the window even when it is occluded. Driving is two-tier:
-
-        1. **UIA tier (no attach needed).** Keyed by PID.
-           - `getUiaTree(pid, fromElement?, depth)` — discover elements (AutomationId, Name, ControlType, HelpText, bounds, patterns).
-           - `findUiaElement(pid, by, value)` — `by` ∈ automationId | name | helpText | controlType (this is the stability order — prefer automationId; treat a VM-type-name Name as a smell).
-           - `captureWindow(pid)` — returns the window as a PNG image; works while occluded; a minimized window returns CaptureUnavailable.
-           - `waitForUia(pid, by, value, timeoutMs)` — wait for an element instead of sleeping.
-           - `invokeUia(element, pattern?)` — click/select/toggle/expand. MUTATES.
-           - `setUiaValue(element, value)` — set a text/numeric field. MUTATES.
-        2. **Payload tier (requires `attach`).** For controls UIA can't drive and for ground-truth checks.
-           Element ids are the Snoop element ids from `attach`/`listVisualRoots`/`findElements`, not UIA-tier
-           `element` references.
-           - `getAutomationPeerInfo(id)` — bridge a Snoop element id to its UIA identity (AutomationId, Name, ClassName, ControlType); correlates the two tiers by `AutomationId`. Read-only.
-           - `waitForValue(id, dependencyProperty?, dataContextPath?, expected, timeoutMs)` — poll a DP or DataContext path until it equals `expected` — ground-truth check (VM/DP state, not pixels). Read-only.
-           - `peerInvoke(id, pattern, dispatch?)` — drive the real WPF `AutomationPeer` pattern (Invoke | Toggle | SelectionItem | ExpandCollapse) in-process. MUTATES.
-           - `executeCommand(id, path?, parameter?, dispatch?)` — execute the `ICommand` bound to an element (or at a DataContext `path`), CanExecute-gated. MUTATES.
-
-        ## An element visibly on screen isn't found by `findUiaElement`/`getUiaTree`
-
-        This is not necessarily a SnoopMCP defect. A UIA tree walk only descends through the automation
-        peers a parent peer reports as its children (`AutomationPeer.GetChildrenCore()`); a custom control
-        whose peer never implemented child-peer support (or reports none) prunes everything below it from
-        every UIA client's search, regardless of scope (`Children`/`Descendants`) or `by` locator — this is
-        unrelated to the raw/control/content tree "view" concept, which only affects `TreeWalker`/caching,
-        not `FindAll`/`FindFirst`. Suspect this whenever a `name`/`controlType` search comes up empty for
-        something you can see rendered.
-
-        **Workaround:** fall back to the payload tier. `attach()` then `findElements(id, { textContains, leafOnly: true })`
-        walks the real WPF visual tree via `VisualTreeHelper` and never consults automation peers, so it
-        finds elements a pruned peer hides from UIA entirely.
-
-        ## Rules
-
-        - Never ask SnoopMCP to synthesize mouse/keyboard input — there is no such tool by design. If a control
-          is `NotDrivable`, tell the user and ask them to act, or try the payload tier.
-        - Mutating tools (`invokeUia`, `setUiaValue`, `peerInvoke`, `executeCommand`) require the host
-          **interaction gate**. If you get `InteractionDisabled`, ask the user to enable "Allow app interaction
-          (driving)" in the SnoopMCP tray.
-        - `peerInvoke`/`executeCommand` accept an optional `dispatch="post"` for actions that open a modal
-          dialog and would otherwise block the wait indefinitely — it validates first (peer present, enabled,
-          pattern supported; command resolves, `CanExecute` true) and reports those as normal errors, then fires
-          the action and returns immediately (`Dispatched: true`) without observing its outcome, i.e.
-          `ActionDispatched`; verify the effect separately with `waitForValue`/`captureWindow`. Only a failure
-          inside the action itself goes unreported.
-        - Without `dispatch="post"` (the default is `dispatch="wait"`), a mutating call that times out on the
-          dispatcher returns `ActionPending` — the action may already have applied before the wait gave up;
-          verify with `waitForValue`/`captureWindow` before assuming failure or retrying.
-        - `ElementNotEnabled` means the control is disabled (`IsEnabled` false) and WPF refuses every action on
-          it. Do not retry the same call: find out what enables it (a selection, a valid input, a finished
-          task), satisfy that or `waitForValue` on `IsEnabled`, then drive it. Both tiers (`invokeUia` and
-          `peerInvoke`) and both dispatch modes report it.
-        - Driving/capturing an elevated (admin) app requires the SnoopMCP host to run elevated — enabling
-          autostart registers an elevated logon task (one UAC). This is admin-only.
-        - Element handles are short-lived; pass back the `element` reference you received. If it is stale,
-          SnoopMCP re-resolves it by locator, or returns `UiaElementStale`/`UiaAmbiguousLocator` — re-find in that case.
-        - The UIA tools deliberately use two argument shapes, not one: `findUiaElement`/`waitForUia` take a flat
-          `pid`/`by`/`value` locator because there is no reference yet; `invokeUia`/`setUiaValue`/`getUiaTree`
-          take an `element`/`fromElement` reference object (handle + locator fallback) because there is. This is
-          an accepted design decision, not an inconsistency — don't flatten the reference calls or wrap the
-          locator calls to make them match.
-        - Endpoint: http://127.0.0.1:6300/mcp. Start the SnoopMCP host (tray app) first.
-        """;
-
-    /// <summary>The skills installed for Claude Code, as (directory-name, body) pairs.</summary>
+    /// <summary>Canonical repository files embedded at build time without duplicated instructions.</summary>
     public static IReadOnlyList<(string Name, string Body)> Definitions { get; } =
-    [
-        (FirstSkillName, FirstSkillBody),
-        (UiaSkillName, UiaSkillBody)
-    ];
+        [(FirstSkillName, ReadResource(FirstSkillName)), (UiaSkillName, ReadResource(UiaSkillName))];
 
-    /// <summary>Writes all registered skills under <paramref name="skillsDir"/>. Returns false if any write fails.</summary>
-    /// <param name="skillsDir">The Claude Code skills directory (e.g. <c>~/.claude/skills</c>).</param>
-    public static bool Install(string skillsDir)
+    /// <summary>The documented shared user skill location for Codex and compatible local clients.</summary>
+    public static string SharedUserDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), AgentsDirectoryName, SkillsDirectoryName);
+
+    /// <summary>Installs or upgrades owned, unedited skills. Conflicts are preserved and return false.</summary>
+    public static bool Install(string skillsDir, string owner = DefaultOwner)
     {
         ArgumentException.ThrowIfNullOrEmpty(skillsDir);
+        ArgumentException.ThrowIfNullOrEmpty(owner);
+        return Apply(skillsDir, (dir, name, body) => InstallOne(dir, name, body, owner));
+    }
+
+    /// <summary>Removes ownership; only unedited owned files are deleted for the last client.</summary>
+    public static bool Remove(string skillsDir, string owner = DefaultOwner)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(skillsDir);
+        ArgumentException.ThrowIfNullOrEmpty(owner);
+        return Apply(skillsDir, (dir, _, _) => RemoveOne(dir, owner));
+    }
+
+    private static bool Apply(string skillsDir, Func<string, string, string, bool> action)
+    {
+        string lockName = MutexPrefix + Hash(Path.GetFullPath(skillsDir).ToUpperInvariant());
+        using var mutex = new Mutex(false, lockName);
+        bool acquired;
+        try
+        {
+            acquired = mutex.WaitOne(smLockTimeout);
+        }
+        catch (AbandonedMutexException)
+        {
+            acquired = true;
+        }
+        bool ok = false;
+        try
+        {
+            if (acquired)
+            {
+                ok = ApplyCore(skillsDir, action);
+            }
+        }
+        finally
+        {
+            if (acquired)
+            {
+                mutex.ReleaseMutex();
+            }
+        }
+        return ok;
+    }
+
+    private static bool ApplyCore(string skillsDir, Func<string, string, string, bool> action)
+    {
         bool ok = true;
         foreach ((string name, string body) in Definitions)
         {
             try
             {
                 string dir = Path.Combine(skillsDir, name);
-                Directory.CreateDirectory(dir);
-                File.WriteAllText(Path.Combine(dir, SkillFileName), body);
+                EnsureNotLinked(dir);
+                ok = action(dir, name, body) && ok;
             }
-            catch (IOException)
-            {
-                ok = false;
-            }
-            catch (UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
             {
                 ok = false;
             }
@@ -204,31 +102,103 @@ public static class SnoopSkill
         return ok;
     }
 
-    /// <summary>Removes all registered skill directories if present. Returns false if any removal fails.</summary>
-    /// <param name="skillsDir">The Claude Code skills directory (e.g. <c>~/.claude/skills</c>).</param>
-    public static bool Remove(string skillsDir)
+    private static bool InstallOne(string dir, string name, string body, string owner)
     {
-        ArgumentException.ThrowIfNullOrEmpty(skillsDir);
-        bool ok = true;
-        foreach ((string name, _) in Definitions)
+        string path = Path.Combine(dir, SkillFileName);
+        string receiptPath = Path.Combine(dir, ReceiptFileName);
+        EnsureNotLinked(path);
+        EnsureNotLinked(receiptPath);
+        SkillReceipt? receipt = ReadReceipt(receiptPath);
+        bool exists = File.Exists(path);
+        string? currentHash = exists ? Hash(File.ReadAllText(path)) : null;
+        bool legacy = exists && receipt is null && owner == DefaultOwner && IsLegacy(name, path);
+        bool ok = !exists || (receipt is not null && receipt.Hashes.Contains(currentHash ?? string.Empty)) || legacy;
+        if (ok)
         {
-            string dir = Path.Combine(skillsDir, name);
-            if (Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+            receipt ??= new SkillReceipt();
+            receipt.Owners.Add(owner);
+            // Record both versions before replacing the body so an interrupted upgrade can be retried.
+            receipt.Hashes = currentHash is null ? [Hash(body)] : [currentHash, Hash(body)];
+            AtomicFile.Write(receiptPath, JsonSerializer.Serialize(receipt));
+            AtomicFile.Write(path, body);
+            receipt.Hashes = [Hash(body)];
+            AtomicFile.Write(receiptPath, JsonSerializer.Serialize(receipt));
+        }
+        return ok;
+    }
+
+    private static bool RemoveOne(string dir, string owner)
+    {
+        string path = Path.Combine(dir, SkillFileName);
+        string receiptPath = Path.Combine(dir, ReceiptFileName);
+        EnsureNotLinked(path);
+        EnsureNotLinked(receiptPath);
+        SkillReceipt? receipt = ReadReceipt(receiptPath);
+        if (receipt is not null && receipt.Owners.Remove(owner))
+        {
+            if (receipt.Owners.Count > 0)
             {
-                try
+                AtomicFile.Write(receiptPath, JsonSerializer.Serialize(receipt));
+            }
+            else
+            {
+                if (File.Exists(path) && receipt.Hashes.Contains(Hash(File.ReadAllText(path))))
                 {
-                    Directory.Delete(dir, recursive: true);
+                    File.Delete(path);
                 }
-                catch (IOException)
+                File.Delete(receiptPath);
+                if (!Directory.EnumerateFileSystemEntries(dir).Any())
                 {
-                    ok = false;
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    ok = false;
+                    Directory.Delete(dir);
                 }
             }
         }
-        return ok;
+        return true;
+    }
+
+    private static SkillReceipt? ReadReceipt(string path)
+    {
+        SkillReceipt? result = null;
+        if (File.Exists(path))
+        {
+            result = JsonSerializer.Deserialize<SkillReceipt>(File.ReadAllText(path));
+            if (result is null || result.Version != 1 || result.Owners is null || result.Hashes is null)
+            {
+                throw new JsonException("Unrecognized SnoopMCP skill ownership record; preserved.");
+            }
+        }
+        return result;
+    }
+
+    private static bool IsLegacy(string name, string path)
+    {
+        string normalized = File.ReadAllText(path).ReplaceLineEndings("\n").TrimEnd();
+        return Hash(normalized) == (name == FirstSkillName ? LegacyFirstHash : LegacyUiaHash);
+    }
+
+    private static string Hash(string body) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(body)));
+
+    private static string ReadResource(string name)
+    {
+        using Stream stream = typeof(SnoopSkill).Assembly.GetManifestResourceStream(name)
+            ?? throw new InvalidOperationException($"Missing canonical skill resource: {name}");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    private static void EnsureNotLinked(string path)
+    {
+        string? current = Path.GetFullPath(path);
+        while (current is not null)
+        {
+            if (new FileInfo(current).LinkTarget is not null
+                || ((File.Exists(current) || Directory.Exists(current))
+                    && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0))
+            {
+                throw new IOException($"Linked skill path is not installer-owned: {current}");
+            }
+            current = Path.GetDirectoryName(current);
+        }
     }
 }

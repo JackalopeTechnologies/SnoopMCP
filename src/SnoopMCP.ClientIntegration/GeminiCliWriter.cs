@@ -20,8 +20,10 @@ public sealed class GeminiCliWriter : JsonMcpServerWriter
     /// <summary>Initialises the writer against explicit paths (used by tests).</summary>
     /// <param name="configPath">Absolute path to Gemini CLI's <c>settings.json</c>.</param>
     /// <param name="detectionPath">Directory whose existence means Gemini CLI is installed.</param>
-    public GeminiCliWriter(string configPath, string detectionPath)
-        : base(configPath, ServersKey, detectionPath, urlKey: HttpUrlKey, emitType: false)
+    /// <param name="skillsDir">Skill discovery directory.</param>
+    public GeminiCliWriter(string configPath, string detectionPath, string? skillsDir = null)
+        : base(configPath, ServersKey, detectionPath, urlKey: HttpUrlKey, emitType: false,
+            skillsDir: skillsDir ?? Path.Combine(detectionPath, SnoopSkill.SkillsDirectoryName))
     {
     }
 
@@ -33,6 +35,6 @@ public sealed class GeminiCliWriter : JsonMcpServerWriter
     {
         string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string dir = Path.Combine(profile, GeminiDirName);
-        return new GeminiCliWriter(Path.Combine(dir, ConfigFileName), dir);
+        return new GeminiCliWriter(Path.Combine(dir, ConfigFileName), dir, SnoopSkill.SharedUserDirectory);
     }
 }

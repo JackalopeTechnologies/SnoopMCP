@@ -33,5 +33,8 @@ public enum McpClient
     Windsurf,
 
     /// <summary>Visual Studio 2022 (<c>~/.mcp.json</c>).</summary>
-    VisualStudio2022
+    VisualStudio2022,
+
+    /// <summary>Grok Build (<c>~/.grok/config.toml</c>).</summary>
+    GrokBuild
 }

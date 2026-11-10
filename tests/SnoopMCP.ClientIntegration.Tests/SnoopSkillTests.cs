@@ -6,12 +6,16 @@
 namespace SnoopMCP.ClientIntegration.Tests;
 
 using ClientIntegration;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Xunit;
 
 /// <summary>Tests for <see cref="SnoopSkill"/> installing/removing the SnoopMCP skills.</summary>
 public sealed class SnoopSkillTests : IDisposable
 {
     private const string SolutionFileName = "SnoopMCP.sln";
+    private static readonly string[] smCodexOwners = ["Codex"];
 
     private readonly string mDir;
 
@@ -77,6 +81,116 @@ public sealed class SnoopSkillTests : IDisposable
 
         Assert.True(File.Exists(Path.Combine(skillsDir, "snoopmcp-first", "SKILL.md")));
         Assert.True(File.Exists(Path.Combine(skillsDir, "snoopmcp-uia", "SKILL.md")));
+    }
+
+    [Fact]
+    public void Remove_PreservesAddedFilesAndUnrelatedSkills()
+    {
+        Assert.True(SnoopSkill.Install(mDir));
+        string added = Path.Combine(mDir, SnoopSkill.FirstSkillName, "notes.txt");
+        string other = Path.Combine(mDir, "other", "SKILL.md");
+        Directory.CreateDirectory(Path.GetDirectoryName(other) ?? throw new InvalidOperationException());
+        File.WriteAllText(added, "personal notes");
+        File.WriteAllText(other, "other skill");
+        Assert.True(SnoopSkill.Remove(mDir));
+        Assert.Equal("personal notes", File.ReadAllText(added));
+        Assert.Equal("other skill", File.ReadAllText(other));
+        Assert.False(File.Exists(Path.Combine(mDir, SnoopSkill.FirstSkillName, "SKILL.md")));
+    }
+
+    [Fact]
+    public void InstallAndRemove_PreserveUserEdits()
+    {
+        Assert.True(SnoopSkill.Install(mDir));
+        string path = Path.Combine(mDir, SnoopSkill.FirstSkillName, "SKILL.md");
+        File.AppendAllText(path, "\nMy local addition");
+        string edited = File.ReadAllText(path);
+        Assert.False(SnoopSkill.Install(mDir));
+        Assert.Equal(edited, File.ReadAllText(path));
+        Assert.True(SnoopSkill.Remove(mDir));
+        Assert.Equal(edited, File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void SharedSkills_AreRemovedOnlyAfterLastRegisteredClient()
+    {
+        Assert.True(SnoopSkill.Install(mDir, "Codex"));
+        Assert.True(SnoopSkill.Install(mDir, "Cursor"));
+        Assert.True(SnoopSkill.Install(mDir, "Cursor"));
+        Assert.True(SnoopSkill.Remove(mDir, "Codex"));
+        Assert.True(SnoopSkill.Remove(mDir, "Grok Build"));
+        Assert.True(File.Exists(Path.Combine(mDir, SnoopSkill.FirstSkillName, "SKILL.md")));
+        Assert.True(SnoopSkill.Remove(mDir, "Cursor"));
+        Assert.False(Directory.Exists(Path.Combine(mDir, SnoopSkill.FirstSkillName)));
+    }
+
+    [Fact]
+    public async Task ConcurrentClients_DoNotLoseOwnership()
+    {
+        bool[] installed = await Task.WhenAll(
+            Task.Run(() => SnoopSkill.Install(mDir, "Codex")),
+            Task.Run(() => SnoopSkill.Install(mDir, "Cursor")));
+        Assert.All(installed, Assert.True);
+        Assert.True(SnoopSkill.Remove(mDir, "Codex"));
+        Assert.True(File.Exists(Path.Combine(mDir, SnoopSkill.FirstSkillName, "SKILL.md")));
+        Assert.True(SnoopSkill.Remove(mDir, "Cursor"));
+        Assert.False(Directory.Exists(Path.Combine(mDir, SnoopSkill.FirstSkillName)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Install_UpgradesOwnedOlderOrInterruptedInstallation(bool interrupted)
+    {
+        string dir = Path.Combine(mDir, SnoopSkill.FirstSkillName);
+        Directory.CreateDirectory(dir);
+        const string OlderBody = "previous canonical release";
+        string oldHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(OlderBody)));
+        string currentBody = SnoopSkill.Definitions[0].Body;
+        string newHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(currentBody)));
+        File.WriteAllText(Path.Combine(dir, "SKILL.md"), interrupted ? currentBody : OlderBody);
+        File.WriteAllText(Path.Combine(dir, ".snoopmcp-install.json"), JsonSerializer.Serialize(new
+        {
+            Version = 1, Owners = smCodexOwners, Hashes = new[] { oldHash, newHash }
+        }));
+        Assert.True(SnoopSkill.Install(mDir, "Codex"));
+        Assert.Equal(currentBody, File.ReadAllText(Path.Combine(dir, "SKILL.md")));
+        Assert.True(SnoopSkill.Remove(mDir, "Codex"));
+        Assert.False(Directory.Exists(dir));
+    }
+
+    [Fact]
+    public void UnownedIdenticalSkill_IsNotClaimedOrDeleted()
+    {
+        string dir = Path.Combine(mDir, SnoopSkill.FirstSkillName);
+        Directory.CreateDirectory(dir);
+        string path = Path.Combine(dir, "SKILL.md");
+        File.WriteAllText(path, SnoopSkill.Definitions[0].Body);
+        Assert.False(SnoopSkill.Install(mDir, "Codex"));
+        Assert.True(SnoopSkill.Remove(mDir, "Codex"));
+        Assert.True(File.Exists(path));
+        Assert.False(File.Exists(Path.Combine(dir, ".snoopmcp-install.json")));
+    }
+
+    [Fact]
+    public void CorruptOwnershipRecord_PreservesFilesAndReportsFailure()
+    {
+        Assert.True(SnoopSkill.Install(mDir));
+        string marker = Path.Combine(mDir, SnoopSkill.FirstSkillName, ".snoopmcp-install.json");
+        File.WriteAllText(marker, "invalid");
+        Assert.False(SnoopSkill.Install(mDir));
+        Assert.False(SnoopSkill.Remove(mDir));
+        Assert.Equal("invalid", File.ReadAllText(marker));
+        Assert.True(File.Exists(Path.Combine(mDir, SnoopSkill.FirstSkillName, "SKILL.md")));
+    }
+
+    [Fact]
+    public void UnwritableDestination_ReturnsFailureWithoutDeletingOtherFiles()
+    {
+        string blocker = Path.Combine(mDir, SnoopSkill.FirstSkillName);
+        File.WriteAllText(blocker, "occupied");
+        Assert.False(SnoopSkill.Install(mDir));
+        Assert.Equal("occupied", File.ReadAllText(blocker));
     }
 
     /// <summary>

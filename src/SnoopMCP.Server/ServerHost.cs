@@ -8,8 +8,10 @@ namespace SnoopMCP.Host;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.AspNetCore;
 using ModelContextProtocol.Protocol;
 using Automation;
+using Guidance;
 using Logging;
 using Tools;
 
@@ -67,6 +69,7 @@ public static class ServerHost
                     Name = ServerName,
                     Version = ThisAssembly.InformationalVersion
                 };
+                options.ServerInstructions = SkillResources.Instructions;
 
                 // Give every failure a typed, self-describing message. Without this the SDK replaces
                 // anything that is not an McpException with "An error occurred invoking '…'", leaving
@@ -74,8 +77,9 @@ public static class ServerHost
                 // failures, which occur outside any tool body and so cannot be caught within one.
                 options.Filters.Request.CallToolFilters.Add(ToolErrorFilter.Create());
             })
-            .WithHttpTransport(transport => transport.Stateless = true)
-            .WithToolsFromAssembly(typeof(McpTools).Assembly);
+            .WithHttpTransport(transport => transport.SessionMode = HttpServerSessionMode.Stateless)
+            .WithToolsFromAssembly(typeof(McpTools).Assembly)
+            .WithResources<SkillResources>();
 
         WebApplication app = builder.Build();
 

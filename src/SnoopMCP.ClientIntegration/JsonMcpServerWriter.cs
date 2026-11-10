@@ -18,6 +18,7 @@ using System.Text.Json.Nodes;
 /// </summary>
 public abstract class JsonMcpServerWriter : IClientWriter
 {
+    private const string SkillsRemovalFailed = " Skill cleanup failed; files were preserved.";
     /// <summary>Conventional <c>type</c> field name.</summary>
     protected const string TypeKey = "type";
 
@@ -28,6 +29,7 @@ public abstract class JsonMcpServerWriter : IClientWriter
     private static readonly UTF8Encoding smNoBomUtf8 = new(encoderShouldEmitUTF8Identifier: false);
 
     private readonly string mConfigPath;
+    private readonly string? mSkillsDir;
     private readonly string mServersKey;
     private readonly string mUrlKey;
     private readonly bool mEmitType;
@@ -44,19 +46,22 @@ public abstract class JsonMcpServerWriter : IClientWriter
     /// Value for <c>type</c> when <paramref name="emitType"/> is true and this is non-null; otherwise
     /// the endpoint's own <see cref="McpEndpoint.Type"/> is used.
     /// </param>
+    /// <param name="skillsDir">Optional canonical skill discovery directory.</param>
     protected JsonMcpServerWriter(
         string configPath,
         string serversKey,
         string detectionPath,
         string urlKey = DefaultUrlKey,
         bool emitType = true,
-        string? serverType = null)
+        string? serverType = null,
+        string? skillsDir = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(configPath);
         ArgumentException.ThrowIfNullOrEmpty(serversKey);
         ArgumentException.ThrowIfNullOrEmpty(detectionPath);
         ArgumentException.ThrowIfNullOrEmpty(urlKey);
         mConfigPath = configPath;
+        mSkillsDir = skillsDir;
         mServersKey = serversKey;
         mDetectionPath = detectionPath;
         mUrlKey = urlKey;
@@ -85,19 +90,51 @@ public abstract class JsonMcpServerWriter : IClientWriter
         {
             JsonObject root = LoadOrCreateRoot();
             JsonObject servers = GetOrAddObject(root, mServersKey);
-            servers[endpoint.Name] = BuildEntry(endpoint);
+            JsonObject proposed = BuildEntry(endpoint);
+            JsonObject entry = GetOrAddObject(servers, endpoint.Name);
+            foreach ((string key, JsonNode? value) in proposed)
+            {
+                if (key == mUrlKey || !entry.ContainsKey(key))
+                {
+                    entry[key] = value?.DeepClone();
+                }
+            }
             WriteAtomic(root);
-            result = new RegisterResult(true, $"Registered '{endpoint.Name}' in {ClientName}.");
+            bool skills = mSkillsDir is null || SnoopSkill.Install(mSkillsDir, ClientName);
+            result = new RegisterResult(skills, $"Registered '{endpoint.Name}' in {ClientName}."
+                + (mSkillsDir is null ? string.Empty : skills
+                    ? $" Installed SnoopMCP skills in {mSkillsDir}. Refresh the client connection; restart if needed."
+                    : $" Skills incomplete in {mSkillsDir}: existing edits, linked paths, or write errors were preserved."));
         }
         catch (JsonException ex)
         {
             result = new RegisterResult(false, $"{ClientName} config is not valid JSON: {ex.Message}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            result = new RegisterResult(false, $"{ClientName}: {ex.Message}");
         }
         return result;
     }
 
     /// <inheritdoc />
     public virtual UnregisterResult Unregister()
+    {
+        UnregisterResult result;
+        try
+        {
+            result = RemoveConnection();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            result = new UnregisterResult(false, $"{ClientName}: {ex.Message}");
+        }
+        bool skills = mSkillsDir is null || SnoopSkill.Remove(mSkillsDir, ClientName);
+        return new UnregisterResult(result.Success && skills, result.Message
+            + (skills ? string.Empty : SkillsRemovalFailed));
+    }
+
+    private UnregisterResult RemoveConnection()
     {
         UnregisterResult result;
         if (!File.Exists(mConfigPath))
@@ -110,6 +147,8 @@ public abstract class JsonMcpServerWriter : IClientWriter
             {
                 JsonObject root = LoadRoot();
                 bool removed = root[mServersKey] is JsonObject servers
+                    && servers[McpEndpoint.Default.Name] is JsonObject entry
+                    && EntryMatches(entry)
                     && servers.Remove(McpEndpoint.Default.Name);
                 if (removed)
                 {
@@ -192,6 +231,10 @@ public abstract class JsonMcpServerWriter : IClientWriter
         }
         else
         {
+            if (parent.ContainsKey(key))
+            {
+                throw new JsonException($"Expected object '{key}'; existing value was preserved.");
+            }
             child = new JsonObject();
             parent[key] = child;
         }

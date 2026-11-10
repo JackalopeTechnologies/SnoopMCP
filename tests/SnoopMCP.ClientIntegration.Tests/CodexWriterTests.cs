@@ -31,7 +31,7 @@ public sealed class CodexWriterTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private TomlTable ReadConfig() => Toml.ToModel(File.ReadAllText(mConfigPath));
+    private TomlTable ReadConfig() => TomlSerializer.Deserialize<TomlTable>(File.ReadAllText(mConfigPath))!;
 
     private static TomlTable Servers(TomlTable root) => (TomlTable)root["mcp_servers"];
 
@@ -49,15 +49,14 @@ public sealed class CodexWriterTests : IDisposable
     }
 
     [Fact]
-    public void Register_EnablesRmcpFeatureFlag()
+    public void Register_DoesNotAddExperimentalFeatureFlags()
     {
         var writer = new CodexWriter(mConfigPath, mDir);
 
         writer.Register(McpEndpoint.Default);
 
         TomlTable root = ReadConfig();
-        var features = (TomlTable)root["features"];
-        Assert.True((bool)features["experimental_use_rmcp_client"]);
+        Assert.False(root.ContainsKey("features"));
     }
 
     [Fact]
@@ -174,13 +173,131 @@ public sealed class CodexWriterTests : IDisposable
     [Fact]
     public void Register_OnModelConflict_FailsWithoutThrowing()
     {
-        File.WriteAllText(mConfigPath,
-            "[mcp_servers]\nsnoopmcp = \"not-a-table\"\n\n[mcp_servers.snoopmcp]\nurl = \"http://y\"\n");
+        const string Original = "[mcp_servers]\nsnoopmcp = \"not-a-table\"\n\n[mcp_servers.snoopmcp]\nurl = \"http://y\"\n";
+        File.WriteAllText(mConfigPath, Original);
         var writer = new CodexWriter(mConfigPath, mDir);
 
         RegisterResult result = writer.Register(McpEndpoint.Default);
 
         Assert.False(result.Success);
         Assert.False(writer.GetStatus().IsRegistered);
+        Assert.Equal(Original, File.ReadAllText(mConfigPath));
+    }
+
+    [Fact]
+    public void RegisterAndUnregister_PreserveCommentsQuotedKeysArraysAndValues()
+    {
+        const string Original = """
+            # Developer's model preference
+            model = "my-model" # Keep this explanation
+            reminder = "control: \u001B"
+            literal = 'text: \x1B and \e'
+            updated = 2026-10-24T12:30:00Z
+            [projects.'E:\My.Project']
+            trust_level = "trusted"
+            [mcp_servers.other]
+            url = "http://other/mcp"
+            # Only these tools are permitted
+            enabled_tools = ["inspect_binding", "describe_element"]
+            [[skills.config]]
+            path = 'E:\My Skills\SKILL.md'
+            enabled = false
+            """;
+        File.WriteAllText(mConfigPath, Original);
+        var writer = new CodexWriter(mConfigPath, mDir);
+        RegisterResult registration = writer.Register(McpEndpoint.Default);
+        Assert.True(registration.Success, registration.Message);
+        string registered = File.ReadAllText(mConfigPath);
+        Assert.True(writer.Register(McpEndpoint.Default).Success);
+        Assert.Equal(registered, File.ReadAllText(mConfigPath));
+        Assert.True(writer.Unregister().Success);
+
+        string final = File.ReadAllText(mConfigPath);
+        Assert.Contains("# Developer's model preference", final);
+        Assert.Contains("# Keep this explanation", final);
+        Assert.Contains("# Only these tools are permitted", final);
+        Assert.Contains("\\u001B", final);
+        TomlTable root = ReadConfig();
+        Assert.Equal("my-model", root["model"]);
+        Assert.Equal("control: \u001B", root["reminder"]);
+        Assert.Equal(@"text: \x1B and \e", root["literal"]);
+        Assert.Equal(TomlSerializer.Deserialize<TomlTable>(Original)!["updated"], root["updated"]);
+        Assert.Equal("trusted", ((TomlTable)((TomlTable)root["projects"])[@"E:\My.Project"])["trust_level"]);
+        var other = (TomlTable)Servers(root)["other"];
+        Assert.Equal(new object[] { "inspect_binding", "describe_element" }, (TomlArray)other["enabled_tools"]);
+        var skill = ((TomlTableArray)((TomlTable)root["skills"])["config"])[0];
+        Assert.Equal(@"E:\My Skills\SKILL.md", skill["path"]);
+        Assert.False((bool)skill["enabled"]);
+        Assert.False(Servers(root).ContainsKey("snoopmcp"));
+    }
+
+    [Fact]
+    public void Register_InstallsCanonicalSkillsAndPreservesPoliciesOnRepeat()
+    {
+        File.WriteAllText(mConfigPath, """
+            model = "my-model"
+            [features]
+            experimental_use_rmcp_client = false
+            [mcp_servers.snoopmcp]
+            url = "http://127.0.0.1:6300/mcp"
+            enabled = false
+            enabled_tools = ["inspect_binding"]
+            disabled_tools = ["execute_command"]
+            tool_timeout_sec = 120
+            [mcp_servers.snoopmcp.tools.inspect_binding]
+            approval_mode = "prompt"
+            [[skills.config]]
+            path = "custom/SKILL.md"
+            enabled = false
+            """);
+        var writer = new CodexWriter(mConfigPath, mDir);
+        Assert.True(writer.Register(McpEndpoint.Default).Success);
+        string first = File.ReadAllText(mConfigPath);
+        Assert.True(writer.Register(McpEndpoint.Default).Success);
+        Assert.Equal(first, File.ReadAllText(mConfigPath));
+        var entry = (TomlTable)Servers(ReadConfig())["snoopmcp"];
+        Assert.False((bool)entry["enabled"]);
+        Assert.Equal(120L, entry["tool_timeout_sec"]);
+        Assert.False((bool)((TomlTable)ReadConfig()["features"])["experimental_use_rmcp_client"]);
+        Assert.Contains("approval_mode = \"prompt\"", first);
+        Assert.Contains("custom/SKILL.md", first);
+        foreach ((string name, string body) in SnoopSkill.Definitions)
+        {
+            Assert.Equal(body, File.ReadAllText(Path.Combine(mDir, "skills", name, "SKILL.md")));
+        }
+    }
+
+    [Fact]
+    public void Unregister_WithoutConfig_StillRemovesOwnedSkills()
+    {
+        var writer = new CodexWriter(mConfigPath, mDir);
+        Assert.True(writer.Register(McpEndpoint.Default).Success);
+        File.Delete(mConfigPath);
+        Assert.True(writer.Unregister().Success);
+        Assert.False(File.Exists(Path.Combine(mDir, "skills", SnoopSkill.FirstSkillName, "SKILL.md")));
+        Assert.True(writer.Unregister().Success);
+    }
+
+    [Fact]
+    public void Register_SkillConflictReportsPartialFailureAndPreservesContent()
+    {
+        string skill = Path.Combine(mDir, "skills", SnoopSkill.FirstSkillName, "SKILL.md");
+        Directory.CreateDirectory(Path.GetDirectoryName(skill) ?? throw new InvalidOperationException());
+        File.WriteAllText(skill, "My custom guidance");
+        var writer = new CodexWriter(mConfigPath, mDir);
+        Assert.False(writer.Register(McpEndpoint.Default).Success);
+        Assert.True(writer.GetStatus().IsRegistered);
+        Assert.Equal("My custom guidance", File.ReadAllText(skill));
+        Assert.True(writer.Unregister().Success);
+        Assert.Equal("My custom guidance", File.ReadAllText(skill));
+    }
+
+    [Fact]
+    public void Unregister_PreservesReplacementServer()
+    {
+        File.WriteAllText(mConfigPath, "[mcp_servers.snoopmcp]\nurl = \"https://my-server/mcp\"\n");
+        var writer = new CodexWriter(mConfigPath, mDir);
+        Assert.True(writer.Unregister().Success);
+        Assert.Equal("https://my-server/mcp", EntryUrl(ReadConfig(), "snoopmcp"));
     }
 }

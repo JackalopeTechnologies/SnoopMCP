@@ -50,29 +50,23 @@ public sealed class ClaudeCodePermissionsTests : IDisposable
     }
 
     [Fact]
-    public void Register_AddsWholeServerPermission()
+    public void Register_DoesNotGrantPermissions()
     {
         var writer = new ClaudeCodeWriter(mConfigPath, mSettingsPath, mSkillsDir);
 
         writer.Register(McpEndpoint.Default);
 
-        using var doc = JsonDocument.Parse(File.ReadAllText(mSettingsPath));
-        JsonElement allow = doc.RootElement.GetProperty("permissions").GetProperty("allow");
-        bool found = allow.EnumerateArray().Any(e => e.GetString() == "mcp__snoopmcp");
-        Assert.True(found);
+        Assert.False(File.Exists(mSettingsPath));
     }
 
     [Fact]
-    public void Register_PermissionsAreIdempotent()
+    public void Register_RepeatDoesNotCreateSettings()
     {
         var writer = new ClaudeCodeWriter(mConfigPath, mSettingsPath, mSkillsDir);
         writer.Register(McpEndpoint.Default);
         writer.Register(McpEndpoint.Default);
 
-        using var doc = JsonDocument.Parse(File.ReadAllText(mSettingsPath));
-        JsonElement allow = doc.RootElement.GetProperty("permissions").GetProperty("allow");
-        int count = allow.EnumerateArray().Count(e => e.GetString() == "mcp__snoopmcp");
-        Assert.Equal(1, count);
+        Assert.False(File.Exists(mSettingsPath));
     }
 
     [Fact]
@@ -98,12 +92,15 @@ public sealed class ClaudeCodePermissionsTests : IDisposable
         JsonElement allow = doc.RootElement.GetProperty("permissions").GetProperty("allow");
         var values = allow.EnumerateArray().Select(e => e.GetString()).ToList();
         Assert.Contains("Bash(ls:*)", values);
-        Assert.Contains("mcp__snoopmcp", values);
+        Assert.DoesNotContain("mcp__snoopmcp", values);
     }
 
     [Fact]
-    public void Unregister_RemovesPermissionAndSkill()
+    public void Unregister_PreservesExistingPermissionAndRemovesOwnedSkill()
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(mSettingsPath) ?? throw new InvalidOperationException());
+        const string Settings = """{ "permissions": { "allow": ["mcp__snoopmcp"], "deny": ["Bash(*)"] } }""";
+        File.WriteAllText(mSettingsPath, Settings);
         var writer = new ClaudeCodeWriter(mConfigPath, mSettingsPath, mSkillsDir);
         writer.Register(McpEndpoint.Default);
 
@@ -111,7 +108,8 @@ public sealed class ClaudeCodePermissionsTests : IDisposable
 
         using var doc = JsonDocument.Parse(File.ReadAllText(mSettingsPath));
         JsonElement allow = doc.RootElement.GetProperty("permissions").GetProperty("allow");
-        Assert.DoesNotContain(allow.EnumerateArray().Select(e => e.GetString()), s => s == "mcp__snoopmcp");
+        Assert.Contains(allow.EnumerateArray().Select(e => e.GetString()), s => s == "mcp__snoopmcp");
+        Assert.Equal(Settings, File.ReadAllText(mSettingsPath));
         Assert.False(Directory.Exists(Path.Combine(mSkillsDir, "snoopmcp-first")));
     }
 }

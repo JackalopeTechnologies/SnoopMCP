@@ -32,6 +32,9 @@ internal static class HostLog
     private static readonly object smGate = new();
     private static readonly string smLogPath = BuildLogPath();
 
+    /// <summary>Directory containing host and server diagnostics.</summary>
+    internal static string DirectoryPath => Path.GetDirectoryName(smLogPath) ?? AppContext.BaseDirectory;
+
     /// <summary>Logs an informational message.</summary>
     internal static void Info(string message) => Write(LevelInfo, message, null);
 
