@@ -77,6 +77,8 @@ try {
     $running = Wait-Healthy
     $result.Health = $running.Health
     $result.HostProcess = $running.Process.Id
+    $result.HostPriorityClass = $running.Process.PriorityClass.ToString()
+    if ($result.HostPriorityClass -eq 'Idle') { throw 'The installed MCP server must not run at idle priority.' }
     for ($attempt = 1; $attempt -le 4; $attempt++) {
         # Kill only this disposable installation after checking inspection ownership and the gate.
         $health = Invoke-RestMethod 'http://127.0.0.1:6300/health' -TimeoutSec 2

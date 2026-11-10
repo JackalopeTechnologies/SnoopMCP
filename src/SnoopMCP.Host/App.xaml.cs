@@ -90,7 +90,8 @@ public partial class App
             ShowOwnedDialog,
             InteractionGate.ForCurrentUser(),
             ElevationInfo.IsElevated());
-        mTrayIcon.ForceCreate();
+        // Efficiency Mode lowers the priority of the whole process, including the HTTP server.
+        mTrayIcon.ForceCreate(enablesEfficiencyMode: false);
         RecordStartup();
         SessionEnding += OnSessionEnding;
         _ = mController.StartAsync();
