@@ -92,12 +92,12 @@ public static class ProcessEnumerator
             if (isWpfModule)
             {
                 isWpf = true;
-                framework = module.FileVersionInfo.FileVersion ?? UnknownVersion;
+                framework = ModuleFileVersion.Read(module.FileName);
             }
             bool isHostFxr = string.Equals(name, HostFxrModule, StringComparison.OrdinalIgnoreCase);
             if (isHostFxr)
             {
-                runtime = module.FileVersionInfo.FileVersion ?? UnknownVersion;
+                runtime = ModuleFileVersion.Read(module.FileName);
             }
         }
         return (isWpf, framework, runtime);

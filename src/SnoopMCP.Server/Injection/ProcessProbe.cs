@@ -103,12 +103,12 @@ public static class ProcessProbe
             bool isHostFxr = string.Equals(name, HostFxrModule, StringComparison.OrdinalIgnoreCase);
             if (isHostFxr)
             {
-                runtime = module.FileVersionInfo.FileVersion ?? UnknownVersion;
+                runtime = ModuleFileVersion.Read(module.FileName);
             }
             bool isWpf = string.Equals(name, WpfModule, StringComparison.OrdinalIgnoreCase);
             if (isWpf)
             {
-                framework = module.FileVersionInfo.FileVersion ?? UnknownVersion;
+                framework = ModuleFileVersion.Read(module.FileName);
             }
         }
         return (runtime, framework);
